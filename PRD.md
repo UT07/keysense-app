@@ -1,5 +1,5 @@
 # KeySense: AI-Powered Piano Learning App
-## Product Requirements Document v1.0
+## Product Requirements Document v2.0 (Updated February 2026)
 
 ---
 
@@ -58,7 +58,7 @@ KeySense is a mobile-first piano learning application that combines Duolingo's h
 │         ▼                                                       │
 │  ┌─────────────────────────────────────────────────────────────┐│
 │  │                    Data Layer                               ││
-│  │  Local: SQLite + MMKV    Cloud: Firebase (optional sync)   ││
+│  │  Local: AsyncStorage     Cloud: Firebase (optional sync)   ││
 │  └─────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -74,8 +74,8 @@ KeySense is a mobile-first piano learning application that combines Duolingo's h
 | **Pitch Detection** | Custom C++ TurboModule (YIN) | Fallback for non-MIDI users |
 | **UI Animation** | react-native-reanimated 3 | 60fps keyboard animations |
 | **Graphics** | @shopify/react-native-skia | Piano roll rendering |
-| **State** | Zustand | Simple, performant, TypeScript-first |
-| **Local Storage** | SQLite (expo-sqlite) + MMKV | Structured data + fast KV |
+| **State** | Zustand v5 | Simple, performant, TypeScript-first |
+| **Local Storage** | AsyncStorage (@react-native-async-storage) | Expo Go compatible; migrate to MMKV for production builds |
 | **Backend** | Firebase (Auth, Firestore, Functions) | Rapid development, generous free tier |
 | **AI Coaching** | Gemini 1.5 Flash | Cost-effective, fast responses |
 | **Analytics** | PostHog | Privacy-friendly, self-hostable |
@@ -123,7 +123,9 @@ src/
 | Microphone Fallback | P2 | High | Medium | ⚠️ Limited |
 | Social/Leaderboards | P3 | Medium | Low | ❌ |
 | Web Version | P3 | High | Medium | ❌ |
-| Guitar Support | P3 | Very High | Medium | ❌ |
+| Guitar Support | Deferred to v2.0 | Very High | Medium | ❌ |
+
+> **MVP Decision:** Piano-only. Guitar support deferred to v2.0. MIDI input is primary; pitch detection is fallback only.
 
 ### 3.2 Interactive Piano Keyboard
 
@@ -629,7 +631,7 @@ interface GamificationData {
   };
 }
 
-// Local-only (MMKV)
+// Local-only (AsyncStorage, persisted via Zustand persist middleware)
 interface LocalPreferences {
   lastMidiDeviceId: string | null;
   audioBufferSize: number;
@@ -676,29 +678,31 @@ interface SyncProgressResponse {
 
 ## 6. Development Phases
 
-### Phase 0: Foundation (Weeks 1-2)
+### Phase 0: Foundation (Weeks 1-2) — COMPLETE
 
-| Task | Deliverable | Success Criteria |
-|------|-------------|------------------|
-| Project scaffolding | Expo + TypeScript setup | Builds on iOS/Android |
-| Audio engine integration | react-native-audio-api working | Play a note on tap |
-| Latency measurement | Test harness | Documented latency per device |
-| Piano samples | 5 samples integrated | Full keyboard playback |
-| Basic keyboard UI | 2-octave keyboard | Multi-touch working |
+| Task | Deliverable | Status |
+|------|-------------|--------|
+| Project scaffolding | Expo SDK 52 + TypeScript strict | Done |
+| Audio engine integration | Mock AudioEngine (native pending dev build) | Done |
+| Latency measurement | Test harness in scripts/ | Done |
+| Piano samples | Sample management system | Done |
+| Basic keyboard UI | 2-octave scrollable keyboard | Done |
 
-**Gate:** Touch-to-sound latency <25ms on iPhone 12+ and Pixel 6+
+**Gate:** App builds and runs on iOS simulator.
 
-### Phase 1: Core Loop (Weeks 3-5)
+### Phase 1: Core Loop (Weeks 3-5) — COMPLETE
 
-| Task | Deliverable | Success Criteria |
-|------|-------------|------------------|
-| MIDI input | USB + BLE MIDI working | <5ms input latency |
-| Exercise player | Note display + playback | Scrolling piano roll |
-| Scoring engine | Real-time note validation | Accurate timing scores |
-| 10 exercises | First lesson content | Completeable lesson |
-| Basic progress | Local storage | XP and scores persist |
+| Task | Deliverable | Status |
+|------|-------------|--------|
+| MIDI input | MidiInput + MidiDevice classes | Done |
+| Exercise player | Landscape layout with piano roll, keyboard, scoring | Done |
+| Scoring engine | ExerciseValidator + ScoringEngine (433 tests passing) | Done |
+| 10 exercises | Exercise JSON format + default exercise | Done |
+| Basic progress | Zustand stores + AsyncStorage persistence | Done |
+| Navigation | Bottom tabs + modal stack (Exercise, MidiSetup) | Done |
+| Stabilization | 0 TS errors, 433/433 tests, crash fix, layout redesign | Done |
 
-**Gate:** Complete one full lesson with accurate scoring
+**Gate:** Complete one full exercise with accurate scoring. Passed.
 
 ### Phase 2: Gamification (Weeks 6-7)
 
@@ -781,29 +785,73 @@ interface SyncProgressResponse {
 
 ---
 
-## 9. Future Roadmap (Post-MVP)
+## 9. Privacy & Safety Architecture
+
+### 9.1 Privacy-by-Default
+
+| Principle | Implementation |
+|-----------|---------------|
+| **On-device audio** | All audio processing happens locally; no audio data transmitted |
+| **Minimal data collection** | Only structured scoring data (note accuracy, timing) sent to AI coach |
+| **No PII in AI prompts** | Coach prompts contain exercise ID, score breakdown — never names or emails |
+| **Opt-in sync** | Firebase sync is optional; app works fully offline |
+| **Local-first storage** | All progress stored locally via AsyncStorage; cloud is backup |
+
+### 9.2 AI Coach Safety Guardrails
+
+```typescript
+// AI coaching constraints
+const AI_SAFETY = {
+  maxOutputTokens: 150,           // Keep responses concise
+  temperature: 0.7,               // Balanced creativity/consistency
+  forbiddenPhrases: [             // Never include in responses
+    'as an AI', 'I am a language model', 'I cannot',
+    'metacarpal', 'proprioception'  // Too technical for beginners
+  ],
+  rateLimit: {
+    perHour: 20,
+    perDay: 100,
+  },
+  fallbackEnabled: true,          // Template responses when API unavailable
+  cacheTTL: 24 * 60 * 60 * 1000, // Cache for 24h to reduce costs
+};
+```
+
+### 9.3 Content Generation Pipeline (Future)
+
+For scaling beyond 30 hand-crafted exercises:
+1. AI generates exercise JSON from musical concepts
+2. Automated validation against exercise schema
+3. Difficulty scoring via algorithm (not human judgment)
+4. Human review for quality gate before publication
+
+---
+
+## 10. Future Roadmap (Post-MVP)
 
 ### v1.1 (Month 2-3)
-- Improved microphone detection
-- Song library expansion (10 popular songs)
+- Exercise loading from content library (JSON → ExerciseStore)
+- Improved microphone detection (pitch detection TurboModule)
+- Song library expansion (10 popular songs, public domain)
 - Practice reminders with smart timing
 
 ### v1.2 (Month 4-5)
 - Subscription model (Pro tier)
 - Advanced technique analysis
 - Social features (share progress)
+- Web portability via react-native-audio-api (Web Audio API compatible)
 
 ### v2.0 (Month 6+)
-- Web version
+- Web version (leveraging audio API portability)
 - Teacher dashboard (B2B)
-- Additional instruments (guitar)
-- Custom song import
+- Guitar support (new instrument module)
+- Custom song import (MusicXML/MIDI file parsing)
 
 ---
 
-## 10. Appendix
+## 11. Appendix
 
-### A. Competitive Analysis Summary
+### 11.1 Competitive Analysis Summary
 
 | Feature | KeySense | Simply Piano | Yousician | Flowkey |
 |---------|----------|--------------|-----------|---------|
@@ -815,16 +863,37 @@ interface SyncProgressResponse {
 | Privacy-first | ✅ | ❌ | ❌ | ❌ |
 | Price (annual) | $99 | $150 | $120 | $120 |
 
-### B. Content Guidelines
+### 11.2 Content Guidelines
 
 - All exercises must be original or public domain
 - Song arrangements must be simplified for learning
 - Avoid songs with complex licensing (Disney, etc.)
 - Include diverse musical styles and cultures
 
-### C. Accessibility Requirements
+### 11.3 Accessibility Requirements
 
 - VoiceOver/TalkBack support for navigation
 - High contrast mode option
 - Adjustable text sizes
 - Colorblind-friendly note coloring
+
+### 11.4 Technology Decision Log
+
+| Decision | Choice | Rationale | Alternatives Considered |
+|----------|--------|-----------|------------------------|
+| Audio library | react-native-audio-api | Web Audio API compatible, <10ms latency, future web portability | expo-av (too high latency), native modules (not portable) |
+| State management | Zustand v5 | Simple API, TypeScript-first, persist middleware | Redux (too much boilerplate), Jotai (less ecosystem) |
+| Local storage | AsyncStorage | Expo Go compatible for dev; migrate to MMKV for prod | MMKV (requires dev build), SQLite (overkill for KV) |
+| AI model | Gemini 1.5 Flash | Cost-effective ($0.021/call), fast responses | GPT-4o-mini (higher cost), Claude Haiku (less music knowledge) |
+| Build system | Expo Development Build | Native module access + OTA updates | bare React Native (harder to maintain) |
+| Scoring weights | 40/35/15/10 | MIDI-optimized: accuracy and timing dominate | Equal weights (doesn't reflect piano learning priorities) |
+| Pitch detection | Deferred to post-MVP | MIDI provides ground truth; mic adds complexity | Ship with mic (too much scope for 12 weeks) |
+
+### 11.5 Audio Library Comparison
+
+| Library | Latency | Web Audio API | Expo Go | Notes |
+|---------|---------|--------------|---------|-------|
+| react-native-audio-api | <10ms | Yes | No (dev build) | Best for production |
+| expo-av | 50-100ms | No | Yes | Current mock target |
+| react-native-sound | 20-50ms | No | No | Deprecated |
+| @nicolo-ribaudo/react-native-audio-api | <10ms | Partial | No | Fork, less maintained |

@@ -10,6 +10,7 @@ import {
   StyleSheet,
   AccessibilityInfo,
   Platform,
+  TouchableOpacity,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button } from '../../components/common/Button';
@@ -21,6 +22,7 @@ export interface ExerciseControlsProps {
   onPause: () => void;
   onRestart: () => void;
   onExit: () => void;
+  compact?: boolean;
   testID?: string;
 }
 
@@ -35,6 +37,7 @@ export const ExerciseControls: React.FC<ExerciseControlsProps> = ({
   onPause,
   onRestart,
   onExit,
+  compact = false,
   testID,
 }) => {
   const handlePlayPress = useCallback(() => {
@@ -58,6 +61,56 @@ export const ExerciseControls: React.FC<ExerciseControlsProps> = ({
   const handleExitPress = useCallback(() => {
     onExit();
   }, [onExit]);
+
+  if (compact) {
+    return (
+      <View style={styles.compactContainer} testID={testID}>
+        {!isPlaying ? (
+          <TouchableOpacity
+            onPress={handlePlayPress}
+            style={styles.compactButton}
+            testID="control-play"
+            accessibilityLabel="Play exercise"
+          >
+            <MaterialCommunityIcons name="play" size={20} color="#2196F3" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={handlePausePress}
+            style={styles.compactButton}
+            testID="control-pause"
+            accessibilityLabel={isPaused ? 'Resume' : 'Pause'}
+          >
+            <MaterialCommunityIcons
+              name={isPaused ? 'play' : 'pause'}
+              size={20}
+              color="#2196F3"
+            />
+          </TouchableOpacity>
+        )}
+
+        {isPlaying && (
+          <TouchableOpacity
+            onPress={handleRestartPress}
+            style={styles.compactButton}
+            testID="control-restart"
+            accessibilityLabel="Restart"
+          >
+            <MaterialCommunityIcons name="restart" size={20} color="#757575" />
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          onPress={handleExitPress}
+          style={styles.compactButton}
+          testID="control-exit"
+          accessibilityLabel="Exit"
+        >
+          <MaterialCommunityIcons name="close" size={20} color="#F44336" />
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container} testID={testID}>
@@ -129,6 +182,21 @@ export const ExerciseControls: React.FC<ExerciseControlsProps> = ({
 ExerciseControls.displayName = 'ExerciseControls';
 
 const styles = StyleSheet.create({
+  // Compact mode styles
+  compactContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  compactButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Full mode styles
   container: {
     gap: 12,
   },

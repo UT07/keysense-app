@@ -19,6 +19,7 @@ import {
   Animated,
   Platform,
   AccessibilityInfo,
+  InteractionManager,
 } from 'react-native';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import * as Haptics from 'expo-haptics';
@@ -33,7 +34,6 @@ import { ExerciseControls } from './ExerciseControls';
 import { HintDisplay } from './HintDisplay';
 import { CompletionModal } from './CompletionModal';
 import { CountInAnimation } from './CountInAnimation';
-import { RealTimeFeedback } from './RealTimeFeedback';
 import { ErrorDisplay } from './ErrorDisplay';
 
 export interface ExercisePlayerProps {
@@ -160,6 +160,16 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   // Animation values
   const comboScale = useRef(new Animated.Value(0)).current;
 
+  // Cleanup feedback timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (feedbackTimeoutRef.current) {
+        clearTimeout(feedbackTimeoutRef.current);
+        feedbackTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   // Derived state
   const countInComplete = currentBeat >= 0;
 
@@ -238,11 +248,14 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   const handleExit = useCallback(() => {
     stopPlayback();
     exerciseStore.clearSession();
-    if (onClose) {
-      onClose();
-    } else {
-      navigation.goBack();
-    }
+    // Defer navigation to let stopPlayback settle before unmount
+    InteractionManager.runAfterInteractions(() => {
+      if (onClose) {
+        onClose();
+      } else {
+        navigation.goBack();
+      }
+    });
   }, [stopPlayback, exerciseStore, onClose, navigation]);
 
   /**
@@ -393,49 +406,44 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         />
       )}
 
-      {/* Landscape layout: left panel (info) + center (piano roll) + right (keyboard) */}
-      <View style={styles.landscapeRow}>
-        {/* Left panel: score + hints + controls */}
-        <View style={styles.leftPanel}>
+      {/* Landscape layout: vertical stack — top bar, piano roll, keyboard */}
+      <View style={styles.mainColumn}>
+        {/* Top bar: score + hint + controls in a single compact row */}
+        <View style={styles.topBar}>
           <ScoreDisplay
             exercise={exercise}
             currentBeat={currentBeat}
             combo={comboCount}
             feedback={feedback.type}
             comboAnimValue={comboScale}
+            compact
           />
 
-          <View style={styles.hintContainer}>
-            <HintDisplay
-              hints={exercise.hints}
-              isPlaying={isPlaying}
-              countInComplete={countInComplete}
-              feedback={feedback.type}
-            />
-          </View>
+          <View style={styles.topBarDivider} />
 
-          <View style={styles.feedbackContainer}>
-            <RealTimeFeedback
-              feedback={feedback}
-              expectedNotes={expectedNotes}
-              highlightedKeys={highlightedKeys}
-            />
-          </View>
+          <HintDisplay
+            hints={exercise.hints}
+            isPlaying={isPlaying}
+            countInComplete={countInComplete}
+            feedback={feedback.type}
+            compact
+          />
 
-          <View style={styles.controlsContainer}>
-            <ExerciseControls
-              isPlaying={isPlaying}
-              isPaused={isPaused}
-              onStart={handleStart}
-              onPause={handlePause}
-              onRestart={handleRestart}
-              onExit={handleExit}
-              testID="exercise-controls"
-            />
-          </View>
+          <View style={styles.topBarDivider} />
+
+          <ExerciseControls
+            isPlaying={isPlaying}
+            isPaused={isPaused}
+            onStart={handleStart}
+            onPause={handlePause}
+            onRestart={handleRestart}
+            onExit={handleExit}
+            compact
+            testID="exercise-controls"
+          />
         </View>
 
-        {/* Center: Piano roll */}
+        {/* Center: Piano roll fills remaining vertical space */}
         <View style={styles.pianoRollContainer}>
           <PianoRoll
             notes={exercise.notes}
@@ -446,7 +454,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
           />
         </View>
 
-        {/* Right: Keyboard */}
+        {/* Bottom: Full-width keyboard */}
         <View style={styles.keyboardContainer}>
           <Keyboard
             startNote={48}
@@ -459,7 +467,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
             hapticEnabled={true}
             showLabels={false}
             scrollable={true}
-            keyHeight={120}
+            keyHeight={100}
             testID="exercise-keyboard"
           />
         </View>
@@ -497,38 +505,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
-  landscapeRow: {
+  mainColumn: {
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: 'column',
   },
-  leftPanel: {
-    width: 200,
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     backgroundColor: '#FFFFFF',
-    borderRightWidth: 1,
-    borderRightColor: '#E0E0E0',
-    padding: 8,
-    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    gap: 8,
+  },
+  topBarDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#E0E0E0',
   },
   pianoRollContainer: {
     flex: 1,
-    margin: 8,
-  },
-  feedbackContainer: {
-    flex: 1,
-    marginVertical: 4,
-  },
-  hintContainer: {
-    flex: 1,
-    marginVertical: 4,
+    margin: 4,
   },
   keyboardContainer: {
-    width: 160,
-    borderLeftWidth: 1,
-    borderLeftColor: '#E0E0E0',
+    height: 110,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
     overflow: 'hidden',
-  },
-  controlsContainer: {
-    marginTop: 4,
   },
 });
 

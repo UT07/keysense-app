@@ -69,6 +69,20 @@ export function useExercisePlayback({
   const startTimeRef = useRef(0);
   const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const activeNotesRef = useRef<Map<number, any>>(new Map());
+  const mountedRef = useRef(true);
+
+  // Track component mount lifecycle
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      // Synchronous cleanup: clear interval immediately on unmount
+      if (playbackIntervalRef.current) {
+        clearInterval(playbackIntervalRef.current);
+        playbackIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   /**
    * Initialize MIDI input
@@ -153,7 +167,7 @@ export function useExercisePlayback({
     if (!enableMidi || !isMidiReady) return;
 
     const unsubscribe = midiInput.onNoteEvent((midiEvent) => {
-      if (!isPlaying) return;
+      if (!mountedRef.current || !isPlaying) return;
 
       // Add note to played notes
       setPlayedNotes((prev) => [...prev, midiEvent]);
@@ -212,6 +226,14 @@ export function useExercisePlayback({
       Math.max(...exercise.notes.map((n) => n.startBeat + n.durationBeats)) + 1;
 
     playbackIntervalRef.current = setInterval(() => {
+      if (!mountedRef.current) {
+        if (playbackIntervalRef.current) {
+          clearInterval(playbackIntervalRef.current);
+          playbackIntervalRef.current = null;
+        }
+        return;
+      }
+
       const currentTime = Date.now();
       const elapsed = currentTime - startTimeRef.current;
 
@@ -252,6 +274,12 @@ export function useExercisePlayback({
    * Pause playback
    */
   const pausePlayback = useCallback(() => {
+    // Clear interval synchronously to prevent further state updates
+    if (playbackIntervalRef.current) {
+      clearInterval(playbackIntervalRef.current);
+      playbackIntervalRef.current = null;
+    }
+
     setIsPlaying(false);
     exerciseStore.setIsPlaying(false);
 
@@ -268,6 +296,12 @@ export function useExercisePlayback({
    * Stop playback
    */
   const stopPlayback = useCallback(() => {
+    // Clear interval synchronously to prevent further state updates
+    if (playbackIntervalRef.current) {
+      clearInterval(playbackIntervalRef.current);
+      playbackIntervalRef.current = null;
+    }
+
     setIsPlaying(false);
     setCurrentBeat(-exercise.settings.countIn);
     exerciseStore.setIsPlaying(false);
@@ -296,6 +330,14 @@ export function useExercisePlayback({
    * Handle exercise completion
    */
   const handleCompletion = useCallback(() => {
+    if (!mountedRef.current) return;
+
+    // Clear interval synchronously to prevent further state updates
+    if (playbackIntervalRef.current) {
+      clearInterval(playbackIntervalRef.current);
+      playbackIntervalRef.current = null;
+    }
+
     setIsPlaying(false);
     exerciseStore.setIsPlaying(false);
 

@@ -18,6 +18,7 @@ export interface HintDisplayProps {
   isPlaying: boolean;
   countInComplete: boolean;
   feedback: 'perfect' | 'good' | 'ok' | 'early' | 'late' | 'miss' | null;
+  compact?: boolean;
   testID?: string;
 }
 
@@ -31,6 +32,7 @@ export const HintDisplay: React.FC<HintDisplayProps> = ({
   isPlaying,
   countInComplete,
   feedback,
+  compact = false,
   testID,
 }) => {
   // Determine which hint to show
@@ -97,6 +99,25 @@ export const HintDisplay: React.FC<HintDisplayProps> = ({
     }
   }, [isPlaying, countInComplete, feedback, hints.beforeStart]);
 
+  if (compact) {
+    return (
+      <View style={styles.compactContainer} testID={testID}>
+        <MaterialCommunityIcons
+          name={currentHint.icon as any}
+          size={14}
+          color={currentHint.color}
+        />
+        <Text
+          style={styles.compactText}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {currentHint.text}
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container} testID={testID}>
       <View
@@ -125,6 +146,21 @@ export const HintDisplay: React.FC<HintDisplayProps> = ({
 HintDisplay.displayName = 'HintDisplay';
 
 const styles = StyleSheet.create({
+  // Compact mode styles
+  compactContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flex: 1,
+    paddingHorizontal: 8,
+  },
+  compactText: {
+    flex: 1,
+    fontSize: 11,
+    color: '#616161',
+    fontWeight: '500',
+  },
+  // Full mode styles
   container: {
     flex: 1,
     justifyContent: 'center',

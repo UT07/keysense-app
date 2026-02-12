@@ -255,17 +255,14 @@ firebase deploy --only functions
 
 - [PRD Section 5.3](../PRD.md#53-data-models) - Data models
 - [Firebase Schema](../agent_docs/firebase-schema.md) - Complete schema
-- [AI Coaching](../agent_docs/ai-coaching.md) - AI system details
-- [Firebase Setup](../FIREBASE_SETUP.md) - Deployment guide
-- [Team 5 Progress](../TEAM5_PROGRESS.md) - Implementation details
+- [AI Coaching](../agent_docs/ai-coaching.md) - AI coaching system details
 
 ## Support
 
 For questions about:
-- **Firebase**: Check `firebase/` directory and FIREBASE_SETUP.md
+- **Firebase**: Check `firebase/` directory and Firestore security rules
 - **AI Coaching**: Check `agent_docs/ai-coaching.md`
 - **Data Models**: Check `firestore.ts` type definitions
-- **API Contracts**: Check `TEAM5_PROGRESS.md`
 
 ---
 

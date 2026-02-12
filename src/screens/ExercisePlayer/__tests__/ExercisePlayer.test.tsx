@@ -9,6 +9,18 @@ import { ExercisePlayer } from '../ExercisePlayer';
 import type { Exercise } from '../../../core/exercises/types';
 
 // Mock dependencies
+// Mock InteractionManager.runAfterInteractions to run callbacks synchronously
+jest.mock('react-native/Libraries/Interaction/InteractionManager', () => {
+  const actual = jest.requireActual('react-native/Libraries/Interaction/InteractionManager');
+  return {
+    ...actual,
+    runAfterInteractions: jest.fn((callback: () => void) => {
+      callback();
+      return { cancel: jest.fn() };
+    }),
+  };
+});
+
 jest.mock('expo-haptics', () => ({
   impactAsync: jest.fn().mockResolvedValue(undefined),
   notificationAsync: jest.fn().mockResolvedValue(undefined),

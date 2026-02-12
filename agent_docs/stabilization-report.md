@@ -111,6 +111,44 @@
 
 ---
 
+### 5. Exercise Player Crash Fix
+
+**Root cause:** Race condition between unmount, orientation reset, and 16ms playback interval.
+
+**`src/hooks/useExercisePlayback.ts`:**
+- Added `mountedRef` to track component lifecycle
+- All interval callbacks guarded with `if (!mountedRef.current) return`
+- `stopPlayback()`, `pausePlayback()`, `handleCompletion()` now clear interval synchronously via `clearInterval()` instead of relying on useEffect cleanup
+- MIDI event subscription callback also guarded with `mountedRef`
+
+**`src/screens/ExercisePlayer/ExercisePlayer.tsx`:**
+- Added `InteractionManager.runAfterInteractions()` to defer `navigation.goBack()` in `handleExit()`
+- Added cleanup effect for `feedbackTimeoutRef` on unmount
+
+### 6. Exercise Player Layout Redesign
+
+**Problem:** 3-column row layout put keyboard in 160px right column (unusable).
+
+**New layout (vertical stack):**
+```
+┌─────────────────────────────────────────────────┐
+│ [Score] [Hint] [Play ⏸ 🔄 ✕]    ← compact bar │
+├─────────────────────────────────────────────────┤
+│         Piano Roll (flex: 1)                     │
+├─────────────────────────────────────────────────┤
+│  Full-width Keyboard (110px)   scrollable →     │
+└─────────────────────────────────────────────────┘
+```
+
+**Changes:**
+- `ScoreDisplay`, `HintDisplay`, `ExerciseControls` all gained `compact` prop
+- Layout changed from `flexDirection: 'row'` to `flexDirection: 'column'`
+- Keyboard gets full screen width (was 160px, now ~844px in landscape)
+- Removed `RealTimeFeedback` from layout (redundant with ScoreDisplay feedback badge)
+- Key height reduced from 120 to 100
+
+---
+
 ## Known Remaining Items
 
 1. **Exercise loading by ID**: `ExerciseScreen` uses a hardcoded `DEFAULT_EXERCISE`; needs to load exercises from `content/exercises/` by route param `exerciseId`
@@ -118,5 +156,6 @@
 3. **Greeting time-of-day**: HomeScreen shows "Good Evening" regardless of time
 4. **ProfileScreen settings**: "Daily Goal", "Volume", and "About" buttons don't open any settings UI yet
 5. **PlayScreen keyboard**: Shows placeholder instead of actual piano keyboard component
-6. **Audio on simulator**: Audio playback requires physical device testing
+6. **Audio on simulator**: Audio playback requires physical device testing (mock engine active)
 7. **Worker teardown warning**: Jest reports "worker process has failed to exit gracefully" (timer leak in tests, non-blocking)
+8. **Native audio engine**: Replace mock AudioEngine with react-native-audio-api (requires Expo Development Build)

@@ -19,6 +19,7 @@ export interface ScoreDisplayProps {
   combo: number;
   feedback: 'perfect' | 'good' | 'ok' | 'early' | 'late' | 'miss' | null;
   comboAnimValue: Animated.Value;
+  compact?: boolean;
   testID?: string;
 }
 
@@ -31,6 +32,7 @@ export const ScoreDisplay: React.FC<ScoreDisplayProps> = ({
   combo,
   feedback,
   comboAnimValue,
+  compact = false,
   testID,
 }) => {
   // Calculate exercise duration
@@ -83,6 +85,46 @@ export const ScoreDisplay: React.FC<ScoreDisplayProps> = ({
   const comboAnimStyle = {
     transform: [{ scale: comboAnimValue }],
   };
+
+  if (compact) {
+    return (
+      <View style={styles.compactContainer} testID={testID}>
+        <Text style={styles.compactTitle} numberOfLines={1}>
+          {exercise.metadata.title}
+        </Text>
+
+        <View style={styles.compactProgress}>
+          <View
+            style={[
+              styles.compactProgressBar,
+              { width: `${progressPercent}%` },
+            ]}
+          />
+        </View>
+
+        {combo > 0 && (
+          <Animated.View style={[styles.compactCombo, comboAnimStyle]}>
+            <Text style={styles.compactComboText}>{combo}x</Text>
+          </Animated.View>
+        )}
+
+        {feedback && (
+          <View
+            style={[
+              styles.compactFeedbackBadge,
+              { backgroundColor: getFeedbackColor() },
+            ]}
+          >
+            <Text style={styles.compactFeedbackText}>{getFeedbackText()}</Text>
+          </View>
+        )}
+
+        <Text style={styles.compactPercent}>
+          {Math.round(progressPercent)}%
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container} testID={testID}>
@@ -148,6 +190,60 @@ export const ScoreDisplay: React.FC<ScoreDisplayProps> = ({
 ScoreDisplay.displayName = 'ScoreDisplay';
 
 const styles = StyleSheet.create({
+  // Compact mode styles
+  compactContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  compactTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#212121',
+    maxWidth: 140,
+  },
+  compactProgress: {
+    flex: 1,
+    height: 4,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  compactProgressBar: {
+    height: '100%',
+    backgroundColor: '#2196F3',
+    borderRadius: 2,
+  },
+  compactCombo: {
+    backgroundColor: '#FFF3E0',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  compactComboText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FF6F00',
+  },
+  compactFeedbackBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  compactFeedbackText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  compactPercent: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#2196F3',
+    minWidth: 30,
+    textAlign: 'right',
+  },
+  // Full mode styles
   container: {
     gap: 8,
   },
