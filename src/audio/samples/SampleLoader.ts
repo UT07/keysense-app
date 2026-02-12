@@ -40,7 +40,7 @@ export class SampleLoader {
   private samples: Map<number, AudioBuffer> = new Map();
   private isLoading = false;
   private loadPromise: Promise<Map<number, AudioBuffer>> | null = null;
-  private config: Required<SampleLoaderConfig>;
+  config: Required<SampleLoaderConfig>;
 
   constructor(context: AudioContext, config: SampleLoaderConfig = {}) {
     this.context = context;

@@ -4,7 +4,7 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { MMKV } from 'react-native-mmkv';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ============================================================================
 // Type Definitions
@@ -78,13 +78,41 @@ EXAMPLES OF BAD RESPONSES:
 // Cache Configuration
 // ============================================================================
 
-const cache = new MMKV({ id: 'coach-cache' });
+const CACHE_PREFIX = 'coach-cache:';
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 interface CacheEntry {
   response: string;
   timestamp: number;
 }
+
+// AsyncStorage cache helpers
+const cache = {
+  async getString(key: string): Promise<string | undefined> {
+    const value = await AsyncStorage.getItem(CACHE_PREFIX + key);
+    return value ?? undefined;
+  },
+  async setString(key: string, value: string): Promise<void> {
+    await AsyncStorage.setItem(CACHE_PREFIX + key, value);
+  },
+  async set(key: string, value: string): Promise<void> {
+    await AsyncStorage.setItem(CACHE_PREFIX + key, value);
+  },
+  async delete(key: string): Promise<void> {
+    await AsyncStorage.removeItem(CACHE_PREFIX + key);
+  },
+  async getAllKeys(): Promise<string[]> {
+    const allKeys = await AsyncStorage.getAllKeys();
+    return allKeys.filter(k => k.startsWith(CACHE_PREFIX)).map(k => k.slice(CACHE_PREFIX.length));
+  },
+  async clearAll(): Promise<void> {
+    const allKeys = await AsyncStorage.getAllKeys();
+    const cacheKeys = allKeys.filter(k => k.startsWith(CACHE_PREFIX));
+    if (cacheKeys.length > 0) {
+      await AsyncStorage.multiRemove(cacheKeys);
+    }
+  },
+};
 
 // ============================================================================
 // Gemini Coach Service
@@ -186,8 +214,8 @@ export class GeminiCoach {
   /**
    * Get cached response if available
    */
-  private static getCachedResponse(cacheKey: string): string | null {
-    const cached = cache.getString(cacheKey);
+  private static async getCachedResponse(cacheKey: string): Promise<string | null> {
+    const cached = await cache.getString(cacheKey);
     if (!cached) {
       return null;
     }
@@ -198,9 +226,9 @@ export class GeminiCoach {
         return entry.response;
       }
       // Cache expired, delete it
-      cache.delete(cacheKey);
+      await cache.delete(cacheKey);
     } catch {
-      cache.delete(cacheKey);
+      await cache.delete(cacheKey);
     }
 
     return null;
@@ -209,12 +237,12 @@ export class GeminiCoach {
   /**
    * Cache response with timestamp
    */
-  private static cacheResponse(cacheKey: string, response: string): void {
+  private static async cacheResponse(cacheKey: string, response: string): Promise<void> {
     const entry: CacheEntry = {
       response,
       timestamp: Date.now(),
     };
-    cache.set(cacheKey, JSON.stringify(entry));
+    await cache.set(cacheKey, JSON.stringify(entry));
   }
 
   /**
@@ -224,7 +252,7 @@ export class GeminiCoach {
     const cacheKey = this.getCacheKey(request);
 
     // Check cache first
-    const cached = this.getCachedResponse(cacheKey);
+    const cached = await this.getCachedResponse(cacheKey);
     if (cached) {
       return cached;
     }
@@ -254,7 +282,7 @@ export class GeminiCoach {
       }
 
       // Cache successful response
-      this.cacheResponse(cacheKey, text);
+      await this.cacheResponse(cacheKey, text);
 
       return text;
     } catch (error) {
@@ -327,11 +355,11 @@ export class GeminiCoach {
   /**
    * Clear cache for a specific exercise (admin use)
    */
-  static clearExerciseCache(exerciseId: string): void {
-    const keys = cache.getAllKeys();
+  static async clearExerciseCache(exerciseId: string): Promise<void> {
+    const keys = await cache.getAllKeys();
     for (const key of keys) {
       if (key.startsWith(`coach:${exerciseId}:`)) {
-        cache.delete(key);
+        await cache.delete(key);
       }
     }
   }
@@ -339,18 +367,18 @@ export class GeminiCoach {
   /**
    * Clear all cache
    */
-  static clearAllCache(): void {
-    cache.clearAll();
+  static async clearAllCache(): Promise<void> {
+    await cache.clearAll();
   }
 
   /**
    * Get cache statistics
    */
-  static getCacheStats(): { size: number; itemCount: number } {
-    const keys = cache.getAllKeys();
+  static async getCacheStats(): Promise<{ size: number; itemCount: number }> {
+    const keys = await cache.getAllKeys();
     let size = 0;
     for (const key of keys) {
-      const value = cache.getString(key);
+      const value = await cache.getString(key);
       if (value) {
         size += value.length;
       }

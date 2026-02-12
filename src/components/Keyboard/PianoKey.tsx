@@ -5,13 +5,11 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
+import { StyleSheet, Pressable } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
-  Easing,
-  withTiming,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
@@ -52,7 +50,7 @@ export const PianoKey = React.memo(
   ({
     midiNote,
     isBlackKey: isBlackKeyProp,
-    label,
+    label: _label,
     isHighlighted = false,
     isExpected = false,
     onKeyDown,
@@ -128,7 +126,7 @@ export const PianoKey = React.memo(
           <Pressable
             onPressIn={handlePressIn}
             onPressOut={handlePressOut}
-            style={({ pressed }) => [
+            style={({ pressed: _pressed }) => [
               styles.blackKey,
               isExpected && styles.expectedBlackKey,
               isHighlighted && styles.highlightedBlackKey,
@@ -154,7 +152,7 @@ export const PianoKey = React.memo(
         <Pressable
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
-          style={({ pressed }) => [
+          style={({ pressed: _pressed }) => [
             styles.whiteKey,
             isExpected && styles.expectedWhiteKey,
             isHighlighted && styles.highlightedWhiteKey,

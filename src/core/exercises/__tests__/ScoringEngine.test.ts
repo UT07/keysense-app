@@ -15,7 +15,7 @@ import {
   summarizeNoteScores,
   buildExerciseScore,
 } from '../ScoringEngine';
-import { NoteScore, NoteEvent, Exercise } from '../types';
+import { NoteScore } from '../types';
 
 describe('ScoringEngine', () => {
   describe('calculateTimingScore', () => {

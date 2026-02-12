@@ -39,7 +39,7 @@ export function xpForLevel(level: number): number {
  */
 export function totalXpForLevel(level: number): number {
   let total = 0;
-  for (let i = 1; i <= level; i++) {
+  for (let i = 1; i < level; i++) {
     total += xpForLevel(i);
   }
   return total;
@@ -74,7 +74,7 @@ export function getLevelProgress(totalXp: number): LevelProgress {
   const level = levelFromXp(totalXp);
   const currentLevelXp = xpForLevel(level);
   const nextLevelXp = xpForLevel(level + 1);
-  const xpAtCurrentLevel = totalXpForLevel(level - 1);
+  const xpAtCurrentLevel = totalXpForLevel(level);
   const xpIntoLevel = totalXp - xpAtCurrentLevel;
   const xpToNextLevel = currentLevelXp - xpIntoLevel;
   const percentToNextLevel = Math.round((xpIntoLevel / currentLevelXp) * 100);
@@ -132,10 +132,11 @@ export function daysSinceLastPractice(streak: StreakData): number {
     return Infinity;
   }
 
-  const lastDate = new Date(streak.lastPracticeDate);
+  const lastDate = new Date(streak.lastPracticeDate + 'T00:00:00');
   const today = new Date();
-  const diffTime = today.getTime() - lastDate.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const todayDate = new Date(today.toISOString().split('T')[0] + 'T00:00:00');
+  const diffTime = todayDate.getTime() - lastDate.getTime();
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
   return diffDays;
 }
@@ -152,6 +153,17 @@ export function recordPracticeSession(streak: StreakData): StreakData {
 
   // If already practiced today, no streak update
   if (streak.lastPracticeDate === today) {
+    return updated;
+  }
+
+  // First ever practice (no previous date)
+  if (!streak.lastPracticeDate) {
+    updated.currentStreak = 1;
+    updated.lastPracticeDate = today;
+    updated.weeklyPractice = [...updated.weeklyPractice.slice(1), true];
+    if (updated.currentStreak > updated.longestStreak) {
+      updated.longestStreak = updated.currentStreak;
+    }
     return updated;
   }
 
@@ -203,7 +215,7 @@ export function recordPracticeSession(streak: StreakData): StreakData {
  * - Streak bonus
  */
 export function calculateExerciseXp(
-  score: number,
+  _score: number,
   stars: 0 | 1 | 2 | 3,
   isFirstCompletion: boolean = true,
   currentStreak: number = 0

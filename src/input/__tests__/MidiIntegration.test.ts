@@ -175,6 +175,11 @@ describe('MIDI Integration Tests', () => {
 
       eventHandler.registerCallbacks(mockCallbacks);
 
+      // Register note handler (pipes MIDI input → event handler)
+      const unsubscribeNote = midiInput.onNoteEvent((note) => {
+        eventHandler.processMidiNote(note);
+      });
+
       // Register CC handler
       const unsubscribeCC = midiInput.onControlChange((cc, value) => {
         if (cc === 64) {
@@ -191,10 +196,10 @@ describe('MIDI Integration Tests', () => {
         channel: 0,
       });
 
-      // Press sustain (simulate by calling handler directly)
+      // Press sustain
       eventHandler.processMidiControlChange(64, 127, 0);
 
-      // Release note
+      // Release note (should be sustained)
       midiInput._simulateNoteEvent({
         type: 'noteOff',
         note: 60,
@@ -212,6 +217,7 @@ describe('MIDI Integration Tests', () => {
       // Note should be released
       expect(eventHandler.isNoteActive(60)).toBe(false);
 
+      unsubscribeNote();
       unsubscribeCC();
       await midiInput.dispose();
     });
@@ -361,7 +367,7 @@ describe('MIDI Integration Tests', () => {
       const velocities: number[] = [];
 
       const mockCallbacks = {
-        onNoteOn: jest.fn((note: number, velocity: number) => {
+        onNoteOn: jest.fn((_note: number, velocity: number) => {
           velocities.push(velocity);
         }),
         onNoteOff: jest.fn(),

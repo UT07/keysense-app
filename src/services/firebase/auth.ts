@@ -11,8 +11,6 @@ import {
   signInWithCredential,
   User,
   UserCredential,
-  setPersistence,
-  browserLocalPersistence,
 } from 'firebase/auth';
 import { auth } from './config';
 import { db } from './config';

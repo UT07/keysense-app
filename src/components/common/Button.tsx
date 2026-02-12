@@ -9,7 +9,6 @@ import {
   Text,
   StyleSheet,
   ViewStyle,
-  TextStyle,
   ActivityIndicator,
 } from 'react-native';
 import Animated, {
@@ -32,6 +31,8 @@ export interface ButtonProps {
   icon?: React.ReactNode;
   style?: ViewStyle;
   testID?: string;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 }
 
 const COLORS = {

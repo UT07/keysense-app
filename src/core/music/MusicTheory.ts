@@ -137,7 +137,12 @@ export function getInterval(midiNote1: number, midiNote2: number): number {
  * Get the name of an interval in semitones
  */
 export function intervalName(semitones: number): string {
-  const normalized = Math.abs(semitones) % 12;
+  const abs = Math.abs(semitones);
+  // Check for octaves (12, 24, 36, etc.)
+  if (abs % 12 === 0 && abs !== 0) {
+    return 'octave';
+  }
+  const normalized = abs % 12;
   return INTERVAL_NAMES[normalized] || `${normalized} semitones`;
 }
 

@@ -21,10 +21,10 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import MidiInputManager from '../input/MidiInput';
+import { getMidiInput } from '../input/MidiInput';
 import MidiDeviceManager from '../input/MidiDevice';
-import MidiEventHandler from '../input/MidiEventHandler';
 import type { MidiDevice } from '../input/MidiInput';
+import type { MidiNoteEvent } from '../core/exercises/types';
 
 /**
  * Setup Step Type
@@ -47,7 +47,7 @@ export const MidiSetupScreen: React.FC<MidiSetupScreenProps> = ({
   const [step, setStep] = useState<SetupStep>('welcome');
   const [availableDevices, setAvailableDevices] = useState<MidiDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<MidiDevice | null>(null);
-  const [isDetecting, setIsDetecting] = useState(false);
+  const [_isDetecting, setIsDetecting] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<
     'pending' | 'testing' | 'success' | 'failed'
   >('pending');
@@ -59,7 +59,7 @@ export const MidiSetupScreen: React.FC<MidiSetupScreenProps> = ({
   useEffect(() => {
     const initMidi = async () => {
       try {
-        await MidiInputManager.initialize();
+        await getMidiInput().initialize();
         console.log('[MidiSetupScreen] MIDI initialized');
       } catch (error) {
         console.error('[MidiSetupScreen] MIDI init failed:', error);
@@ -79,7 +79,7 @@ export const MidiSetupScreen: React.FC<MidiSetupScreenProps> = ({
 
     try {
       // Get currently connected devices
-      const devices = await MidiInputManager.getConnectedDevices();
+      const devices = await getMidiInput().getConnectedDevices();
       setAvailableDevices(devices);
 
       if (devices.length === 0) {
@@ -116,16 +116,13 @@ export const MidiSetupScreen: React.FC<MidiSetupScreenProps> = ({
     setVerificationStatus('testing');
     setTestNoteDetected(false);
 
-    // Create event handler
-    const handler = new MidiEventHandler({ logPerformance: true });
-
     // Listen for note
     const timer = setTimeout(() => {
       setVerificationStatus('failed');
       unsubscribe();
     }, 5000); // 5 second timeout
 
-    const unsubscribe = MidiInputManager.onNote((event) => {
+    const unsubscribe = getMidiInput().onNoteEvent((event: MidiNoteEvent) => {
       if (event.type === 'noteOn' && event.velocity > 0) {
         clearTimeout(timer);
         setTestNoteDetected(true);

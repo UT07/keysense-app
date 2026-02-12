@@ -59,18 +59,30 @@ describe('MidiEventHandler', () => {
   });
 
   describe('Velocity Mapping', () => {
-    it('should map velocity 0 to gain 0', () => {
-      const note: MidiNoteEvent = {
+    it('should treat velocity 0 as note off (MIDI spec)', () => {
+      // Per MIDI spec, noteOn with velocity 0 is equivalent to noteOff.
+      // First send a real noteOn so the note is active.
+      handler.processMidiNote({
+        type: 'noteOn',
+        note: 60,
+        velocity: 100,
+        timestamp: Date.now(),
+        channel: 0,
+      });
+
+      expect(mockCallbacks.onNoteOn).toHaveBeenCalledWith(60, 100 / 127, expect.any(Number));
+
+      // Now send velocity 0 — should be treated as noteOff
+      handler.processMidiNote({
         type: 'noteOn',
         note: 60,
         velocity: 0,
         timestamp: Date.now(),
         channel: 0,
-      };
+      });
 
-      handler.processMidiNote(note);
-
-      expect(mockCallbacks.onNoteOn).toHaveBeenCalledWith(60, 0, expect.any(Number));
+      expect(mockCallbacks.onNoteOff).toHaveBeenCalledWith(60, expect.any(Number), false);
+      expect(handler.isNoteActive(60)).toBe(false);
     });
 
     it('should map velocity 127 to gain 1', () => {
@@ -156,18 +168,30 @@ describe('MidiEventHandler', () => {
       expect(mockCallbacks.onNoteOff).not.toHaveBeenCalled();
     });
 
-    it('should treat note on with velocity 0 as note off', () => {
-      const note: MidiNoteEvent = {
+    it('should route velocity 0 noteOn to noteOff handler', () => {
+      // First play the note so it's active
+      handler.processMidiNote({
+        type: 'noteOn',
+        note: 60,
+        velocity: 80,
+        timestamp: Date.now(),
+        channel: 0,
+      });
+
+      expect(handler.isNoteActive(60)).toBe(true);
+
+      // Now send noteOn with velocity 0 (MIDI "running status" note off)
+      handler.processMidiNote({
         type: 'noteOn',
         note: 60,
         velocity: 0,
-        timestamp: Date.now(),
+        timestamp: Date.now() + 100,
         channel: 0,
-      };
+      });
 
-      handler.processMidiNote(note);
-
+      // Should have called noteOff and deactivated the note
       expect(mockCallbacks.onNoteOff).toHaveBeenCalledWith(60, expect.any(Number), false);
+      expect(handler.isNoteActive(60)).toBe(false);
     });
 
     it('should handle explicit note off', () => {

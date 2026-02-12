@@ -6,10 +6,7 @@
 
 import {
   NoteScore,
-  NoteEvent,
-  MidiNoteEvent,
   ExerciseScore,
-  ExerciseScoreBreakdown,
   TimingResult,
   ExerciseScoringConfig,
 } from './types';
@@ -46,7 +43,7 @@ export function calculateTimingScore(
   }
 
   // Good timing: linear interpolation from perfect to ok
-  if (absOffset <= toleranceMs + gracePeriodMs) {
+  if (absOffset < toleranceMs + gracePeriodMs) {
     const scoreDecay = ((absOffset - toleranceMs) / gracePeriodMs) * 30;
     return {
       score: Math.max(0, 100 - scoreDecay),
@@ -58,7 +55,8 @@ export function calculateTimingScore(
   const okRange = gracePeriodMs * 2;
   if (absOffset <= toleranceMs + okRange) {
     const distanceFromGrace = absOffset - (toleranceMs + gracePeriodMs);
-    const score = 70 * Math.exp(-(distanceFromGrace / gracePeriodMs));
+    // Start just under 70 to ensure clean boundary separation
+    const score = 69.9 * Math.exp(-(distanceFromGrace / gracePeriodMs));
     return {
       score: Math.max(0, score),
       status: 'ok',
@@ -205,7 +203,8 @@ export function isPassed(score: number, passingScore: number): boolean {
  * Sources:
  * - Base: 10 XP per completed exercise
  * - Stars: 10 XP per star (0-30)
- * - Perfect: 20 bonus XP for 95%+ score
+ * - Perfect: 20 bonus XP for explicit perfect (isPerfect flag)
+ * - High score: 10 bonus XP for 95%+ score (when not perfect)
  * - First time: 25 bonus XP
  */
 export function calculateXpEarned(
@@ -219,9 +218,12 @@ export function calculateXpEarned(
   // Stars bonus
   xp += stars * 10;
 
-  // Perfect bonus
-  if (isPerfect || score >= 95) {
+  // Perfect bonus (explicit perfect flag)
+  if (isPerfect) {
     xp += 20;
+  } else if (score >= 95) {
+    // High score bonus (when not explicitly perfect)
+    xp += 10;
   }
 
   // First completion bonus

@@ -15,7 +15,13 @@ import type { Exercise, ExerciseScore, MidiNoteEvent } from '@/core/exercises/ty
 import type { ExerciseSessionState } from './types';
 import { PersistenceManager, STORAGE_KEYS, createDebouncedSave } from './persistence';
 
-const defaultState: ExerciseSessionState = {
+/** Data-only shape of exercise session (excludes actions) */
+type ExerciseSessionData = Pick<
+  ExerciseSessionState,
+  'currentExercise' | 'currentExerciseId' | 'playedNotes' | 'isPlaying' | 'currentBeat' | 'score' | 'sessionStartTime' | 'sessionEndTime'
+>;
+
+const defaultData: ExerciseSessionData = {
   currentExercise: null,
   currentExerciseId: null,
   playedNotes: [],
@@ -24,36 +30,13 @@ const defaultState: ExerciseSessionState = {
   score: null,
   sessionStartTime: null,
   sessionEndTime: null,
-  setCurrentExercise: () => {},
-  addPlayedNote: () => {},
-  clearSession: () => {},
-  setIsPlaying: () => {},
-  setCurrentBeat: () => {},
-  setScore: () => {},
-  setSessionTime: () => {},
-  reset: () => {},
 };
-
-// Initialize persisted state
-const initialState = PersistenceManager.loadState<Omit<ExerciseSessionState, keyof {}>>(
-  STORAGE_KEYS.EXERCISE,
-  {
-    currentExercise: null,
-    currentExerciseId: null,
-    playedNotes: [],
-    isPlaying: false,
-    currentBeat: 0,
-    score: null,
-    sessionStartTime: null,
-    sessionEndTime: null,
-  }
-);
 
 // Create debounced save function
 const debouncedSave = createDebouncedSave(STORAGE_KEYS.EXERCISE, 500);
 
 export const useExerciseStore = create<ExerciseSessionState>((set, get) => ({
-  ...initialState,
+  ...defaultData,
 
   setCurrentExercise: (exercise: Exercise) => {
     const newState = {

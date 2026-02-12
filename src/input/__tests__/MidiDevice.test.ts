@@ -343,7 +343,7 @@ describe('MidiDeviceManager', () => {
       manager.markDeviceUsed('device-1');
       manager.markDeviceUsed('device-2');
 
-      const discovered = manager.getDiscoveredDevices();
+      manager.getDiscoveredDevices();
       const lastDeviceId = manager.getLastUsedDeviceId();
 
       expect(lastDeviceId).toBe('device-2');

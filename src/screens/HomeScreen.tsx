@@ -3,7 +3,7 @@
  * Main home screen with daily practice goal, XP/streak display, and quick actions
  */
 
-import React, { useCallback, useState } from 'react';
+import React from 'react';
 import {
   View,
   StyleSheet,
@@ -13,9 +13,16 @@ import {
   TouchableOpacity,
   Animated,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { XPBar } from '../components/Progress/XPBar';
 import { StreakDisplay } from '../components/Progress/StreakDisplay';
+import { useProgressStore } from '../stores/progressStore';
+import { useSettingsStore } from '../stores/settingsStore';
+import type { RootStackParamList } from '../navigation/AppNavigator';
+
+type HomeNavProp = NativeStackNavigationProp<RootStackParamList>;
 
 export interface HomeScreenProps {
   onNavigateToExercise?: () => void;
@@ -47,21 +54,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigateToSongs,
   onNavigateToSettings,
 }) => {
-  // Mock state - would connect to Zustand store in production
-  const [state] = useState<HomeScreenState>({
-    currentXP: 1234,
-    currentLevel: 5,
-    currentStreak: 7,
-    longestStreak: 14,
-    freezesAvailable: 1,
-    lastPracticeDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // Yesterday
-    dailyGoalMinutes: 10,
-    minutesPracticedToday: 3,
-    nextExerciseTitle: 'C Major Scale - Part 2',
-    exerciseProgress: 40,
-  });
+  const navigation = useNavigation<HomeNavProp>();
 
-  const dailyGoalProgress = state.minutesPracticedToday / state.dailyGoalMinutes;
+  // Connect to Zustand stores for real data
+  const { totalXp, level, streakData } = useProgressStore();
+  const { dailyGoalMinutes } = useSettingsStore();
+
+  // Calculate daily progress (would come from a session tracker in production)
+  const minutesPracticedToday = 0; // TODO: Implement session tracking
+  const dailyGoalProgress = minutesPracticedToday / dailyGoalMinutes;
+
+  // Use real store data with safe defaults
+  const state: HomeScreenState = {
+    currentXP: totalXp ?? 0,
+    currentLevel: level ?? 1,
+    currentStreak: streakData?.currentStreak ?? 0,
+    longestStreak: streakData?.longestStreak ?? 0,
+    freezesAvailable: streakData?.freezesAvailable ?? 0,
+    lastPracticeDate: streakData?.lastPracticeDate,
+    dailyGoalMinutes: dailyGoalMinutes ?? 10,
+    minutesPracticedToday,
+    nextExerciseTitle: 'C Major Scale - Part 2', // TODO: Get from progress
+    exerciseProgress: 40, // TODO: Calculate from completed exercises
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -74,7 +89,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <Text style={styles.greeting}>Good Evening</Text>
           <TouchableOpacity
             style={styles.settingsButton}
-            onPress={onNavigateToSettings}
+            onPress={onNavigateToSettings ?? (() => navigation.navigate('MidiSetup'))}
           >
             <MaterialCommunityIcons name="cog" size={24} color="#666666" />
           </TouchableOpacity>
@@ -131,7 +146,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <Text style={styles.sectionTitle}>Continue Learning</Text>
           <TouchableOpacity
             style={styles.continueCard}
-            onPress={onNavigateToExercise}
+            onPress={onNavigateToExercise ?? (() => navigation.navigate('Exercise', { exerciseId: 'lesson-01-ex-01' }))}
             activeOpacity={0.7}
           >
             <View style={styles.continueHeader}>
@@ -153,7 +168,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   style={[
                     styles.continueProgressFill,
                     {
-                      width: `${state.exerciseProgress}%`,
+                      width: `${state.exerciseProgress ?? 0}%`,
                     },
                   ]}
                 />
@@ -171,7 +186,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <View style={styles.actionsGrid}>
             <TouchableOpacity
               style={styles.actionCard}
-              onPress={onNavigateToLesson}
+              onPress={onNavigateToLesson ?? (() => navigation.navigate('MainTabs', { screen: 'Learn' } as any))}
             >
               <MaterialCommunityIcons
                 name="book-open-outline"
@@ -183,10 +198,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
             <TouchableOpacity
               style={styles.actionCard}
-              onPress={onNavigateToExercise}
+              onPress={onNavigateToExercise ?? (() => navigation.navigate('Exercise', { exerciseId: 'lesson-01-ex-01' }))}
             >
               <MaterialCommunityIcons
-                name="music-note-multiple"
+                name="music-box-multiple"
                 size={28}
                 color="#FF9800"
               />
@@ -195,7 +210,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
             <TouchableOpacity
               style={styles.actionCard}
-              onPress={onNavigateToSongs}
+              onPress={onNavigateToSongs ?? (() => navigation.navigate('MainTabs', { screen: 'Play' } as any))}
             >
               <MaterialCommunityIcons
                 name="music"
@@ -207,7 +222,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
             <TouchableOpacity
               style={styles.actionCard}
-              onPress={onNavigateToSettings}
+              onPress={onNavigateToSettings ?? (() => navigation.navigate('MidiSetup'))}
             >
               <MaterialCommunityIcons
                 name="tune"

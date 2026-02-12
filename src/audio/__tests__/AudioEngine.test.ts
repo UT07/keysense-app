@@ -215,7 +215,7 @@ describe('NativeAudioEngine', () => {
         engine.playNote(note)
       );
 
-      handles.forEach((handle) => {
+      handles.forEach((_handle) => {
         expect(engine.getActiveNoteCount()).toBeGreaterThan(0);
       });
 
@@ -264,7 +264,7 @@ describe('NativeAudioEngine', () => {
     });
 
     test('replaces note at same pitch', () => {
-      const handle1 = engine.playNote(60);
+      engine.playNote(60);
       expect(engine.getActiveNoteCount()).toBe(1);
 
       const handle2 = engine.playNote(60); // Same note
@@ -473,7 +473,9 @@ describe('NativeAudioEngine', () => {
       const melody = [64, 62, 60, 62, 64, 64, 64];
       const handles = melody.map((note) => engine.playNote(note));
 
-      expect(engine.getActiveNoteCount()).toBe(melody.length);
+      // Engine replaces notes at the same pitch, so only unique pitches remain active
+      const uniquePitches = new Set(melody).size; // 3: {60, 62, 64}
+      expect(engine.getActiveNoteCount()).toBe(uniquePitches);
 
       handles.forEach((h) => engine.releaseNote(h));
     });
@@ -488,7 +490,7 @@ describe('NativeAudioEngine', () => {
       chords.forEach((chord) => {
         engine.releaseAllNotes(); // Release previous chord
 
-        const handles = chord.map((note) => engine.playNote(note));
+        chord.map((note) => engine.playNote(note));
         expect(engine.getActiveNoteCount()).toBe(chord.length);
       });
     });

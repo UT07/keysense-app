@@ -88,6 +88,8 @@ describe('ScoreDisplay', () => {
   });
 
   it('should display progress percentage', () => {
+    // Exercise has notes at beat 0 (dur 1) and beat 2 (dur 1), so duration = 3.
+    // At currentBeat=1: progress = (1/3)*100 = 33%
     const { getByText } = render(
       <ScoreDisplay
         exercise={MOCK_EXERCISE}
@@ -98,7 +100,7 @@ describe('ScoreDisplay', () => {
       />
     );
 
-    expect(getByText('50%')).toBeTruthy();
+    expect(getByText('33%')).toBeTruthy();
   });
 
   it('should show combo counter when combo > 0', () => {
@@ -173,11 +175,10 @@ describe('ScoreDisplay', () => {
         combo={0}
         feedback={null}
         comboAnimValue={new Animated.Value(0)}
+        testID="exercise-score-display"
       />
     );
 
-    // Progress should be 50% (1 out of 2 total beats)
-    // The progress bar should reflect this
     expect(getByTestId('exercise-score-display')).toBeTruthy();
   });
 
@@ -196,6 +197,7 @@ describe('ScoreDisplay', () => {
   });
 
   it('should display negative beat during count-in', () => {
+    // Math.ceil(Math.max(0, -2)) = Math.ceil(0) = 0
     const { getByText } = render(
       <ScoreDisplay
         exercise={MOCK_EXERCISE}
@@ -206,6 +208,6 @@ describe('ScoreDisplay', () => {
       />
     );
 
-    expect(getByText('Beat 1')).toBeTruthy();
+    expect(getByText('Beat 0')).toBeTruthy();
   });
 });

@@ -13,14 +13,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
+  Text,
   StyleSheet,
   SafeAreaView,
-  Dimensions,
   Animated,
   Platform,
   AccessibilityInfo,
 } from 'react-native';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import * as Haptics from 'expo-haptics';
+import { useNavigation } from '@react-navigation/native';
 import { Keyboard } from '../../components/Keyboard/Keyboard';
 import { PianoRoll } from '../../components/PianoRoll/PianoRoll';
 import { useExerciseStore } from '../../stores/exerciseStore';
@@ -40,15 +42,6 @@ export interface ExercisePlayerProps {
   onClose?: () => void;
 }
 
-interface PlaybackState {
-  isPlaying: boolean;
-  isPaused: boolean;
-  currentBeat: number;
-  elapsedTime: number; // ms
-  countInComplete: boolean;
-  startTime: number; // timestamp when playback started
-}
-
 interface FeedbackState {
   type: 'perfect' | 'good' | 'ok' | 'early' | 'late' | 'miss' | null;
   noteIndex: number;
@@ -56,52 +49,46 @@ interface FeedbackState {
 }
 
 const DEFAULT_EXERCISE: Exercise = {
-  id: 'demo',
+  id: 'lesson-01-ex-01',
   version: 1,
   metadata: {
-    title: 'Demo Exercise',
-    description: 'Press any key to test',
+    title: 'Find Middle C',
+    description: 'Learn to locate and play Middle C',
     difficulty: 1,
     estimatedMinutes: 2,
-    skills: ['test'],
+    skills: ['note-finding', 'c-major'],
     prerequisites: [],
   },
   settings: {
-    tempo: 120,
-    timeSignature: [4, 4],
+    tempo: 60,
+    timeSignature: [4, 4] as [number, number],
     keySignature: 'C',
     countIn: 4,
     metronomeEnabled: true,
   },
   notes: [
-    { note: 60, startBeat: 4, durationBeats: 1, hand: 'left' },
-    { note: 64, startBeat: 5, durationBeats: 1, hand: 'right' },
-    { note: 67, startBeat: 6, durationBeats: 1, hand: 'right' },
+    { note: 60, startBeat: 0, durationBeats: 1, hand: 'right' as const },
+    { note: 60, startBeat: 1, durationBeats: 1, hand: 'right' as const },
+    { note: 60, startBeat: 2, durationBeats: 1, hand: 'right' as const },
+    { note: 60, startBeat: 3, durationBeats: 1, hand: 'right' as const },
   ],
   scoring: {
-    timingToleranceMs: 50,
-    timingGracePeriodMs: 150,
-    passingScore: 70,
-    starThresholds: [70, 85, 95],
+    timingToleranceMs: 75,
+    timingGracePeriodMs: 200,
+    passingScore: 60,
+    starThresholds: [60, 80, 95],
   },
   hints: {
-    beforeStart: 'Focus on keeping a steady rhythm',
+    beforeStart: 'Place your right thumb on Middle C (the white key in the center)',
     commonMistakes: [
       {
-        pattern: 'rushing',
-        advice: 'Try to play with the metronome beat',
+        pattern: 'wrong-key',
+        advice: 'Middle C is to the left of the two black keys in the center of the keyboard',
       },
     ],
-    successMessage: 'Great job! You nailed it!',
+    successMessage: 'Great job finding Middle C!',
   },
 };
-
-/**
- * Calculate current beat from elapsed time and tempo
- */
-function calculateCurrentBeat(elapsedMs: number, tempo: number): number {
-  return (elapsedMs / 60000) * tempo;
-}
 
 /**
  * ExercisePlayer - Main screen component
@@ -117,18 +104,24 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   onExerciseComplete,
   onClose,
 }) => {
-  const screenHeight = Dimensions.get('window').height;
-  const screenWidth = Dimensions.get('window').width;
+  const navigation = useNavigation();
 
   // Store integration
   const exerciseStore = useExerciseStore();
   const exercise = exerciseOverride || exerciseStore.currentExercise || DEFAULT_EXERCISE;
 
+  // Lock to landscape orientation on mount, restore portrait on unmount
+  useEffect(() => {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(() => {});
+    return () => {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+    };
+  }, []);
+
   // Exercise playback coordination (MIDI + Audio + Scoring)
   const {
     isPlaying,
     currentBeat,
-    playedNotes,
     startPlayback,
     pausePlayback,
     stopPlayback,
@@ -165,7 +158,6 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Animation values
-  const feedbackScale = useRef(new Animated.Value(0)).current;
   const comboScale = useRef(new Animated.Value(0)).current;
 
   // Derived state
@@ -246,8 +238,12 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   const handleExit = useCallback(() => {
     stopPlayback();
     exerciseStore.clearSession();
-    onClose?.();
-  }, [stopPlayback, exerciseStore, onClose]);
+    if (onClose) {
+      onClose();
+    } else {
+      navigation.goBack();
+    }
+  }, [stopPlayback, exerciseStore, onClose, navigation]);
 
   /**
    * Handle keyboard note press
@@ -384,7 +380,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       {/* Error banner for non-critical errors */}
       {hasError && errorMessage && (isMidiReady || isAudioReady) && (
         <View style={styles.errorBanner}>
-          <Text style={styles.errorText}>⚠️ {errorMessage}</Text>
+          <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
       )}
 
@@ -397,76 +393,76 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         />
       )}
 
-      {/* Score and progress display */}
-      <View style={styles.header}>
-        <ScoreDisplay
-          exercise={exercise}
-          currentBeat={currentBeat}
-          combo={comboCount}
-          feedback={feedback.type}
-          comboAnimValue={comboScale}
-        />
-      </View>
+      {/* Landscape layout: left panel (info) + center (piano roll) + right (keyboard) */}
+      <View style={styles.landscapeRow}>
+        {/* Left panel: score + hints + controls */}
+        <View style={styles.leftPanel}>
+          <ScoreDisplay
+            exercise={exercise}
+            currentBeat={currentBeat}
+            combo={comboCount}
+            feedback={feedback.type}
+            comboAnimValue={comboScale}
+          />
 
-      {/* Piano roll visualization */}
-      <View style={styles.pianoRollContainer}>
-        <PianoRoll
-          notes={exercise.notes}
-          currentBeat={currentBeat}
-          tempo={exercise.settings.tempo}
-          timeSignature={exercise.settings.timeSignature}
-          testID="exercise-piano-roll"
-        />
-      </View>
+          <View style={styles.hintContainer}>
+            <HintDisplay
+              hints={exercise.hints}
+              isPlaying={isPlaying}
+              countInComplete={countInComplete}
+              feedback={feedback.type}
+            />
+          </View>
 
-      {/* Real-time feedback display */}
-      <View style={styles.feedbackContainer}>
-        <RealTimeFeedback
-          feedback={feedback}
-          expectedNotes={expectedNotes}
-          highlightedKeys={highlightedKeys}
-        />
-      </View>
+          <View style={styles.feedbackContainer}>
+            <RealTimeFeedback
+              feedback={feedback}
+              expectedNotes={expectedNotes}
+              highlightedKeys={highlightedKeys}
+            />
+          </View>
 
-      {/* Hints display */}
-      <View style={styles.hintContainer}>
-        <HintDisplay
-          hints={exercise.hints}
-          isPlaying={isPlaying}
-          countInComplete={countInComplete}
-          feedback={feedback.type}
-        />
-      </View>
+          <View style={styles.controlsContainer}>
+            <ExerciseControls
+              isPlaying={isPlaying}
+              isPaused={isPaused}
+              onStart={handleStart}
+              onPause={handlePause}
+              onRestart={handleRestart}
+              onExit={handleExit}
+              testID="exercise-controls"
+            />
+          </View>
+        </View>
 
-      {/* Piano keyboard */}
-      <View style={styles.keyboardContainer}>
-        <Keyboard
-          startNote={48}
-          octaveCount={2}
-          onNoteOn={handleKeyDown}
-          onNoteOff={handleKeyUp}
-          highlightedNotes={highlightedKeys}
-          expectedNotes={expectedNotes}
-          enabled={isPlaying && !isPaused}
-          hapticEnabled={true}
-          showLabels={false}
-          scrollable={true}
-          keyHeight={80}
-          testID="exercise-keyboard"
-        />
-      </View>
+        {/* Center: Piano roll */}
+        <View style={styles.pianoRollContainer}>
+          <PianoRoll
+            notes={exercise.notes}
+            currentBeat={currentBeat}
+            tempo={exercise.settings.tempo}
+            timeSignature={exercise.settings.timeSignature}
+            testID="exercise-piano-roll"
+          />
+        </View>
 
-      {/* Controls (play, pause, restart, exit) */}
-      <View style={styles.controlsContainer}>
-        <ExerciseControls
-          isPlaying={isPlaying}
-          isPaused={isPaused}
-          onStart={handleStart}
-          onPause={handlePause}
-          onRestart={handleRestart}
-          onExit={handleExit}
-          testID="exercise-controls"
-        />
+        {/* Right: Keyboard */}
+        <View style={styles.keyboardContainer}>
+          <Keyboard
+            startNote={48}
+            octaveCount={2}
+            onNoteOn={handleKeyDown}
+            onNoteOff={handleKeyUp}
+            highlightedNotes={highlightedKeys}
+            expectedNotes={expectedNotes}
+            enabled={isPlaying && !isPaused}
+            hapticEnabled={true}
+            showLabels={false}
+            scrollable={true}
+            keyHeight={120}
+            testID="exercise-keyboard"
+          />
+        </View>
       </View>
 
       {/* Completion modal */}
@@ -491,48 +487,48 @@ const styles = StyleSheet.create({
   },
   errorBanner: {
     backgroundColor: '#FFF3CD',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: '#FFE69C',
   },
   errorText: {
     color: '#856404',
-    fontSize: 14,
+    fontSize: 12,
     textAlign: 'center',
   },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  landscapeRow: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  leftPanel: {
+    width: 200,
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderRightWidth: 1,
+    borderRightColor: '#E0E0E0',
+    padding: 8,
+    justifyContent: 'space-between',
   },
   pianoRollContainer: {
-    height: 200,
-    marginHorizontal: 16,
-    marginVertical: 12,
+    flex: 1,
+    margin: 8,
   },
   feedbackContainer: {
-    height: 80,
-    marginHorizontal: 16,
-    marginBottom: 12,
+    flex: 1,
+    marginVertical: 4,
   },
   hintContainer: {
-    height: 60,
-    marginHorizontal: 16,
-    marginBottom: 12,
+    flex: 1,
+    marginVertical: 4,
   },
   keyboardContainer: {
-    height: 100,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 8,
+    width: 160,
+    borderLeftWidth: 1,
+    borderLeftColor: '#E0E0E0',
     overflow: 'hidden',
   },
   controlsContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    marginTop: 4,
   },
 });
 

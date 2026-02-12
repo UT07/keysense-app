@@ -23,7 +23,7 @@ import * as functions from 'firebase-functions';
  */
 export const syncProgress = functions
   .region('us-central1')
-  .https.onCall(async (data: any, context) => {
+  .https.onCall(async (data: any, context: functions.https.CallableContext) => {
     if (!context.auth) {
       throw new functions.https.HttpsError(
         'unauthenticated',
@@ -45,14 +45,14 @@ export const syncProgress = functions
         .where('timestamp', '>', admin.firestore.Timestamp.fromMillis(lastSyncTimestamp))
         .get();
 
-      const serverChangesList = serverChanges.docs.map((doc) => doc.data());
+      const serverChangesList = serverChanges.docs.map((doc: admin.firestore.QueryDocumentSnapshot) => doc.data());
 
       // Detect conflicts (same type + exercise within 5 seconds)
-      const conflicts: any[] = [];
+      const conflicts: Array<Record<string, any>> = [];
 
       for (const localChange of localChanges) {
         const conflict = serverChangesList.find(
-          (sc) =>
+          (sc: Record<string, any>) =>
             sc.type === localChange.type &&
             sc.exerciseId === localChange.exerciseId &&
             Math.abs(sc.timestamp.toMillis() - localChange.timestamp.toMillis()) < 5000
@@ -102,7 +102,7 @@ export const syncProgress = functions
  */
 export const completeExercise = functions
   .region('us-central1')
-  .https.onCall(async (data: any, context) => {
+  .https.onCall(async (data: any, context: functions.https.CallableContext) => {
     if (!context.auth) {
       throw new functions.https.HttpsError(
         'unauthenticated',
@@ -111,7 +111,7 @@ export const completeExercise = functions
     }
 
     const uid = context.auth.uid;
-    const { exerciseId, score, timeSpentSeconds, isPerfect } = data;
+    const { exerciseId, isPerfect } = data;
 
     try {
       const db = admin.firestore();
@@ -210,7 +210,7 @@ export const completeExercise = functions
  */
 export const getExerciseRecommendations = functions
   .region('us-central1')
-  .https.onCall(async (data: any, context) => {
+  .https.onCall(async (_data: any, context: functions.https.CallableContext) => {
     if (!context.auth) {
       throw new functions.https.HttpsError(
         'unauthenticated',
@@ -226,10 +226,6 @@ export const getExerciseRecommendations = functions
 
       // Get user progress
       const progressDocs = await userRef.collection('progress').get();
-
-      // Get profile for level
-      const profileDoc = await userRef.get();
-      const profile = profileDoc.data();
 
       const recommendations = [];
 
@@ -272,7 +268,7 @@ export const getExerciseRecommendations = functions
  */
 export const getWeeklySummary = functions
   .region('us-central1')
-  .https.onCall(async (data: any, context) => {
+  .https.onCall(async (_data: any, context: functions.https.CallableContext) => {
     if (!context.auth) {
       throw new functions.https.HttpsError(
         'unauthenticated',

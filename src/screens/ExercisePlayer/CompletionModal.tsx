@@ -12,7 +12,6 @@ import {
   Modal,
   Animated,
   Easing,
-  TouchableOpacity,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -40,7 +39,6 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
   const scaleAnim = useRef(new Animated.Value(0.5)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const starsAnimValue = useRef(new Animated.Value(0)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
 
   // Trigger animations on mount
   useEffect(() => {

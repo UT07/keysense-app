@@ -193,7 +193,7 @@ function validateResponse(text: string): boolean {
 
 export const generateCoachFeedback = functions
   .region('us-central1')
-  .https.onCall(async (data: CoachFeedbackRequest, context) => {
+  .https.onCall(async (data: CoachFeedbackRequest, context: functions.https.CallableContext) => {
     // Authentication check
     if (!context.auth) {
       throw new functions.https.HttpsError(
@@ -217,7 +217,7 @@ export const generateCoachFeedback = functions
       const cachedDoc = await cacheDocRef.get();
       if (cachedDoc.exists) {
         const cached = cachedDoc.data();
-        if (Date.now() - cached.timestamp < 24 * 60 * 60 * 1000) {
+        if (cached && Date.now() - cached.timestamp < 24 * 60 * 60 * 1000) {
           // Return cached response
           return {
             feedback: cached.feedback,
@@ -307,7 +307,7 @@ export const cleanupCoachFeedbackCache = functions
       const oldDocs = await cacheRef.where('timestamp', '<', cutoffTime).get();
 
       const batch = admin.firestore().batch();
-      oldDocs.docs.forEach((doc) => batch.delete(doc.ref));
+      oldDocs.docs.forEach((doc: admin.firestore.QueryDocumentSnapshot) => batch.delete(doc.ref));
       await batch.commit();
 
       functions.logger.info('Coach feedback cache cleanup completed', {

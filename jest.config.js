@@ -25,7 +25,10 @@ module.exports = {
     '**/?(*.)+(spec|test).[jt]s?(x)',
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  transform: {
+    '^.+\\.tsx?$': ['babel-jest', { configFile: './babel.config.js' }],
+  },
   transformIgnorePatterns: [
-    'node_modules/(?!(expo|expo-router|@react-native|react-native|@react-native-community|@shopify/react-native-skia|react-native-reanimated|react-native-gesture-handler)/)',
+    'node_modules/(?!(expo|expo-router|expo-font|expo-screen-orientation|expo-haptics|@expo/vector-icons|@react-native|react-native|@react-native-community|@react-navigation|@shopify/react-native-skia|react-native-reanimated|react-native-gesture-handler|expo-modules-core)/)',
   ],
 };

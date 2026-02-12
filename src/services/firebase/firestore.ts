@@ -14,11 +14,9 @@ import {
   where,
   orderBy,
   serverTimestamp,
-  WriteBatch,
   writeBatch,
   Timestamp,
-  DocumentData,
-  QueryConstraint,
+  FieldValue,
 } from 'firebase/firestore';
 import { db } from './config';
 
@@ -30,7 +28,7 @@ export interface UserProfile {
   uid: string;
   email: string;
   displayName: string;
-  createdAt: Date | Timestamp;
+  createdAt: Date | Timestamp | FieldValue;
   settings: {
     dailyGoalMinutes: number;
     reminderTime: string | null;

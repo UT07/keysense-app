@@ -18,7 +18,7 @@
  */
 
 import type { IAudioEngine, NoteHandle, AudioContextState, NoteState, ADSRConfig } from './types';
-import { SampleLoader, BASE_NOTES } from './samples/SampleLoader';
+import { SampleLoader } from './samples/SampleLoader';
 
 const DEFAULT_VOLUME = 0.8;
 const MIN_NOTE_DURATION = 0.05; // 50ms minimum before release
@@ -45,24 +45,8 @@ export class NativeAudioEngine implements IAudioEngine {
   private masterGain: GainNode | null = null;
   private volume: number = DEFAULT_VOLUME;
 
-  /**
-   * Object pool for note states to prevent allocations during playback
-   * Pre-allocates objects at initialization
-   */
-  private noteStatePool: NoteState[] = [];
-  private readonly POOL_SIZE = 20; // Support up to 20 simultaneous notes
-
   constructor() {
-    this.preallocateNoteStatePool();
-  }
-
-  /**
-   * Pre-allocate note state objects to prevent allocations during callbacks
-   * CRITICAL: This prevents garbage collection pauses in audio thread
-   */
-  private preallocateNoteStatePool(): void {
-    // Note: Actual objects will be created during initialize()
-    // This is a conceptual allocation pattern
+    // Pre-allocation happens during initialize()
   }
 
   /**
@@ -84,12 +68,10 @@ export class NativeAudioEngine implements IAudioEngine {
 
     try {
       // Create AudioContext with low-latency settings
-      // @ts-expect-error - react-native-audio-api API
-      this.context = new (window.AudioContext ||
-        window.webkitAudioContext)({
+      this.context = new AudioContext({
         sampleRate: 44100,
         latencyHint: 'interactive', // Minimum latency
-      });
+      } as AudioContextOptions);
 
       // Create master gain node (0.0 to 1.0 volume control)
       this.masterGain = this.context.createGain();
@@ -166,7 +148,6 @@ export class NativeAudioEngine implements IAudioEngine {
 
     this.masterGain = null;
     this.activeNotes.clear();
-    this.noteStatePool = [];
   }
 
   /**
@@ -246,7 +227,12 @@ export class NativeAudioEngine implements IAudioEngine {
       // Track active note (stop any existing note at this pitch first)
       const existingNote = this.activeNotes.get(note);
       if (existingNote) {
-        existingNote.release();
+        try {
+          existingNote.source.stop();
+        } catch {
+          // Already stopped
+        }
+        this.activeNotes.delete(note);
       }
 
       // Store note state for management
@@ -281,7 +267,7 @@ export class NativeAudioEngine implements IAudioEngine {
     source: AudioBufferSourceNode,
     envelope: GainNode,
     startTime: number,
-    currentLevel: number
+    _currentLevel: number
   ): void {
     if (!this.context) return;
 
@@ -336,7 +322,7 @@ export class NativeAudioEngine implements IAudioEngine {
    * Used for exercise pause/stop or app backgrounding
    */
   releaseAllNotes(): void {
-    for (const [note, noteState] of this.activeNotes.entries()) {
+    for (const [_note, noteState] of this.activeNotes.entries()) {
       try {
         noteState.source.stop();
       } catch {

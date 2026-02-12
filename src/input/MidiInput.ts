@@ -11,6 +11,7 @@
 
 import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
 import type { MidiNoteEvent } from '@/core/exercises/types';
+export type { MidiNoteEvent } from '@/core/exercises/types';
 
 const { RNMidi } = NativeModules;
 
@@ -317,18 +318,20 @@ export class NoOpMidiInput implements MidiInput {
   }
 
   async connectDevice(deviceId: string): Promise<void> {
+    this.state.activeDeviceId = deviceId;
     const device = this.state.connectedDevices.find((d) => d.id === deviceId);
     if (device) {
-      this.state.activeDeviceId = deviceId;
       this.connectionCallbacks.forEach((cb) => cb(device, true));
     }
   }
 
   async disconnectDevice(deviceId: string): Promise<void> {
-    const device = this.state.connectedDevices.find((d) => d.id === deviceId);
-    if (device && this.state.activeDeviceId === deviceId) {
+    if (this.state.activeDeviceId === deviceId) {
       this.state.activeDeviceId = null;
-      this.connectionCallbacks.forEach((cb) => cb(device, false));
+      const device = this.state.connectedDevices.find((d) => d.id === deviceId);
+      if (device) {
+        this.connectionCallbacks.forEach((cb) => cb(device, false));
+      }
     }
   }
 
@@ -357,7 +360,7 @@ export class NoOpMidiInput implements MidiInput {
   }
 
   getState(): MidiInputState {
-    return this.state;
+    return { ...this.state, connectedDevices: [...this.state.connectedDevices] };
   }
 
   isReady(): boolean {
@@ -366,10 +369,32 @@ export class NoOpMidiInput implements MidiInput {
 
   // For testing only
   _simulateNoteEvent(note: MidiNoteEvent): void {
-    this.noteCallbacks.forEach((cb) => cb(note));
+    this.state.lastNoteTime = Date.now();
+    this.noteCallbacks.forEach((cb) => {
+      try {
+        cb(note);
+      } catch (error) {
+        console.error('[MIDI] Error in note callback:', error);
+      }
+    });
   }
 
   _simulateDeviceConnection(device: MidiDevice, connected: boolean): void {
+    if (connected) {
+      // Add device to connected list if not already present
+      if (!this.state.connectedDevices.find((d) => d.id === device.id)) {
+        this.state.connectedDevices.push(device);
+      }
+    } else {
+      // Remove device from connected list
+      this.state.connectedDevices = this.state.connectedDevices.filter(
+        (d) => d.id !== device.id
+      );
+      // Clear active device if it was the disconnected one
+      if (this.state.activeDeviceId === device.id) {
+        this.state.activeDeviceId = null;
+      }
+    }
     this.connectionCallbacks.forEach((cb) => cb(device, connected));
   }
 }

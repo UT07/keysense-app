@@ -19,7 +19,7 @@ export interface CoachingInput {
 }
 
 export class CoachingService {
-  private apiKey: string;
+  apiKey: string;
 
   constructor(apiKey?: string) {
     this.apiKey = apiKey || process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';

@@ -112,7 +112,7 @@ export async function getCoachFeedback(
  * Fallback feedback when API is unavailable
  */
 function getFallbackCoachFeedback(request: CoachFeedbackRequest): CoachFeedbackResponse {
-  const { score, issues, context } = request;
+  const { score, issues } = request;
 
   let feedback = '';
 

@@ -4,7 +4,7 @@
  * Shows real-time scoring and visual feedback
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -12,15 +12,15 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Animated,
-  Dimensions,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Keyboard } from '../components/Keyboard/Keyboard';
 import { PianoRoll } from '../components/PianoRoll/PianoRoll';
-import { Exercise, ExerciseScore } from '../core/exercises/types';
+import { Exercise, ExerciseScore, MidiNoteEvent } from '../core/exercises/types';
 
 export interface ExerciseScreenProps {
-  exercise: Exercise;
+  exercise?: Exercise;
   onExerciseComplete?: (score: ExerciseScore) => void;
   onClose?: () => void;
 }
@@ -44,13 +44,56 @@ function calculateCurrentBeat(elapsedMs: number, tempo: number): number {
  * ExerciseScreen - Full exercise player with keyboard and feedback
  * Manages playback, scoring, and visual feedback
  */
+// Default demo exercise when no specific exercise is loaded
+const DEFAULT_EXERCISE: Exercise = {
+  id: 'lesson-01-ex-01',
+  version: 1,
+  metadata: {
+    title: 'Find Middle C',
+    description: 'Learn to locate and play Middle C',
+    difficulty: 1,
+    estimatedMinutes: 2,
+    skills: ['note-finding', 'c-major'],
+    prerequisites: [],
+  },
+  settings: {
+    tempo: 60,
+    timeSignature: [4, 4] as [number, number],
+    keySignature: 'C',
+    countIn: 4,
+    metronomeEnabled: true,
+  },
+  notes: [
+    { note: 60, startBeat: 0, durationBeats: 1, hand: 'right' as const },
+    { note: 60, startBeat: 1, durationBeats: 1, hand: 'right' as const },
+    { note: 60, startBeat: 2, durationBeats: 1, hand: 'right' as const },
+    { note: 60, startBeat: 3, durationBeats: 1, hand: 'right' as const },
+  ],
+  scoring: {
+    timingToleranceMs: 75,
+    timingGracePeriodMs: 200,
+    passingScore: 60,
+    starThresholds: [60, 80, 95],
+  },
+  hints: {
+    beforeStart: 'Place your right thumb on Middle C (the white key in the center)',
+    commonMistakes: [{ pattern: 'wrong-key', advice: 'Middle C is to the left of the two black keys in the center of the keyboard' }],
+    successMessage: 'Great job finding Middle C!',
+  },
+};
+
 export const ExerciseScreen: React.FC<ExerciseScreenProps> = ({
-  exercise,
+  exercise: exerciseProp,
   onExerciseComplete,
   onClose,
 }) => {
-  const screenHeight = Dimensions.get('window').height;
+  const navigation = useNavigation();
+  // Route params available for future exercise loading by ID
+  // const route = useRoute<RouteProp<RootStackParamList, 'Exercise'>>();
 
+  // Use provided exercise or default (TODO: load by route.params.exerciseId)
+  const exercise = exerciseProp ?? DEFAULT_EXERCISE;
+  const handleClose = onClose ?? (() => navigation.goBack());
   // Playback state
   const [playbackState, setPlaybackState] = useState<PlaybackState>({
     isPlaying: false,
@@ -67,11 +110,11 @@ export const ExerciseScreen: React.FC<ExerciseScreenProps> = ({
     type: 'perfect' | 'good' | 'ok' | 'miss';
     noteIndex: number;
   } | null>(null);
-  const [score, setScore] = useState<ExerciseScore | null>(null);
+  const [_score, setScore] = useState<ExerciseScore | null>(null);
 
   // Animations
   const feedbackAnim = useRef(new Animated.Value(0)).current;
-  const progressAnim = useRef(new Animated.Value(0)).current;
+  // progressAnim reserved for future animation use
 
   // Update expected notes for current playback position
   useEffect(() => {
@@ -90,7 +133,8 @@ export const ExerciseScreen: React.FC<ExerciseScreenProps> = ({
    * Handle keyboard key press
    */
   const handleKeyDown = useCallback(
-    (midiNote: number) => {
+    (event: MidiNoteEvent) => {
+      const midiNote = event.note;
       setHighlightedKeys(prev => new Set([...prev, midiNote]));
 
       // Check if this is an expected note
@@ -194,7 +238,7 @@ export const ExerciseScreen: React.FC<ExerciseScreenProps> = ({
         accuracy: 90,
         timing: 85,
         completeness: 95,
-        precision: 85,
+        extraNotes: 0,
       },
       details: [],
       perfectNotes: 5,
@@ -218,7 +262,7 @@ export const ExerciseScreen: React.FC<ExerciseScreenProps> = ({
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+        <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
           <MaterialCommunityIcons name="close" size={24} color="#333" />
         </TouchableOpacity>
         <View style={styles.titleContainer}>
@@ -299,8 +343,8 @@ export const ExerciseScreen: React.FC<ExerciseScreenProps> = ({
           scrollable={true}
           highlightedNotes={highlightedKeys}
           expectedNotes={expectedKeys}
-          onKeyDown={handleKeyDown}
-          onKeyUp={handleKeyUp}
+          onNoteOn={handleKeyDown}
+          onNoteOff={handleKeyUp}
           hapticEnabled={true}
           showLabels={false}
           keyHeight={100}

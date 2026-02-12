@@ -310,9 +310,3 @@ export function getExpectedNoteSequence(exercise: Exercise): number[] {
   return exercise.notes.map((n) => n.note);
 }
 
-/**
- * Check if note is enharmonic equivalent
- */
-function areEnharmonic(note1: number, note2: number): boolean {
-  return note1 % 12 === note2 % 12;
-}

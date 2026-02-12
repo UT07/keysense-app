@@ -66,9 +66,9 @@ export const PianoRoll = React.memo(
   ({
     notes,
     currentBeat = 0,
-    tempo = 120,
-    timeSignature = [4, 4],
-    visibleBeats = 8,
+    tempo: _tempo = 120,
+    timeSignature: _timeSignature = [4, 4],
+    visibleBeats: _visibleBeats = 8,
     onNoteHighlight,
     testID,
   }: PianoRollProps) => {
@@ -167,7 +167,7 @@ export const PianoRoll = React.memo(
           onScroll={handleScroll}
           showsHorizontalScrollIndicator={false}
           scrollsToTop={false}
-          scrollX={currentScrollX}
+          contentOffset={{ x: currentScrollX, y: 0 }}
         >
           <View
             style={[

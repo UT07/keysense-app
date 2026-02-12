@@ -23,13 +23,6 @@
 import { NativeAudioEngine } from '../src/audio/AudioEngine.native';
 import type { NoteHandle } from '../src/audio/types';
 
-interface LatencyMeasurement {
-  outputLatency: number; // milliseconds
-  schedulingOverhead: number; // milliseconds
-  totalLatency: number; // milliseconds
-  timestamp: number;
-}
-
 interface LatencyStats {
   min: number;
   max: number;
@@ -97,7 +90,6 @@ async function measureTouchToSound(
 
   for (let i = 0; i < iterations; i++) {
     // Simulate touch event processing
-    const touchStartTime = performance.now();
 
     // Simulate event handler (typically <1ms)
     // This would be React Native event processing time
@@ -133,7 +125,6 @@ async function measureMidiToSound(
 
   for (let i = 0; i < iterations; i++) {
     // Simulate MIDI message arrival
-    const midiTime = performance.now();
 
     // MIDI parsing (typically <0.5ms)
     const parseTime = 0.2; // 0.2ms estimate
@@ -264,7 +255,7 @@ async function main(): Promise<void> {
     console.log('═'.repeat(50));
     console.log('\n1️⃣  HARDWARE OUTPUT LATENCY');
     console.log('─'.repeat(50));
-    const outputLatency = await measureOutputLatency(engine);
+    await measureOutputLatency(engine);
 
     // Measure scheduling overhead
     console.log('\n2️⃣  JAVASCRIPT SCHEDULING OVERHEAD');

@@ -6,26 +6,26 @@
 import { PersistenceManager, STORAGE_KEYS, createDebouncedSave } from '../persistence';
 
 describe('Persistence Manager', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     // Clear all data before each test
-    PersistenceManager.clearAll();
+    await PersistenceManager.clearAll();
   });
 
   describe('saveState and loadState', () => {
-    it('should save and load simple state', () => {
+    it('should save and load simple state', async () => {
       const testData = {
         count: 42,
         name: 'test',
         active: true,
       };
 
-      PersistenceManager.saveState('test-key', testData);
-      const loaded = PersistenceManager.loadState('test-key', { count: 0, name: '', active: false });
+      await PersistenceManager.saveState('test-key', testData);
+      const loaded = await PersistenceManager.loadState('test-key', { count: 0, name: '', active: false });
 
       expect(loaded).toEqual(testData);
     });
 
-    it('should handle complex objects', () => {
+    it('should handle complex objects', async () => {
       const testData = {
         user: {
           id: 'user-1',
@@ -40,13 +40,13 @@ describe('Persistence Manager', () => {
         },
       };
 
-      PersistenceManager.saveState('complex-key', testData);
-      const loaded = PersistenceManager.loadState('complex-key', {});
+      await PersistenceManager.saveState('complex-key', testData);
+      const loaded = await PersistenceManager.loadState('complex-key', {});
 
       expect(loaded).toEqual(testData);
     });
 
-    it('should handle arrays', () => {
+    it('should handle arrays', async () => {
       const testData = {
         items: [
           { id: 1, name: 'item1' },
@@ -55,92 +55,94 @@ describe('Persistence Manager', () => {
         ],
       };
 
-      PersistenceManager.saveState('array-key', testData);
-      const loaded = PersistenceManager.loadState('array-key', { items: [] });
+      await PersistenceManager.saveState('array-key', testData);
+      const loaded = await PersistenceManager.loadState('array-key', { items: [] });
 
       expect(loaded).toEqual(testData);
     });
 
-    it('should return default value if key not found', () => {
+    it('should return default value if key not found', async () => {
       const defaultValue = { count: 0, name: 'default' };
-      const loaded = PersistenceManager.loadState('non-existent', defaultValue);
+      const loaded = await PersistenceManager.loadState('non-existent', defaultValue);
 
       expect(loaded).toEqual(defaultValue);
     });
 
-    it('should overwrite previous data', () => {
-      PersistenceManager.saveState('key', { value: 1 });
-      PersistenceManager.saveState('key', { value: 2 });
+    it('should overwrite previous data', async () => {
+      await PersistenceManager.saveState('key', { value: 1 });
+      await PersistenceManager.saveState('key', { value: 2 });
 
-      const loaded = PersistenceManager.loadState('key', { value: 0 });
+      const loaded = await PersistenceManager.loadState('key', { value: 0 });
       expect(loaded).toEqual({ value: 2 });
     });
   });
 
   describe('deleteState', () => {
-    it('should delete saved state', () => {
-      PersistenceManager.saveState('delete-key', { value: 42 });
-      expect(PersistenceManager.loadState('delete-key', { value: 0 })).toEqual({ value: 42 });
+    it('should delete saved state', async () => {
+      await PersistenceManager.saveState('delete-key', { value: 42 });
+      expect(await PersistenceManager.loadState('delete-key', { value: 0 })).toEqual({ value: 42 });
 
-      PersistenceManager.deleteState('delete-key');
-      expect(PersistenceManager.loadState('delete-key', { value: 0 })).toEqual({ value: 0 });
+      await PersistenceManager.deleteState('delete-key');
+      expect(await PersistenceManager.loadState('delete-key', { value: 0 })).toEqual({ value: 0 });
     });
 
-    it('should handle deleting non-existent keys gracefully', () => {
-      expect(() => {
-        PersistenceManager.deleteState('non-existent-key');
+    it('should handle deleting non-existent keys gracefully', async () => {
+      await expect(async () => {
+        await PersistenceManager.deleteState('non-existent-key');
       }).not.toThrow();
     });
   });
 
   describe('clearAll', () => {
-    it('should clear all KeySense data', () => {
-      PersistenceManager.saveState(STORAGE_KEYS.EXERCISE, { exerciseId: 'ex-1' });
-      PersistenceManager.saveState(STORAGE_KEYS.PROGRESS, { totalXp: 100 });
-      PersistenceManager.saveState(STORAGE_KEYS.SETTINGS, { volume: 0.8 });
+    it('should clear all KeySense data', async () => {
+      await PersistenceManager.saveState(STORAGE_KEYS.EXERCISE, { exerciseId: 'ex-1' });
+      await PersistenceManager.saveState(STORAGE_KEYS.PROGRESS, { totalXp: 100 });
+      await PersistenceManager.saveState(STORAGE_KEYS.SETTINGS, { volume: 0.8 });
 
-      PersistenceManager.clearAll();
+      await PersistenceManager.clearAll();
 
-      expect(PersistenceManager.loadState(STORAGE_KEYS.EXERCISE, null)).toBeNull();
-      expect(PersistenceManager.loadState(STORAGE_KEYS.PROGRESS, null)).toBeNull();
-      expect(PersistenceManager.loadState(STORAGE_KEYS.SETTINGS, null)).toBeNull();
+      expect(await PersistenceManager.loadState(STORAGE_KEYS.EXERCISE, null)).toBeNull();
+      expect(await PersistenceManager.loadState(STORAGE_KEYS.PROGRESS, null)).toBeNull();
+      expect(await PersistenceManager.loadState(STORAGE_KEYS.SETTINGS, null)).toBeNull();
     });
   });
 
   describe('Migration versioning', () => {
-    it('should track migration version', () => {
-      expect(PersistenceManager.getMigrationVersion()).toBe(0);
+    it('should track migration version', async () => {
+      expect(await PersistenceManager.getMigrationVersion()).toBe(0);
 
-      PersistenceManager.setMigrationVersion(1);
-      expect(PersistenceManager.getMigrationVersion()).toBe(1);
+      await PersistenceManager.setMigrationVersion(1);
+      expect(await PersistenceManager.getMigrationVersion()).toBe(1);
 
-      PersistenceManager.setMigrationVersion(2);
-      expect(PersistenceManager.getMigrationVersion()).toBe(2);
+      await PersistenceManager.setMigrationVersion(2);
+      expect(await PersistenceManager.getMigrationVersion()).toBe(2);
     });
 
-    it('should persist migration version across operations', () => {
-      PersistenceManager.setMigrationVersion(3);
+    it('should persist migration version across operations', async () => {
+      await PersistenceManager.setMigrationVersion(3);
 
       // Save and load other data
-      PersistenceManager.saveState('test', { data: 'value' });
-      PersistenceManager.loadState('test', {});
+      await PersistenceManager.saveState('test', { data: 'value' });
+      await PersistenceManager.loadState('test', {});
 
       // Version should still be preserved
-      expect(PersistenceManager.getMigrationVersion()).toBe(3);
+      expect(await PersistenceManager.getMigrationVersion()).toBe(3);
     });
   });
 });
 
 describe('Debounced Save', () => {
-  jest.useFakeTimers();
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
 
   afterEach(() => {
     jest.runOnlyPendingTimers();
     jest.useRealTimers();
   });
 
-  it('should debounce save calls', () => {
-    const mockSaveState = jest.spyOn(PersistenceManager, 'saveState');
+  it('should debounce save calls', async () => {
+    const mockSaveState = jest.spyOn(PersistenceManager, 'saveState').mockResolvedValue();
     const debouncedSave = createDebouncedSave('test-key', 500);
 
     // Multiple calls
@@ -151,8 +153,9 @@ describe('Debounced Save', () => {
     // Nothing saved yet
     expect(mockSaveState).not.toHaveBeenCalled();
 
-    // Advance time
+    // Advance time and flush promises
     jest.advanceTimersByTime(500);
+    await Promise.resolve(); // Flush promises
 
     // Only one save should have happened (with latest value)
     expect(mockSaveState).toHaveBeenCalledTimes(1);
@@ -161,55 +164,62 @@ describe('Debounced Save', () => {
     mockSaveState.mockRestore();
   });
 
-  it('should respect debounce delay', () => {
-    const mockSaveState = jest.spyOn(PersistenceManager, 'saveState');
+  it('should respect debounce delay', async () => {
+    const mockSaveState = jest.spyOn(PersistenceManager, 'saveState').mockResolvedValue();
     const debouncedSave = createDebouncedSave('test-key', 1000);
 
     debouncedSave({ value: 1 });
 
     // Advance less than delay
     jest.advanceTimersByTime(500);
+    await Promise.resolve();
     expect(mockSaveState).not.toHaveBeenCalled();
 
     // Advance to full delay
     jest.advanceTimersByTime(500);
+    await Promise.resolve(); // Flush promises
     expect(mockSaveState).toHaveBeenCalledTimes(1);
 
     mockSaveState.mockRestore();
   });
 
-  it('should reset timer on new calls', () => {
-    const mockSaveState = jest.spyOn(PersistenceManager, 'saveState');
+  it('should reset timer on new calls', async () => {
+    const mockSaveState = jest.spyOn(PersistenceManager, 'saveState').mockResolvedValue();
     const debouncedSave = createDebouncedSave('test-key', 500);
 
     debouncedSave({ value: 1 });
     jest.advanceTimersByTime(400);
+    await Promise.resolve();
 
     // Call again before timer expires
     debouncedSave({ value: 2 });
     jest.advanceTimersByTime(400);
+    await Promise.resolve();
 
     // Still shouldn't have saved
     expect(mockSaveState).not.toHaveBeenCalled();
 
     // Advance to new timer expiry
     jest.advanceTimersByTime(100);
+    await Promise.resolve(); // Flush promises
     expect(mockSaveState).toHaveBeenCalledTimes(1);
     expect(mockSaveState).toHaveBeenCalledWith('test-key', { value: 2 });
 
     mockSaveState.mockRestore();
   });
 
-  it('should handle large delays', () => {
-    const mockSaveState = jest.spyOn(PersistenceManager, 'saveState');
+  it('should handle large delays', async () => {
+    const mockSaveState = jest.spyOn(PersistenceManager, 'saveState').mockResolvedValue();
     const debouncedSave = createDebouncedSave('test-key', 5000);
 
     debouncedSave({ value: 'large-delay' });
 
     jest.advanceTimersByTime(4999);
+    await Promise.resolve();
     expect(mockSaveState).not.toHaveBeenCalled();
 
     jest.advanceTimersByTime(1);
+    await Promise.resolve(); // Flush promises
     expect(mockSaveState).toHaveBeenCalledTimes(1);
 
     mockSaveState.mockRestore();

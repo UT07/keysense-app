@@ -15,7 +15,10 @@ import { create } from 'zustand';
 import type { SettingsStoreState, AudioSettings, DisplaySettings, NotificationSettings, MidiSettings } from './types';
 import { PersistenceManager, STORAGE_KEYS, createDebouncedSave } from './persistence';
 
-const defaultSettings: Omit<SettingsStoreState, keyof SettingsStoreState['updateAudioSettings'] | keyof SettingsStoreState['reset']> = {
+/** Data-only shape of settings state (excludes actions) */
+type SettingsData = AudioSettings & DisplaySettings & NotificationSettings & MidiSettings;
+
+const defaultSettings: SettingsData = {
   // Audio settings
   masterVolume: 0.8,
   soundEnabled: true,
@@ -42,35 +45,13 @@ const defaultSettings: Omit<SettingsStoreState, keyof SettingsStoreState['update
   lastMidiDeviceId: null,
   lastMidiDeviceName: null,
   autoConnectMidi: true,
-
-  // Action placeholders (overridden below)
-  updateAudioSettings: () => {},
-  updateDisplaySettings: () => {},
-  updateNotificationSettings: () => {},
-  updateMidiSettings: () => {},
-  setMasterVolume: () => {},
-  setSoundEnabled: () => {},
-  setHapticEnabled: () => {},
-  setShowFingerNumbers: () => {},
-  setShowNoteNames: () => {},
-  setPreferredHand: () => {},
-  setReminderTime: () => {},
-  setDailyGoalMinutes: () => {},
-  setLastMidiDevice: () => {},
-  setDarkMode: () => {},
 };
-
-// Initialize persisted state
-const initialState = PersistenceManager.loadState<Omit<SettingsStoreState, keyof {}>>(
-  STORAGE_KEYS.SETTINGS,
-  defaultSettings as Omit<SettingsStoreState, keyof {}>
-);
 
 // Create debounced save function
 const debouncedSave = createDebouncedSave(STORAGE_KEYS.SETTINGS, 500);
 
 export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
-  ...initialState,
+  ...defaultSettings,
 
   // Batch audio settings update
   updateAudioSettings: (settings: Partial<AudioSettings>) => {
@@ -168,7 +149,7 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
   },
 
   reset: () => {
-    set(defaultSettings as SettingsStoreState);
+    set(defaultSettings);
     PersistenceManager.deleteState(STORAGE_KEYS.SETTINGS);
   },
 }));

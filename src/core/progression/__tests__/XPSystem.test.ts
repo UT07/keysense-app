@@ -16,7 +16,7 @@ import {
   isDailyGoalMet,
   createDailyGoal,
   XP_REWARDS,
-} from '../XPSystem';
+} from '../XpSystem';
 
 describe('XPSystem', () => {
   describe('Level Calculations', () => {
@@ -46,18 +46,22 @@ describe('XPSystem', () => {
     });
 
     describe('totalXpForLevel', () => {
-      it('should return 100 for level 1', () => {
-        expect(totalXpForLevel(1)).toBe(100);
+      it('should return 0 for level 1 (no XP needed to start)', () => {
+        expect(totalXpForLevel(1)).toBe(0);
       });
 
-      it('should return 250 for level 2 (100 + 150)', () => {
-        expect(totalXpForLevel(2)).toBe(250);
+      it('should return 100 for level 2 (XP needed to reach level 2)', () => {
+        expect(totalXpForLevel(2)).toBe(100);
+      });
+
+      it('should return 250 for level 3 (100 + 150)', () => {
+        expect(totalXpForLevel(3)).toBe(250);
       });
 
       it('should accumulate correctly', () => {
-        const total1 = totalXpForLevel(1);
         const total2 = totalXpForLevel(2);
-        expect(total2).toBe(total1 + xpForLevel(2));
+        const total3 = totalXpForLevel(3);
+        expect(total3).toBe(total2 + xpForLevel(2));
       });
 
       it('should grow for each level', () => {
@@ -80,9 +84,14 @@ describe('XPSystem', () => {
         expect(levelFromXp(249)).toBe(2);
       });
 
-      it('should return level 3 for 250+ XP', () => {
+      it('should return level 3 for 250-474 XP', () => {
         expect(levelFromXp(250)).toBe(3);
-        expect(levelFromXp(500)).toBe(3);
+        expect(levelFromXp(474)).toBe(3);
+      });
+
+      it('should return level 4 for 475+ XP', () => {
+        expect(levelFromXp(475)).toBe(4);
+        expect(levelFromXp(500)).toBe(4);
       });
 
       it('should match totalXpForLevel', () => {
@@ -230,15 +239,28 @@ describe('XPSystem', () => {
       });
 
       it('should award freeze every 7 days', () => {
-        let streak = createEmptyStreak();
-        for (let i = 0; i < 6; i++) {
-          streak = recordPracticeSession(streak);
-        }
-        expect(streak.freezesAvailable).toBe(1); // Original
+        // Simulate 7 consecutive days of practice by manually constructing streak state
+        const today = new Date();
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-        // Day 7
+        // Build up streak to 6 days (as if practiced 6 consecutive days ending yesterday)
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+        let streak: ReturnType<typeof createEmptyStreak> = {
+          ...createEmptyStreak(),
+          currentStreak: 6,
+          longestStreak: 6,
+          lastPracticeDate: yesterdayStr,
+          freezesAvailable: 1,
+        };
+
+        // Day 7 practice (today)
         streak = recordPracticeSession(streak);
-        expect(streak.freezesAvailable).toBe(2); // Original + 1 for 7-day milestone
+        expect(streak.currentStreak).toBe(7);
+        expect(streak.freezesAvailable).toBe(2); // Original 1 + 1 for 7-day milestone
       });
 
       it('should update weekly practice log', () => {

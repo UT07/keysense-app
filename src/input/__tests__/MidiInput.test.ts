@@ -3,7 +3,7 @@
  * Tests for device discovery, connection, and event handling
  */
 
-import { NoOpMidiInput, NativeMidiInput } from '../MidiInput';
+import { NoOpMidiInput } from '../MidiInput';
 import type { MidiNoteEvent, MidiDevice } from '../MidiInput';
 
 describe('NoOpMidiInput', () => {

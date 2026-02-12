@@ -1,6 +1,6 @@
 /**
- * MMKV Persistence Layer
- * Handles automated state synchronization with React Native MMKV
+ * AsyncStorage Persistence Layer
+ * Handles automated state synchronization with AsyncStorage (Expo Go compatible)
  *
  * Features:
  * - Type-safe serialization/deserialization
@@ -8,14 +8,38 @@
  * - State hydration on app launch
  * - Schema migration support
  * - Development logging
+ *
+ * NOTE: Using AsyncStorage instead of MMKV for Expo Go compatibility.
+ * For production builds, consider switching to MMKV for better performance.
  */
 
-import { MMKV } from 'react-native-mmkv';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
- * Singleton MMKV instance
+ * Storage wrapper with sync-like interface for compatibility
  */
-export const storage = new MMKV();
+export const storage = {
+  setString: async (key: string, value: string): Promise<void> => {
+    await AsyncStorage.setItem(key, value);
+  },
+  getString: async (key: string): Promise<string | undefined> => {
+    const value = await AsyncStorage.getItem(key);
+    return value ?? undefined;
+  },
+  setNumber: async (key: string, value: number): Promise<void> => {
+    await AsyncStorage.setItem(key, value.toString());
+  },
+  getNumber: async (key: string): Promise<number | undefined> => {
+    const value = await AsyncStorage.getItem(key);
+    return value ? parseFloat(value) : undefined;
+  },
+  delete: async (key: string): Promise<void> => {
+    await AsyncStorage.removeItem(key);
+  },
+  clearAll: async (): Promise<void> => {
+    await AsyncStorage.clear();
+  },
+};
 
 /**
  * Storage keys
@@ -37,12 +61,12 @@ export const MIGRATION_VERSION = 1;
  */
 export class PersistenceManager {
   /**
-   * Save state to MMKV
+   * Save state to AsyncStorage
    */
-  static saveState<T>(key: string, state: T): void {
+  static async saveState<T>(key: string, state: T): Promise<void> {
     try {
       const serialized = JSON.stringify(state);
-      storage.setString(key, serialized);
+      await storage.setString(key, serialized);
 
       if (process.env.NODE_ENV === 'development') {
         console.log(`[PERSIST] Saved ${key}:`, state);
@@ -53,11 +77,11 @@ export class PersistenceManager {
   }
 
   /**
-   * Load state from MMKV
+   * Load state from AsyncStorage
    */
-  static loadState<T>(key: string, defaultValue: T): T {
+  static async loadState<T>(key: string, defaultValue: T): Promise<T> {
     try {
-      const serialized = storage.getString(key);
+      const serialized = await storage.getString(key);
       if (!serialized) {
         return defaultValue;
       }
@@ -76,11 +100,11 @@ export class PersistenceManager {
   }
 
   /**
-   * Delete state from MMKV
+   * Delete state from AsyncStorage
    */
-  static deleteState(key: string): void {
+  static async deleteState(key: string): Promise<void> {
     try {
-      storage.delete(key);
+      await storage.delete(key);
 
       if (process.env.NODE_ENV === 'development') {
         console.log(`[PERSIST] Deleted ${key}`);
@@ -93,13 +117,13 @@ export class PersistenceManager {
   /**
    * Clear all KeySense data
    */
-  static clearAll(): void {
+  static async clearAll(): Promise<void> {
     try {
-      Object.values(STORAGE_KEYS).forEach(key => {
-        if (typeof key === 'string') {
-          storage.delete(key);
-        }
-      });
+      await Promise.all(
+        Object.values(STORAGE_KEYS).map(key =>
+          typeof key === 'string' ? storage.delete(key) : Promise.resolve()
+        )
+      );
 
       if (process.env.NODE_ENV === 'development') {
         console.log('[PERSIST] Cleared all KeySense data');
@@ -112,9 +136,9 @@ export class PersistenceManager {
   /**
    * Get migration version
    */
-  static getMigrationVersion(): number {
+  static async getMigrationVersion(): Promise<number> {
     try {
-      const version = storage.getNumber(STORAGE_KEYS.MIGRATION_VERSION);
+      const version = await storage.getNumber(STORAGE_KEYS.MIGRATION_VERSION);
       return version ?? 0;
     } catch (error) {
       console.error('[PERSIST] Failed to get migration version:', error);
@@ -125,9 +149,9 @@ export class PersistenceManager {
   /**
    * Set migration version
    */
-  static setMigrationVersion(version: number): void {
+  static async setMigrationVersion(version: number): Promise<void> {
     try {
-      storage.setNumber(STORAGE_KEYS.MIGRATION_VERSION, version);
+      await storage.setNumber(STORAGE_KEYS.MIGRATION_VERSION, version);
     } catch (error) {
       console.error('[PERSIST] Failed to set migration version:', error);
     }
@@ -150,7 +174,10 @@ export function createDebouncedSave<T>(
     }
 
     timeoutId = setTimeout(() => {
-      PersistenceManager.saveState(key, state);
+      // Fire and forget - async save
+      PersistenceManager.saveState(key, state).catch(err =>
+        console.error('[PERSIST] Debounced save failed:', err)
+      );
       timeoutId = null;
     }, delayMs);
   };
@@ -166,20 +193,32 @@ export function createPersistMiddleware<T>(
   options: {
     debounceMs?: number;
     version?: number;
-    migrate?: (state: unknown, version: number) => T;
+    migrate?: (state: unknown, version: number) => Awaited<T>;
   } = {}
 ) {
   const { debounceMs = 1000, version = 1, migrate } = options;
 
   return (config: any) => {
-    const currentVersion = PersistenceManager.getMigrationVersion();
-    let initialState = PersistenceManager.loadState<T>(key, defaultValue);
+    // Initialize state asynchronously
+    let initialState = defaultValue;
 
-    // Run migrations if needed
-    if (migrate && currentVersion < version) {
-      initialState = migrate(initialState, currentVersion);
-      PersistenceManager.setMigrationVersion(version);
-    }
+    // Load initial state in background
+    (async () => {
+      try {
+        const currentVersion = await PersistenceManager.getMigrationVersion();
+        let loadedState = await PersistenceManager.loadState<T>(key, defaultValue);
+
+        // Run migrations if needed
+        if (migrate && currentVersion < version) {
+          loadedState = migrate(loadedState, currentVersion);
+          await PersistenceManager.setMigrationVersion(version);
+        }
+
+        initialState = loadedState;
+      } catch (error) {
+        console.error('[PERSIST] Failed to load initial state:', error);
+      }
+    })();
 
     const debouncedSave = createDebouncedSave(key, debounceMs);
 

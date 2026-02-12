@@ -95,7 +95,7 @@ export const Keyboard = React.memo(
     );
 
     const handleScroll = useCallback(
-      (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      (_event: NativeSyntheticEvent<NativeScrollEvent>) => {
         // Scroll event for potential future optimization
         // e.g., virtualization of off-screen keys
       },

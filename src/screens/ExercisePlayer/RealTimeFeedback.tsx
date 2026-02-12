@@ -9,7 +9,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Animated,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 

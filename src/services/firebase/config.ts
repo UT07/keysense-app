@@ -6,7 +6,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
-import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
+import { getFunctions } from 'firebase/functions';
 
 // ============================================================================
 // Firebase Config
@@ -38,14 +38,15 @@ export const functions = getFunctions(app, 'us-central1');
 // Emulator Setup (for local development)
 // ============================================================================
 
-if (process.env.EXPO_PUBLIC_FIREBASE_EMULATOR === 'true') {
+let emulatorsConnected = false;
+
+if (process.env.EXPO_PUBLIC_FIREBASE_EMULATOR === 'true' && !emulatorsConnected) {
   // Only connect once to avoid errors
   if (!auth.emulatorConfig) {
     connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
   }
-  if (!db.emulatorConfig) {
-    connectFirestoreEmulator(db, 'localhost', 8080);
-  }
+  connectFirestoreEmulator(db, 'localhost', 8080);
+  emulatorsConnected = true;
   // Note: Functions emulator connection is environment-specific
   // For React Native/Expo, use different approach
 }

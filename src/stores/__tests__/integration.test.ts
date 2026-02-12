@@ -6,7 +6,7 @@
 import { useExerciseStore } from '../exerciseStore';
 import { useProgressStore } from '../progressStore';
 import { useSettingsStore } from '../settingsStore';
-import { PersistenceManager, STORAGE_KEYS } from '../persistence';
+import { PersistenceManager } from '../persistence';
 import type { Exercise, MidiNoteEvent } from '@/core/exercises/types';
 
 describe('Store Integration', () => {
@@ -83,7 +83,7 @@ describe('Store Integration', () => {
           accuracy: 90,
           timing: 85,
           completeness: 95,
-          precision: 80,
+          extraNotes: 80,
         },
         details: [],
         perfectNotes: 3,
@@ -350,7 +350,7 @@ describe('Store Integration', () => {
           accuracy: 95,
           timing: 90,
           completeness: 100,
-          precision: 85,
+          extraNotes: 85,
         },
         details: [],
         perfectNotes: 8,

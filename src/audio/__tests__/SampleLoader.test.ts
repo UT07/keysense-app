@@ -120,7 +120,7 @@ describe('SampleLoader', () => {
     });
 
     test('retrieves correct sample for each base note', () => {
-      for (const [name, note] of Object.entries(BASE_NOTES)) {
+      for (const [_name, note] of Object.entries(BASE_NOTES)) {
         const sample = loader.getSample(note);
         expect(sample).not.toBeNull();
         expect(sample?.numberOfChannels).toBe(1);

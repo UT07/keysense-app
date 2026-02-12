@@ -33,23 +33,25 @@ const defaultDailyGoal: DailyGoalData = {
   isComplete: false,
 };
 
-// Initialize persisted state
-const initialState = PersistenceManager.loadState<Omit<ProgressStoreState, keyof {}>>(
-  STORAGE_KEYS.PROGRESS,
-  {
-    totalXp: 0,
-    level: 1,
-    streakData: defaultStreakData,
-    lessonProgress: {},
-    dailyGoalData: {},
-  }
-);
+/** Data-only shape of progress state (excludes actions) */
+type ProgressData = Pick<
+  ProgressStoreState,
+  'totalXp' | 'level' | 'streakData' | 'lessonProgress' | 'dailyGoalData'
+>;
+
+const defaultData: ProgressData = {
+  totalXp: 0,
+  level: 1,
+  streakData: defaultStreakData,
+  lessonProgress: {},
+  dailyGoalData: {},
+};
 
 // Create debounced save function
 const debouncedSave = createDebouncedSave(STORAGE_KEYS.PROGRESS, 1000);
 
 export const useProgressStore = create<ProgressStoreState>((set, get) => ({
-  ...initialState,
+  ...defaultData,
 
   addXp: (amount: number) => {
     set((state) => ({
@@ -141,7 +143,7 @@ export const useProgressStore = create<ProgressStoreState>((set, get) => ({
     debouncedSave(get());
   },
 
-  recordExerciseCompletion: (exerciseId: string, score: number, xpEarned: number) => {
+  recordExerciseCompletion: (_exerciseId: string, _score: number, xpEarned: number) => {
     const today = new Date().toISOString().split('T')[0];
     set((state) => {
       const dailyGoal = state.dailyGoalData[today] || {

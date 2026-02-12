@@ -12,7 +12,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { getMidiInput } from '../input/MidiInput';
 import MidiDeviceManager from '../input/MidiDevice';
-import type { MidiDevice, MidiInputState } from '../input/MidiInput';
+import type { MidiInputState } from '../input/MidiInput';
 import type { MidiDeviceInfo } from '../input/MidiDevice';
 
 interface MidiDeviceListProps {
@@ -241,7 +241,7 @@ export const MidiDeviceList: React.FC<MidiDeviceListProps> = ({
   const [preferredDeviceId, setPreferredDeviceId] = useState<string | null>(null);
 
   const midiInput = getMidiInput();
-  const deviceManager = MidiDeviceManager.getInstance();
+  const deviceManager = MidiDeviceManager;
 
   // Initialize and listen for changes
   useEffect(() => {

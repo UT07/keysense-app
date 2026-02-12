@@ -13,7 +13,6 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
-  Dimensions,
   ScrollView,
 } from 'react-native';
 import Animated, {
@@ -24,9 +23,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Button, Card } from '../components/common';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type OnboardingScreenProps = NativeStackNavigationProp<
-  any,
+  RootStackParamList,
   'Onboarding'
 >;
 
@@ -37,7 +37,6 @@ interface OnboardingState {
   completedAt?: Date;
 }
 
-const { width, height } = Dimensions.get('window');
 
 /**
  * Step 1: Welcome Screen
@@ -332,8 +331,8 @@ export function OnboardingScreen({
         ...prev,
         completedAt: new Date(),
       }));
-      // Navigate to home screen
-      navigation.navigate('Home');
+      // Navigate to main app
+      navigation.navigate('MainTabs');
     } else {
       setStep((prev) => prev + 1);
     }

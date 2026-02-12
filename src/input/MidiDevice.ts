@@ -11,7 +11,7 @@
  * - Cache device information for quick access
  */
 
-import { MMKV } from 'react-native-mmkv';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { MidiDevice as IMidiDevice } from './MidiInput';
 
 /**
@@ -113,17 +113,60 @@ const STORAGE_KEYS = {
 } as const;
 
 /**
+ * Storage wrapper for AsyncStorage
+ */
+class MidiStorage {
+  private prefix = 'midi-devices:';
+
+  async getString(key: string): Promise<string | null> {
+    return await AsyncStorage.getItem(this.prefix + key);
+  }
+
+  async getNumber(key: string): Promise<number | undefined> {
+    const value = await AsyncStorage.getItem(this.prefix + key);
+    return value ? parseFloat(value) : undefined;
+  }
+
+  async getBoolean(key: string): Promise<boolean | undefined> {
+    const value = await AsyncStorage.getItem(this.prefix + key);
+    return value ? value === 'true' : undefined;
+  }
+
+  async set(key: string, value: string | number | boolean): Promise<void> {
+    await AsyncStorage.setItem(this.prefix + key, String(value));
+  }
+
+  async delete(key: string): Promise<void> {
+    await AsyncStorage.removeItem(this.prefix + key);
+  }
+
+  async clearAll(): Promise<void> {
+    const keys = await AsyncStorage.getAllKeys();
+    const midiKeys = keys.filter(k => k.startsWith(this.prefix));
+    await AsyncStorage.multiRemove(midiKeys);
+  }
+}
+
+/**
  * MIDI Device Manager
  */
 export class MidiDeviceManager {
   private static instance: MidiDeviceManager;
-  private storage: MMKV;
+  private storage: MidiStorage;
   private discoveredDevices: Map<string, MidiDeviceInfo> = new Map();
   private statusListeners: Array<(device: MidiDeviceInfo, connected: boolean) => void> = [];
 
+  // In-memory cache for synchronous reads (async storage is fire-and-forget persistence)
+  private preferredDeviceId: string | null = null;
+  private lastUsedDeviceId: string | null = null;
+  private autoConnect: boolean = false;
+
   private constructor() {
-    this.storage = new MMKV({ id: 'midi-devices' });
-    this._loadDiscoveredDevices();
+    this.storage = new MidiStorage();
+    // Load devices asynchronously (fire-and-forget)
+    this._loadDiscoveredDevices().catch(err =>
+      console.error('[MIDI Device] Failed to load devices:', err)
+    );
   }
 
   static getInstance(): MidiDeviceManager {
@@ -166,10 +209,11 @@ export class MidiDeviceManager {
    */
   registerDevice(device: IMidiDevice): MidiDeviceInfo {
     const compatibility = this.getCompatibility(device);
+    const existing = this.discoveredDevices.get(device.id);
     const info: MidiDeviceInfo = {
       ...device,
       compatibility,
-      lastUsedTime: this.storage.getNumber(`device_last_used_${device.id}`),
+      lastUsedTime: existing?.lastUsedTime,
     };
 
     this.discoveredDevices.set(device.id, info);
@@ -199,22 +243,27 @@ export class MidiDeviceManager {
     const device = this.discoveredDevices.get(deviceId);
     if (device) {
       device.lastUsedTime = Date.now();
+      this.lastUsedDeviceId = deviceId;
       this.storage.set(`device_last_used_${deviceId}`, device.lastUsedTime);
       this._saveDiscoveredDevices();
     }
   }
 
   /**
-   * Get last used device ID
+   * Get last used device ID (most recently used, or preferred if none used)
    */
   getLastUsedDeviceId(): string | null {
-    return this.storage.getString(STORAGE_KEYS.lastDeviceId) ?? null;
+    return this.lastUsedDeviceId ?? this.preferredDeviceId;
   }
 
   /**
    * Set preferred device for auto-connect
    */
   setPreferredDevice(deviceId: string): void {
+    this.preferredDeviceId = deviceId;
+    this.autoConnect = true;
+
+    // Persist (fire-and-forget)
     this.storage.set(STORAGE_KEYS.lastDeviceId, deviceId);
     this.storage.set(STORAGE_KEYS.autoConnectEnabled, true);
 
@@ -239,13 +288,14 @@ export class MidiDeviceManager {
    * Check if auto-connect is enabled
    */
   isAutoConnectEnabled(): boolean {
-    return this.storage.getBoolean(STORAGE_KEYS.autoConnectEnabled) ?? false;
+    return this.autoConnect;
   }
 
   /**
    * Enable/disable auto-connect
    */
   setAutoConnectEnabled(enabled: boolean): void {
+    this.autoConnect = enabled;
     this.storage.set(STORAGE_KEYS.autoConnectEnabled, enabled);
   }
 
@@ -289,6 +339,9 @@ export class MidiDeviceManager {
    */
   clearHistory(): void {
     this.discoveredDevices.clear();
+    this.preferredDeviceId = null;
+    this.lastUsedDeviceId = null;
+    this.autoConnect = false;
     this.storage.clearAll();
     console.log('[MIDI Device] Cleared all device history');
   }
@@ -317,9 +370,9 @@ export class MidiDeviceManager {
   /**
    * Load discovered devices from storage
    */
-  private _loadDiscoveredDevices(): void {
+  private async _loadDiscoveredDevices(): Promise<void> {
     try {
-      const data = this.storage.getString(STORAGE_KEYS.discoveredDevices);
+      const data = await this.storage.getString(STORAGE_KEYS.discoveredDevices);
       if (data) {
         const devices = JSON.parse(data);
         for (const [id, device] of Object.entries(devices)) {
@@ -335,13 +388,13 @@ export class MidiDeviceManager {
   /**
    * Save discovered devices to storage
    */
-  private _saveDiscoveredDevices(): void {
+  private async _saveDiscoveredDevices(): Promise<void> {
     try {
       const data: Record<string, MidiDeviceInfo> = {};
       this.discoveredDevices.forEach((device, id) => {
         data[id] = device;
       });
-      this.storage.set(STORAGE_KEYS.discoveredDevices, JSON.stringify(data));
+      await this.storage.set(STORAGE_KEYS.discoveredDevices, JSON.stringify(data));
     } catch (error) {
       console.error('[MIDI Device] Error saving devices:', error);
     }

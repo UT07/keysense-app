@@ -12,7 +12,6 @@ import {
   Dimensions,
   Animated,
 } from 'react-native';
-import { Easing } from 'react-native-reanimated';
 
 export interface XPBarProps {
   currentXP: number; // Total XP earned
