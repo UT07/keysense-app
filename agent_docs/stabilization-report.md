@@ -287,9 +287,24 @@
 - Added fallback in `replayPooledSound`: if pool replay fails, automatically tries `createAndPlaySound` as backup
 - Better error messages include init state and sound source status
 
+### 15. Scoring Engine Timestamp Fix
+
+**Problem:** Scores were always ~6% even when playing correctly. The `matchNotes()` function in `ExerciseValidator.ts` compared `played.timestamp` (epoch `Date.now()` ~1.7 trillion ms) against `expectedTimeMs` (relative, 0-3000ms). The difference always exceeded the 200ms `maxTimeDistance`, so **no notes ever matched**.
+
+**`src/hooks/useExercisePlayback.ts` — `handleCompletion()`:**
+- Before scoring, converts all played note timestamps from epoch to relative:
+  `adjustedTimestamp = timestamp - startTimeRef - countInMs`
+- This aligns played note times with the scoring engine's `expectedTimeMs = startBeat * msPerBeat` frame
+
+**`src/core/exercises/ExerciseValidator.ts` — `matchNotes()`:**
+- Widened `maxTimeDistance` from hardcoded `200ms` to `tempoMs * 1.5` (±1.5 beats)
+- At 60 BPM this is ±1500ms — ensures the nearest note is always found
+- The timing QUALITY is still evaluated by `calculateTimingScore()` (tolerance/grace period)
+
 #### Verification
 - TypeScript: 0 errors (`npx tsc --noEmit`)
 - Tests: 433/433 passed (`npx jest --silent`)
+- Manual test: Lesson 1 Exercise 1 now scores correctly based on actual timing accuracy
 
 ---
 

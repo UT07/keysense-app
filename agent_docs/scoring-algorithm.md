@@ -104,3 +104,17 @@ overall = accuracy * 0.40 + timing * 0.35 + completeness * 0.15 + precision * 0.
 | 3 Medium | 40 | 125 | 70 |
 | 4 Hard | 30 | 100 | 75 |
 | 5 Expert | 20 | 75 | 80 |
+
+## Note Matching
+
+### Scoring Engine (`ExerciseValidator.matchNotes`)
+- Match window: ±1.5 beats (tempo-relative) — wide enough to always find the nearest note
+- Played note timestamps must be **relative to beat 0** (ms since exercise start, NOT epoch)
+- `useExercisePlayback.handleCompletion` converts epoch timestamps before scoring:
+  `adjustedTimestamp = Date.now() - startTimeRef - countInMs`
+
+### Visual Feedback (`ExercisePlayer.handleKeyDown`)
+- Uses **nearest-note matching** (not window-based)
+- Search radius: ±1.5 beats
+- Tracks consumed note indices to prevent double-counting
+- Independent from the scoring engine — provides real-time feedback during playback
