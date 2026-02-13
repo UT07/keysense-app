@@ -251,6 +251,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
 
   // References
   const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const consumedNoteIndicesRef = useRef<Set<number>>(new Set());
 
   // Animation values
   const comboScale = useRef(new Animated.Value(0)).current;
@@ -269,18 +270,16 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   const countInComplete = currentBeat >= 0;
 
   /**
-   * Calculate expected notes for current beat range
+   * Calculate expected notes for keyboard highlighting.
+   * Uses a wide window so the next note(s) to play are always highlighted.
    */
   useEffect(() => {
-    // Look ahead 0.5 beats for upcoming notes
-    const lookAheadBeats = 0.5;
-
     const expectedNotesSet = new Set<number>(
       exercise.notes
         .filter(
           (note) =>
-            note.startBeat >= currentBeat - 0.2 && // Small lookbehind for timing tolerance
-            note.startBeat < currentBeat + lookAheadBeats
+            note.startBeat >= currentBeat - 0.5 &&
+            note.startBeat < currentBeat + 2.0
         )
         .map((note) => note.note)
     );
@@ -331,6 +330,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     setHighlightedKeys(new Set());
     setComboCount(0);
     setFeedback({ type: null, noteIndex: -1, timestamp: 0 });
+    consumedNoteIndicesRef.current.clear();
 
     if (Platform.OS === 'web') {
       AccessibilityInfo.announceForAccessibility('Exercise restarted');
@@ -357,7 +357,11 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
 
   /**
    * Handle keyboard note press
-   * Always provides audio + visual feedback; scoring only during active playback
+   * Always provides audio + visual feedback; scoring only during active playback.
+   *
+   * Uses nearest-note matching instead of a fixed time window:
+   * for each key press, find the closest unconsumed note (by beat distance)
+   * with matching MIDI pitch. This eliminates dead zones between notes.
    */
   const handleKeyDown = useCallback(
     (midiNote: MidiNoteEvent) => {
@@ -373,41 +377,45 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       // Scoring feedback only during active playback
       if (!isPlaying || isPaused || !countInComplete) return;
 
-      // Check if this matches expected note and calculate timing
-      const isExpected = expectedNotes.has(midiNote.note);
+      // Nearest-note matching: find the closest unconsumed note with matching pitch
+      const MATCH_WINDOW_BEATS = 1.5; // Search within ±1.5 beats
+      let bestMatch: { index: number; beatDiff: number; startBeat: number } | null = null;
 
-      if (isExpected) {
-        // Find the matching expected note and calculate timing offset
-        const matchedNote = exercise.notes.find(
-          (n) =>
-            n.note === midiNote.note &&
-            n.startBeat >= currentBeat - 0.5 &&
-            n.startBeat < currentBeat + 0.5
-        );
+      for (let i = 0; i < exercise.notes.length; i++) {
+        const note = exercise.notes[i];
+        if (consumedNoteIndicesRef.current.has(i)) continue; // Already matched
+        if (note.note !== midiNote.note) continue; // Wrong pitch
 
-        let feedbackType: FeedbackState['type'] = 'good';
+        const beatDiff = Math.abs(currentBeat - note.startBeat);
+        if (beatDiff > MATCH_WINDOW_BEATS) continue; // Too far away
 
-        if (matchedNote) {
-          // Calculate timing offset in ms
-          const beatDiffMs =
-            Math.abs(currentBeat - matchedNote.startBeat) *
-            (60000 / exercise.settings.tempo);
+        if (!bestMatch || beatDiff < bestMatch.beatDiff) {
+          bestMatch = { index: i, beatDiff, startBeat: note.startBeat };
+        }
+      }
 
-          if (beatDiffMs <= exercise.scoring.timingToleranceMs * 0.5) {
-            feedbackType = 'perfect';
-          } else if (beatDiffMs <= exercise.scoring.timingToleranceMs) {
-            feedbackType = 'good';
-          } else if (beatDiffMs <= exercise.scoring.timingGracePeriodMs) {
-            feedbackType = currentBeat < matchedNote.startBeat ? 'early' : 'late';
-          } else {
-            feedbackType = 'ok';
-          }
+      if (bestMatch) {
+        // Mark this note as consumed so it can't be matched again
+        consumedNoteIndicesRef.current.add(bestMatch.index);
+
+        // Calculate timing offset in milliseconds
+        const beatDiffMs = bestMatch.beatDiff * (60000 / exercise.settings.tempo);
+
+        let feedbackType: FeedbackState['type'];
+        if (beatDiffMs <= exercise.scoring.timingToleranceMs * 0.5) {
+          feedbackType = 'perfect';
+        } else if (beatDiffMs <= exercise.scoring.timingToleranceMs) {
+          feedbackType = 'good';
+        } else if (beatDiffMs <= exercise.scoring.timingGracePeriodMs) {
+          feedbackType = currentBeat < bestMatch.startBeat ? 'early' : 'late';
+        } else {
+          feedbackType = 'ok';
         }
 
         setComboCount((prev) => prev + 1);
         setFeedback({
           type: feedbackType,
-          noteIndex: exercise.notes.findIndex((n) => n.note === midiNote.note),
+          noteIndex: bestMatch.index,
           timestamp: Date.now(),
         });
 
@@ -450,7 +458,6 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       isPaused,
       countInComplete,
       currentBeat,
-      expectedNotes,
       exercise.notes,
       exercise.settings.tempo,
       exercise.scoring.timingToleranceMs,
@@ -601,7 +608,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
             expectedNotes={expectedNotes}
             enabled={true}
             hapticEnabled={true}
-            showLabels={false}
+            showLabels={true}
             scrollable={true}
             keyHeight={100}
             testID="exercise-keyboard"

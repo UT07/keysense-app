@@ -64,7 +64,7 @@ function matchNotes(
     const expectedTimeMs = expected.startBeat * tempoMs;
 
     let bestMatch: { index: number; distance: number } | null = null;
-    const maxTimeDistance = 200; // ms
+    const maxTimeDistance = tempoMs * 1.5; // ±1.5 beats — wide enough to always find the closest note
 
     for (let j = 0; j < playedNotes.length; j++) {
       if (usedPlayedIndices.has(j)) continue;

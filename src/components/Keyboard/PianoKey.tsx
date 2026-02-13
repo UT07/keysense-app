@@ -203,8 +203,9 @@ const styles = StyleSheet.create({
     borderColor: '#FF9800',
   },
   expectedWhiteKey: {
-    backgroundColor: '#E8F5E9',
-    borderColor: '#4CAF50',
+    backgroundColor: '#C8E6C9',
+    borderColor: '#2E7D32',
+    borderWidth: 2,
   },
   blackKeyContainer: {
     position: 'absolute',

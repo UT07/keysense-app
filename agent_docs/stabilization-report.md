@@ -264,6 +264,35 @@
 
 ---
 
+### 13. Scoring Fix: Nearest-Note Matching
+
+**Problem:** The `handleKeyDown` in `ExercisePlayer.tsx` used a narrow 0.7-beat window (`[currentBeat - 0.2, currentBeat + 0.5]`) to determine if a key press matched an expected note. With notes 1 beat apart at 60 BPM, there were **300ms dead zones** between notes where every key press was marked as "miss" — making it impossible to complete the exercise. Additionally, `showLabels={false}` meant the user couldn't identify which key was Middle C.
+
+**`src/screens/ExercisePlayer/ExercisePlayer.tsx`:**
+- Replaced window-based `expectedNotes.has()` matching with **nearest-note matching**: for each key press, search all unconsumed exercise notes with matching MIDI pitch within ±1.5 beats
+- Added `consumedNoteIndicesRef` to track which notes have already been matched (prevents double-counting)
+- Timing feedback (perfect/good/early/late/ok/miss) calculated from actual beat distance to the matched note
+- Widened keyboard highlighting window from `[-0.2, +0.5]` to `[-0.5, +2.0]` beats so upcoming notes are always highlighted
+- Changed `showLabels={false}` → `showLabels={true}` so beginners can see note names
+- Consumed notes reset on exercise restart
+
+**`src/components/Keyboard/PianoKey.tsx`:**
+- Made expected key highlighting more visible: `#E8F5E9` → `#C8E6C9` background, `#4CAF50` → `#2E7D32` border, added `borderWidth: 2`
+
+### 14. Audio Engine Diagnostics
+
+**`src/audio/ExpoAudioEngine.ts`:**
+- Added comprehensive diagnostic logging throughout initialization: audio mode config, WAV generation size, file write verification (with `getInfoAsync`), pool load count
+- Added `warmUpAudio()` method that plays a near-silent note after initialization to prime the iOS audio pipeline
+- Added fallback in `replayPooledSound`: if pool replay fails, automatically tries `createAndPlaySound` as backup
+- Better error messages include init state and sound source status
+
+#### Verification
+- TypeScript: 0 errors (`npx tsc --noEmit`)
+- Tests: 433/433 passed (`npx jest --silent`)
+
+---
+
 ## Known Remaining Items
 
 1. ~~**Exercise loading by ID**: `ExerciseScreen` uses a hardcoded `DEFAULT_EXERCISE`~~ **RESOLVED** (Stream A)
@@ -271,6 +300,6 @@
 3. **Greeting time-of-day**: HomeScreen shows "Good Evening" regardless of time
 4. **ProfileScreen settings**: "Daily Goal", "Volume", and "About" buttons don't open any settings UI yet
 5. **PlayScreen keyboard**: Shows placeholder instead of actual piano keyboard component
-6. **Audio on simulator**: Audio playback requires physical device testing (mock engine active)
+6. **Audio on simulator**: Audio playback may require Mac volume to be on and iOS Simulator unmuted. `ExpoAudioEngine` uses in-memory WAV generation with expo-av. Logs now show initialization status for debugging. Physical device recommended for reliable audio testing.
 7. **Worker teardown warning**: Jest reports "worker process has failed to exit gracefully" (timer leak in tests, non-blocking)
-8. **Native audio engine**: Replace mock AudioEngine with react-native-audio-api (requires Expo Development Build)
+8. **Native audio engine**: Replace ExpoAudioEngine with react-native-audio-api (requires Expo Development Build)

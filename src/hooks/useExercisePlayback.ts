@@ -341,8 +341,19 @@ export function useExercisePlayback({
     setIsPlaying(false);
     exerciseStore.setIsPlaying(false);
 
-    // Calculate final score
-    const score = scoreExercise(exercise, playedNotes);
+    // Convert played note timestamps from epoch (Date.now()) to relative
+    // (ms since beat 0). The scoring engine expects timestamps in the same
+    // frame as expectedTimeMs = startBeat * msPerBeat.
+    const msPerBeat = 60000 / exercise.settings.tempo;
+    const countInMs = exercise.settings.countIn * msPerBeat;
+    const beat0EpochMs = startTimeRef.current + countInMs;
+
+    const adjustedNotes = playedNotes.map((n) => ({
+      ...n,
+      timestamp: n.timestamp - beat0EpochMs,
+    }));
+
+    const score = scoreExercise(exercise, adjustedNotes);
     exerciseStore.setScore(score);
 
     console.log('[useExercisePlayback] Exercise completed:', score);

@@ -132,25 +132,65 @@ export class ExpoAudioEngine implements IAudioEngine {
         staysActiveInBackground: false,
         shouldDuckAndroid: true,
       });
+      console.log('[ExpoAudioEngine] Audio mode configured');
 
       // Generate the base piano tone WAV and write to temp file
       // (iOS AVURLAsset does not support data: URIs — must use file://)
       const wavBuffer = generatePianoWav();
+      console.log(`[ExpoAudioEngine] WAV generated: ${wavBuffer.byteLength} bytes`);
+
       const base64 = arrayBufferToBase64(wavBuffer);
-      const fileUri = FileSystem.cacheDirectory + 'piano-tone.wav';
+      const cacheDir = FileSystem.cacheDirectory;
+      if (!cacheDir) {
+        throw new Error('FileSystem.cacheDirectory is null — cannot write audio file');
+      }
+      const fileUri = cacheDir + 'piano-tone.wav';
       await FileSystem.writeAsStringAsync(fileUri, base64, {
         encoding: FileSystem.EncodingType.Base64,
       });
+
+      // Verify the file was written
+      const fileInfo = await FileSystem.getInfoAsync(fileUri);
+      console.log(`[ExpoAudioEngine] WAV file written: ${fileUri}, exists=${fileInfo.exists}, size=${fileInfo.exists ? (fileInfo as { size: number }).size : 0}`);
+
       this.soundSource = { uri: fileUri };
 
       // Pre-create sound objects for common notes (sound pool)
       await this.preloadSoundPool();
 
       this.initialized = true;
-      console.log(`[ExpoAudioEngine] Initialized with ${this.soundPool.size} pre-loaded sounds`);
+      console.log(`[ExpoAudioEngine] Initialized successfully with ${this.soundPool.size}/${PRELOAD_NOTES.length} pre-loaded sounds`);
+
+      // Play a brief silent test to warm up the audio pipeline
+      await this.warmUpAudio();
     } catch (error) {
       console.error('[ExpoAudioEngine] Initialization failed:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Warm up the audio pipeline by playing a note at zero volume.
+   * iOS requires the first audio play to happen from a user gesture context,
+   * but in Expo Go this usually works from initialization.
+   */
+  private async warmUpAudio(): Promise<void> {
+    try {
+      const pooled = this.soundPool.get(60); // Middle C
+      if (pooled) {
+        await pooled.sound.setStatusAsync({
+          positionMillis: 0,
+          volume: 0.01, // Near-silent
+          shouldPlay: true,
+        });
+        // Stop after a brief moment
+        setTimeout(() => {
+          pooled.sound.stopAsync().catch(() => {});
+        }, 50);
+        console.log('[ExpoAudioEngine] Audio warm-up complete');
+      }
+    } catch (error) {
+      console.warn('[ExpoAudioEngine] Audio warm-up failed (non-critical):', error);
     }
   }
 
@@ -215,7 +255,7 @@ export class ExpoAudioEngine implements IAudioEngine {
 
   playNote(note: number, velocity: number = 0.8): NoteHandle {
     if (!this.initialized || !this.soundSource) {
-      console.warn('[ExpoAudioEngine] Not initialized, skipping playNote');
+      console.warn(`[ExpoAudioEngine] Not initialized (init=${this.initialized}, source=${!!this.soundSource}), skipping note ${note}`);
       return {
         note,
         startTime: Date.now() / 1000,
@@ -278,10 +318,11 @@ export class ExpoAudioEngine implements IAudioEngine {
     pooled.ready = false;
 
     // setPositionAsync(0) + playAsync is faster than createAsync
+    const vol = velocity * this.volume;
     pooled.sound
       .setStatusAsync({
         positionMillis: 0,
-        volume: velocity * this.volume,
+        volume: vol,
         shouldPlay: true,
       })
       .then(() => {
@@ -293,8 +334,12 @@ export class ExpoAudioEngine implements IAudioEngine {
         pooled.ready = true;
       })
       .catch((err) => {
-        console.warn(`[ExpoAudioEngine] Pool replay failed for note ${note}:`, err);
+        console.warn(`[ExpoAudioEngine] Pool replay failed for note ${note} (vol=${vol}):`, err);
         pooled.ready = true;
+        // Fallback: try creating a fresh sound
+        const rate = Math.pow(2, (note - BASE_MIDI_NOTE) / 12);
+        const clampedRate = Math.max(0.25, Math.min(4.0, rate));
+        this.createAndPlaySound(note, clampedRate, velocity);
       });
   }
 
