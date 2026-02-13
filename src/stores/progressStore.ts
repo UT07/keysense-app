@@ -18,7 +18,7 @@ import { PersistenceManager, STORAGE_KEYS, createDebouncedSave } from './persist
 const defaultStreakData: StreakData = {
   currentStreak: 0,
   longestStreak: 0,
-  lastPracticeDate: new Date().toISOString().split('T')[0],
+  lastPracticeDate: '', // Empty so first exercise triggers streak
   freezesAvailable: 1,
   freezesUsed: 0,
   weeklyPractice: [false, false, false, false, false, false, false],

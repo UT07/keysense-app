@@ -4,18 +4,21 @@
  * Displays score, stars, breakdown, and celebration
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  Modal,
   Animated,
   Easing,
+  ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button } from '../../components/common/Button';
+import { coachingService } from '../../services/ai/CoachingService';
+import { useProgressStore } from '../../stores/progressStore';
 import type { Exercise, ExerciseScore } from '../../core/exercises/types';
 
 export interface CompletionModalProps {
@@ -39,6 +42,45 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
   const scaleAnim = useRef(new Animated.Value(0.5)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const starsAnimValue = useRef(new Animated.Value(0)).current;
+
+  // AI Coach feedback
+  const [coachFeedback, setCoachFeedback] = useState<string | null>(null);
+  const [coachLoading, setCoachLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchFeedback = async () => {
+      try {
+        const { level } = useProgressStore.getState();
+        const result = await coachingService.generateFeedback({
+          exerciseId: exercise.id,
+          exerciseTitle: exercise.metadata.title,
+          difficulty: exercise.metadata.difficulty,
+          score,
+          userLevel: level,
+          attemptNumber: 1,
+          recentScores: [],
+        });
+        if (!cancelled) {
+          setCoachFeedback(result.feedback);
+        }
+      } catch {
+        if (!cancelled) {
+          setCoachFeedback('Keep practicing! You are making great progress.');
+        }
+      } finally {
+        if (!cancelled) {
+          setCoachLoading(false);
+        }
+      }
+    };
+
+    fetchFeedback();
+    return () => {
+      cancelled = true;
+    };
+  }, [exercise.id, exercise.metadata.title, exercise.metadata.difficulty, score]);
 
   // Trigger animations on mount
   useEffect(() => {
@@ -132,13 +174,11 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
   const resultDisplay = getResultDisplay();
 
   return (
-    <Modal
-      visible={true}
-      transparent={true}
-      animationType="fade"
-      testID={testID}
-    >
-      <View style={styles.overlay}>
+    <View style={styles.overlay} testID={testID}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <Animated.View
           style={[
             styles.container,
@@ -152,41 +192,46 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
             <Text style={styles.subtitle}>Exercise Complete!</Text>
           </View>
 
-          {/* Score Display */}
-          <View style={styles.scoreSection}>
-            <View style={styles.scoreCircle}>
-              <Text style={styles.scoreNumber}>{score.overall}</Text>
-              <Text style={styles.scoreLabel}>%</Text>
+          {/* Score + Stars in a compact row for landscape */}
+          <View style={styles.scoreStarsRow}>
+            {/* Score Display */}
+            <View style={styles.scoreSection}>
+              <View style={styles.scoreCircle}>
+                <Text style={styles.scoreNumber}>{score.overall}</Text>
+                <Text style={styles.scoreLabel}>%</Text>
+              </View>
             </View>
-          </View>
 
-          {/* Stars Display */}
-          <Animated.View
-            style={[
-              styles.starsContainer,
-              starsStyle,
-            ]}
-          >
-            {Array.from({ length: 3 }).map((_, i) => (
-              <MaterialCommunityIcons
-                key={i}
-                name={i < score.stars ? 'star' : 'star-outline'}
-                size={48}
-                color={i < score.stars ? '#FFD700' : '#E0E0E0'}
-              />
-            ))}
-          </Animated.View>
+            {/* Stars + Result */}
+            <View style={styles.starsResultColumn}>
+              <Animated.View
+                style={[
+                  styles.starsContainer,
+                  starsStyle,
+                ]}
+              >
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <MaterialCommunityIcons
+                    key={i}
+                    name={i < score.stars ? 'star' : 'star-outline'}
+                    size={36}
+                    color={i < score.stars ? '#FFD700' : '#E0E0E0'}
+                  />
+                ))}
+              </Animated.View>
 
-          {/* Result message */}
-          <View style={styles.resultSection}>
-            <MaterialCommunityIcons
-              name={resultDisplay.icon as any}
-              size={32}
-              color={resultDisplay.color}
-            />
-            <Text style={[styles.resultText, { color: resultDisplay.color }]}>
-              {resultDisplay.text}
-            </Text>
+              {/* Result message */}
+              <View style={styles.resultSection}>
+                <MaterialCommunityIcons
+                  name={resultDisplay.icon as any}
+                  size={24}
+                  color={resultDisplay.color}
+                />
+                <Text style={[styles.resultText, { color: resultDisplay.color }]}>
+                  {resultDisplay.text}
+                </Text>
+              </View>
+            </View>
           </View>
 
           {/* Score Breakdown */}
@@ -259,6 +304,19 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
             )}
           </View>
 
+          {/* AI Coach Feedback */}
+          <View style={styles.coachSection}>
+            <View style={styles.coachHeader}>
+              <MaterialCommunityIcons name="robot-outline" size={18} color="#7C4DFF" />
+              <Text style={styles.coachTitle}>Coach Feedback</Text>
+            </View>
+            {coachLoading ? (
+              <ActivityIndicator size="small" color="#7C4DFF" />
+            ) : (
+              <Text style={styles.coachText}>{coachFeedback}</Text>
+            )}
+          </View>
+
           {/* Action Buttons */}
           <View style={styles.actions}>
             <Button
@@ -271,8 +329,8 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
             />
           </View>
         </Animated.View>
-      </View>
-    </Modal>
+      </ScrollView>
+    </View>
   );
 };
 
@@ -280,20 +338,24 @@ CompletionModal.displayName = 'CompletionModal';
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    zIndex: 1000,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
   },
   container: {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 500,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 32,
-    gap: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
@@ -302,24 +364,30 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
     color: '#212121',
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#757575',
+  },
+  scoreStarsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 24,
   },
   scoreSection: {
     alignItems: 'center',
   },
   scoreCircle: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: '#E3F2FD',
     justifyContent: 'center',
     alignItems: 'center',
@@ -327,59 +395,63 @@ const styles = StyleSheet.create({
     borderColor: '#2196F3',
   },
   scoreNumber: {
-    fontSize: 56,
+    fontSize: 40,
     fontWeight: '700',
     color: '#2196F3',
   },
   scoreLabel: {
-    fontSize: 20,
+    fontSize: 16,
     color: '#2196F3',
     marginTop: -4,
+  },
+  starsResultColumn: {
+    alignItems: 'center',
+    gap: 8,
   },
   starsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 12,
+    gap: 8,
   },
   resultSection: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
+    gap: 8,
   },
   resultText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
   },
   breakdownSection: {
-    gap: 12,
+    gap: 8,
     backgroundColor: '#F5F5F5',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderRadius: 8,
   },
   breakdownTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: '#212121',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   breakdownRow: {
-    gap: 8,
+    gap: 4,
   },
   breakdownLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#757575',
     fontWeight: '600',
   },
   breakdownBar: {
-    height: 8,
+    height: 6,
     backgroundColor: '#E0E0E0',
-    borderRadius: 4,
+    borderRadius: 3,
     overflow: 'hidden',
   },
   breakdownFill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 3,
   },
   breakdownValue: {
     fontSize: 11,
@@ -395,7 +467,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 6,
     backgroundColor: '#FFF3E0',
     borderRadius: 8,
     flex: 1,
@@ -406,12 +478,34 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   statValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: '#FF6F00',
   },
+  coachSection: {
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  coachHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  coachTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#7C4DFF',
+  },
+  coachText: {
+    fontSize: 13,
+    color: '#4A148C',
+    lineHeight: 18,
+  },
   actions: {
-    gap: 12,
+    gap: 8,
   },
 });
 

@@ -4,22 +4,11 @@
  */
 
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent, act } from '@testing-library/react-native';
 import { ExercisePlayer } from '../ExercisePlayer';
 import type { Exercise } from '../../../core/exercises/types';
 
 // Mock dependencies
-// Mock InteractionManager.runAfterInteractions to run callbacks synchronously
-jest.mock('react-native/Libraries/Interaction/InteractionManager', () => {
-  const actual = jest.requireActual('react-native/Libraries/Interaction/InteractionManager');
-  return {
-    ...actual,
-    runAfterInteractions: jest.fn((callback: () => void) => {
-      callback();
-      return { cancel: jest.fn() };
-    }),
-  };
-});
 
 jest.mock('expo-haptics', () => ({
   impactAsync: jest.fn().mockResolvedValue(undefined),
@@ -37,6 +26,23 @@ jest.mock('../../../stores/exerciseStore', () => ({
     setCurrentBeat: jest.fn(),
     setIsPlaying: jest.fn(),
   })),
+}));
+
+jest.mock('../../../stores/progressStore', () => ({
+  useProgressStore: Object.assign(jest.fn(() => ({})), {
+    getState: jest.fn(() => ({
+      recordExerciseCompletion: jest.fn(),
+      updateStreakData: jest.fn(),
+      streakData: {
+        currentStreak: 0,
+        longestStreak: 0,
+        lastPracticeDate: '2026-01-01',
+        freezesAvailable: 1,
+        freezesUsed: 0,
+        weeklyPractice: [false, false, false, false, false, false, false],
+      },
+    })),
+  }),
 }));
 
 // Mock useExercisePlayback hook
@@ -268,6 +274,7 @@ describe('ExercisePlayer', () => {
   });
 
   it('should call onClose when exit button is pressed', () => {
+    jest.useFakeTimers();
     const onClose = jest.fn();
     const { getByTestId } = render(
       <ExercisePlayer exercise={MOCK_EXERCISE} onClose={onClose} />
@@ -276,7 +283,13 @@ describe('ExercisePlayer', () => {
     const exitButton = getByTestId('control-exit');
     fireEvent.press(exitButton);
 
+    // handleExit defers navigation via setTimeout
+    act(() => {
+      jest.advanceTimersByTime(100);
+    });
+
     expect(onClose).toHaveBeenCalled();
+    jest.useRealTimers();
   });
 
   it('should display piano roll', () => {

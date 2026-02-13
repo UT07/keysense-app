@@ -2,7 +2,7 @@
 
 ## Overview
 
-KeySense uses Gemini 1.5 Flash to provide personalized coaching feedback after exercises. The AI coach analyzes scoring data and provides actionable, encouraging advice.
+KeySense uses Gemini 2.0 Flash to provide personalized coaching feedback after exercises. The AI coach analyzes scoring data and provides actionable, encouraging advice.
 
 ## Integration Points
 
@@ -155,7 +155,7 @@ const genAI = new GoogleGenerativeAI(process.env.EXPO_PUBLIC_GEMINI_API_KEY!);
 
 export async function getCoachFeedback(request: CoachRequest): Promise<string> {
   const model = genAI.getGenerativeModel({ 
-    model: 'gemini-1.5-flash',
+    model: 'gemini-2.0-flash',
     systemInstruction: COACH_SYSTEM_PROMPT,
     generationConfig: {
       maxOutputTokens: 150,

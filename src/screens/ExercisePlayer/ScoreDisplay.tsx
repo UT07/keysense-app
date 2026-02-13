@@ -50,13 +50,17 @@ export const ScoreDisplay: React.FC<ScoreDisplayProps> = ({
   const getFeedbackColor = () => {
     switch (feedback) {
       case 'perfect':
-        return '#4CAF50';
+        return '#4CAF50'; // Green
       case 'good':
-        return '#8BC34A';
+        return '#8BC34A'; // Light green
       case 'ok':
-        return '#FFC107';
+        return '#FFC107'; // Yellow
+      case 'early':
+        return '#2196F3'; // Blue
+      case 'late':
+        return '#FF9800'; // Orange
       case 'miss':
-        return '#F44336';
+        return '#F44336'; // Red
       default:
         return '#757575';
     }

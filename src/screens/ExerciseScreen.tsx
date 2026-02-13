@@ -13,10 +13,12 @@ import {
   SafeAreaView,
   Animated,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Keyboard } from '../components/Keyboard/Keyboard';
 import { PianoRoll } from '../components/PianoRoll/PianoRoll';
+import { getExercise } from '../content/ContentLoader';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 import { Exercise, ExerciseScore, MidiNoteEvent } from '../core/exercises/types';
 
 export interface ExerciseScreenProps {
@@ -44,8 +46,8 @@ function calculateCurrentBeat(elapsedMs: number, tempo: number): number {
  * ExerciseScreen - Full exercise player with keyboard and feedback
  * Manages playback, scoring, and visual feedback
  */
-// Default demo exercise when no specific exercise is loaded
-const DEFAULT_EXERCISE: Exercise = {
+// Fallback exercise used only when no exercise can be loaded from content
+const FALLBACK_EXERCISE: Exercise = {
   id: 'lesson-01-ex-01',
   version: 1,
   metadata: {
@@ -88,11 +90,13 @@ export const ExerciseScreen: React.FC<ExerciseScreenProps> = ({
   onClose,
 }) => {
   const navigation = useNavigation();
-  // Route params available for future exercise loading by ID
-  // const route = useRoute<RouteProp<RootStackParamList, 'Exercise'>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'Exercise'>>();
 
-  // Use provided exercise or default (TODO: load by route.params.exerciseId)
-  const exercise = exerciseProp ?? DEFAULT_EXERCISE;
+  // Load exercise: prop > route param > fallback
+  const loadedExercise = route.params?.exerciseId
+    ? getExercise(route.params.exerciseId)
+    : null;
+  const exercise = exerciseProp ?? loadedExercise ?? FALLBACK_EXERCISE;
   const handleClose = onClose ?? (() => navigation.goBack());
   // Playback state
   const [playbackState, setPlaybackState] = useState<PlaybackState>({

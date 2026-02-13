@@ -149,9 +149,89 @@
 
 ---
 
+### 7. Lesson 1 End-to-End (Content → AI Coach)
+
+**Date:** February 2026
+**Scope:** Make Lesson 1 fully functional with no hardcoded data
+
+#### Stream A: Content Loader
+- **Created** `src/content/ContentLoader.ts` — static `require()` registry for all 31 exercises and 6 lessons
+- **Exports:** `getExercise(id)`, `getLessons()`, `getLesson(id)`, `getLessonExercises(lessonId)`, `getNextExerciseId()`, `getLessonIdForExercise()`
+- **Modified** `ExercisePlayer.tsx` — loads exercise via `route.params.exerciseId` → `ContentLoader.getExercise()`; renamed `DEFAULT_EXERCISE` to `FALLBACK_EXERCISE`
+- **Modified** `ExerciseScreen.tsx` — same treatment, loads from route params
+- **Modified** `LearnScreen.tsx` — replaced hardcoded `LESSONS` array with `ContentLoader.getLessons()`; reads title/description/exercise count from JSON manifests
+
+#### Stream B: Audio Reliability
+- **Modified** `ExpoAudioEngine.ts`:
+  - Pre-creates `Audio.Sound` objects for C3-C5 range (14 sounds) during `initialize()`
+  - `playNote()` replays pooled sounds via `setStatusAsync()` (near-synchronous) instead of `createAsync()` (async gap)
+  - Non-pooled notes fall back to original `createAndPlaySound()`
+  - `MAX_POLYPHONY` eviction now uses `startTime` timestamps instead of Map insertion order
+  - `dispose()` properly unloads pooled sounds
+
+#### Stream C: PianoRoll Scroll + Timing Feedback
+- **Modified** `PianoRoll.tsx`:
+  - Added `contentPadding = screenWidth / 3` to note positioning so beat 0 aligns with the playback marker
+  - Scroll formula simplified to `currentBeat * pixelsPerBeat` (no clamping to 0)
+- **Modified** `ExercisePlayer.tsx`:
+  - `handleKeyDown` now calculates timing offset and shows granular feedback: Perfect, Good, Early, Late, OK, Miss
+- **Modified** `ScoreDisplay.tsx`:
+  - Added colors for 'early' (blue) and 'late' (orange) feedback types
+
+#### Stream D: State Hydration
+- **Modified** `App.tsx`:
+  - `prepare()` now calls `PersistenceManager.loadState(STORAGE_KEYS.PROGRESS, null)` before splash screen hides
+  - Merges loaded data (totalXp, level, streakData, lessonProgress, dailyGoalData) into `useProgressStore.setState()`
+  - XP, streaks, and progress now persist across app restarts
+
+#### Stream E: AI Coach Integration
+- **Modified** `CoachingService.ts`:
+  - Replaced stub implementation with full delegation to `GeminiCoach.getFeedback()`
+  - Added `toCoachRequest()` converter that extracts pitch/timing errors from score details
+  - Added `exerciseId` and `difficulty` to `CoachingInput` interface
+- **Modified** `CompletionModal.tsx`:
+  - Added `useEffect` that calls `coachingService.generateFeedback()` on mount
+  - Shows loading spinner while AI generates feedback
+  - Displays styled coach feedback card (purple theme) with robot icon
+  - GeminiCoach's 5-tier fallback handles offline/failure gracefully
+
+#### Verification
+- TypeScript: 0 errors (`npx tsc --noEmit`)
+- Tests: 433/433 passed (`npx jest --silent`)
+
+---
+
+### 8. Sound Pool Lifecycle Fix
+
+**Problem:** Notes stopped playing midway through exercises. Pooled `Audio.Sound` objects were being permanently destroyed by `unloadAsync()` calls.
+
+**Root cause:** `doRelease()` and `releaseAllNotes()` called `unloadAsync()` on all sounds, including pre-loaded pool entries. Once a pooled sound is unloaded, subsequent `setStatusAsync()` replay attempts fail silently.
+
+**`src/audio/ExpoAudioEngine.ts`:**
+- `doRelease()`: Now checks `this.soundPool.has(note)` — pooled sounds are only stopped, never unloaded
+- `releaseAllNotes()`: Same pool-aware logic — pooled sounds stopped, dynamic sounds unloaded
+- Polyphony eviction: Now routes through `doRelease()` instead of direct `stopAsync()`, ensuring consistent pool handling
+- Only `dispose()` (engine shutdown) unloads pooled sounds
+
+### 9. Gemini Coach Stability Fix
+
+**Problem:** Console errors from Gemini API calls during exercise completion.
+
+**`src/services/ai/GeminiCoach.ts`:**
+- Updated model from `gemini-1.5-flash` to `gemini-2.0-flash`
+- Fixed `result.response` access (synchronous property, not a promise)
+- Added descriptive `console.warn` when API key is missing (helps with debugging)
+- Fallback feedback still provides useful coach responses when API is unavailable
+
+#### Verification
+- TypeScript: 0 errors (`npx tsc --noEmit`)
+- Tests: 433/433 passed (`npx jest --silent`)
+
+---
+
 ## Known Remaining Items
 
-1. **Exercise loading by ID**: `ExerciseScreen` uses a hardcoded `DEFAULT_EXERCISE`; needs to load exercises from `content/exercises/` by route param `exerciseId`
+1. ~~**Exercise loading by ID**: `ExerciseScreen` uses a hardcoded `DEFAULT_EXERCISE`~~ **RESOLVED** (Stream A)
 2. **Session tracking**: `minutesPracticedToday` is hardcoded to 0 in HomeScreen
 3. **Greeting time-of-day**: HomeScreen shows "Good Evening" regardless of time
 4. **ProfileScreen settings**: "Daily Goal", "Volume", and "About" buttons don't open any settings UI yet

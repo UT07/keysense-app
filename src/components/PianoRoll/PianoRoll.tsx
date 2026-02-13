@@ -4,7 +4,7 @@
  * Shows upcoming, active, and past notes with color coding
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -78,11 +78,13 @@ export const PianoRoll = React.memo(
     // Convert beat to pixel position
     // Assumption: 100 pixels per beat for visualization
     const pixelsPerBeat = 100;
+    // Padding so the first note starts at the playback marker (1/3 of screen)
+    const contentPadding = screenWidth / 3;
     const totalWidth = notes.length > 0
       ? Math.max(
           screenWidth,
           (Math.max(...notes.map((n) => n.startBeat + n.durationBeats)) + 2) *
-            pixelsPerBeat
+            pixelsPerBeat + contentPadding
         )
       : screenWidth;
 
@@ -90,7 +92,7 @@ export const PianoRoll = React.memo(
     const visualNotes = useMemo(() => {
       return notes.map((note, index) => {
         const topPosition = calculateNoteY(note.note, containerHeight);
-        const leftPosition = note.startBeat * pixelsPerBeat;
+        const leftPosition = contentPadding + note.startBeat * pixelsPerBeat;
         const width = Math.max(8, note.durationBeats * pixelsPerBeat);
         const height = 20;
 
@@ -116,7 +118,7 @@ export const PianoRoll = React.memo(
           isPast,
         } as VisualNote;
       });
-    }, [notes, currentBeat, containerHeight, pixelsPerBeat]);
+    }, [notes, currentBeat, containerHeight, pixelsPerBeat, contentPadding]);
 
     const handleScroll = useCallback(
       (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -137,11 +139,18 @@ export const PianoRoll = React.memo(
       [visualNotes, screenWidth, onNoteHighlight]
     );
 
-    // Calculate current scroll position to show current beat at 1/3 of screen
-    const currentScrollX = Math.max(
-      0,
-      currentBeat * pixelsPerBeat - screenWidth / 3
-    );
+    // Scroll so the current beat aligns with the playback marker (1/3 of screen).
+    // With contentPadding = screenWidth/3, beat 0 is already at the marker
+    // at scrollX=0, so we simply scroll by currentBeat * pixelsPerBeat.
+    const currentScrollX = Math.max(0, currentBeat * pixelsPerBeat);
+
+    // Ref for programmatic scrolling
+    const scrollViewRef = useRef<ScrollView>(null);
+
+    // Scroll to current beat position whenever it changes
+    useEffect(() => {
+      scrollViewRef.current?.scrollTo({ x: currentScrollX, animated: false });
+    }, [currentScrollX]);
 
     return (
       <View style={[styles.container, { height: containerHeight }]} testID={testID}>
@@ -162,12 +171,12 @@ export const PianoRoll = React.memo(
 
         {/* Notes container */}
         <ScrollView
+          ref={scrollViewRef}
           horizontal
           scrollEventThrottle={16}
           onScroll={handleScroll}
           showsHorizontalScrollIndicator={false}
           scrollsToTop={false}
-          contentOffset={{ x: currentScrollX, y: 0 }}
         >
           <View
             style={[

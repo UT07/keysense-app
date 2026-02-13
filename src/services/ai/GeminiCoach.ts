@@ -128,6 +128,7 @@ export class GeminiCoach {
     if (!this.genAI) {
       const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
       if (!apiKey) {
+        console.warn('[GeminiCoach] EXPO_PUBLIC_GEMINI_API_KEY is not set, using fallback feedback');
         throw new Error('EXPO_PUBLIC_GEMINI_API_KEY is not set');
       }
       this.genAI = new GoogleGenerativeAI(apiKey);
@@ -260,7 +261,7 @@ export class GeminiCoach {
     try {
       const genAI = this.initialize();
       const model = genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.0-flash',
         systemInstruction: COACH_SYSTEM_PROMPT,
         generationConfig: {
           maxOutputTokens: 150,
@@ -271,7 +272,7 @@ export class GeminiCoach {
       const prompt = this.buildPrompt(request);
 
       const result = await model.generateContent(prompt);
-      const response = await result.response;
+      const response = result.response;
       const text = response.text();
 
       // Validate response

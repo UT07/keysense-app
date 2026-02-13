@@ -1,8 +1,10 @@
 /**
- * AI Coaching service using Gemini
+ * AI Coaching service
+ * Delegates to GeminiCoach for actual AI feedback with caching and fallbacks.
  */
 
 import type { ExerciseScore } from '@/core/exercises/types';
+import { GeminiCoach, type CoachRequest } from './GeminiCoach';
 
 export interface CoachFeedback {
   feedback: string;
@@ -11,26 +13,75 @@ export interface CoachFeedback {
 }
 
 export interface CoachingInput {
+  exerciseId: string;
   exerciseTitle: string;
+  difficulty: number;
   score: ExerciseScore;
   userLevel: number;
   attemptNumber: number;
   recentScores: number[];
 }
 
+/**
+ * Convert a CoachingInput to the CoachRequest format used by GeminiCoach
+ */
+function toCoachRequest(input: CoachingInput): CoachRequest {
+  // Extract timing and pitch errors from score details
+  const pitchErrors = (input.score.details ?? [])
+    .filter((d) => !d.isCorrectPitch && !d.isExtraNote && !d.isMissedNote)
+    .slice(0, 3)
+    .map((d) => ({
+      expected: `MIDI ${d.expected.note}`,
+      played: d.played ? `MIDI ${d.played.note}` : 'none',
+      beatPosition: d.expected.startBeat,
+    }));
+
+  const timingErrors = (input.score.details ?? [])
+    .filter((d) => d.isCorrectPitch && Math.abs(d.timingOffsetMs) > 50)
+    .sort((a, b) => Math.abs(b.timingOffsetMs) - Math.abs(a.timingOffsetMs))
+    .slice(0, 3)
+    .map((d) => ({
+      note: `MIDI ${d.expected.note}`,
+      offsetMs: d.timingOffsetMs,
+      beatPosition: d.expected.startBeat,
+    }));
+
+  return {
+    exerciseId: input.exerciseId,
+    exerciseTitle: input.exerciseTitle,
+    difficulty: input.difficulty,
+    score: {
+      overall: input.score.overall,
+      accuracy: input.score.breakdown.accuracy,
+      timing: input.score.breakdown.timing,
+      completeness: input.score.breakdown.completeness,
+    },
+    issues: {
+      pitchErrors,
+      timingErrors,
+      missedCount: input.score.missedNotes ?? 0,
+      extraCount: input.score.extraNotes ?? 0,
+    },
+    context: {
+      attemptNumber: input.attemptNumber,
+      previousScore:
+        input.recentScores.length > 0
+          ? input.recentScores[input.recentScores.length - 1]
+          : null,
+      userLevel: input.userLevel,
+      sessionMinutes: 0,
+    },
+  };
+}
+
 export class CoachingService {
-  apiKey: string;
-
-  constructor(apiKey?: string) {
-    this.apiKey = apiKey || process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
-  }
-
   async generateFeedback(input: CoachingInput): Promise<CoachFeedback> {
     try {
-      // TODO: Implement Gemini API call
-      // For now, return placeholder feedback
+      const request = toCoachRequest(input);
+      const feedbackText = await GeminiCoach.getFeedback(request);
+
       return {
-        feedback: `Great job on ${input.exerciseTitle}! Keep practicing to improve your score.`,
+        feedback: feedbackText,
         suggestedAction: input.score.isPassed ? 'continue' : 'retry',
       };
     } catch (error) {

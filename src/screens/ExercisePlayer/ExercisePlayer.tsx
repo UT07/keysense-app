@@ -19,15 +19,17 @@ import {
   Animated,
   Platform,
   AccessibilityInfo,
-  InteractionManager,
 } from 'react-native';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import * as Haptics from 'expo-haptics';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Keyboard } from '../../components/Keyboard/Keyboard';
 import { PianoRoll } from '../../components/PianoRoll/PianoRoll';
 import { useExerciseStore } from '../../stores/exerciseStore';
+import { useProgressStore } from '../../stores/progressStore';
 import { useExercisePlayback } from '../../hooks/useExercisePlayback';
+import { getExercise } from '../../content/ContentLoader';
+import type { RootStackParamList } from '../../navigation/AppNavigator';
 import type { Exercise, ExerciseScore, MidiNoteEvent } from '../../core/exercises/types';
 import { ScoreDisplay } from './ScoreDisplay';
 import { ExerciseControls } from './ExerciseControls';
@@ -48,7 +50,8 @@ interface FeedbackState {
   timestamp: number;
 }
 
-const DEFAULT_EXERCISE: Exercise = {
+// Fallback exercise used only when no exercise can be loaded from content
+const FALLBACK_EXERCISE: Exercise = {
   id: 'lesson-01-ex-01',
   version: 1,
   metadata: {
@@ -105,16 +108,86 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   onClose,
 }) => {
   const navigation = useNavigation();
+  const route = useRoute<RouteProp<RootStackParamList, 'Exercise'>>();
+  const mountedRef = useRef(true);
 
   // Store integration
   const exerciseStore = useExerciseStore();
-  const exercise = exerciseOverride || exerciseStore.currentExercise || DEFAULT_EXERCISE;
+
+  // Load exercise: prop > route param > store > fallback
+  const loadedExercise = route.params?.exerciseId
+    ? getExercise(route.params.exerciseId)
+    : null;
+  const exercise =
+    exerciseOverride || loadedExercise || exerciseStore.currentExercise || FALLBACK_EXERCISE;
+
+  // Track mount lifecycle
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Completion state (declared before useExercisePlayback so the callback is available)
+  const [showCompletion, setShowCompletion] = useState(false);
+  const [finalScore, setFinalScore] = useState<ExerciseScore | null>(null);
+
+  /**
+   * Handle exercise completion (called by useExercisePlayback hook)
+   * Persists score, XP, and streak to the progress store
+   */
+  const handleExerciseCompletion = useCallback((score: ExerciseScore) => {
+    if (!mountedRef.current) return;
+    setFinalScore(score);
+    setShowCompletion(true);
+    onExerciseComplete?.(score);
+
+    // Persist XP and daily goal progress
+    const progressStore = useProgressStore.getState();
+    progressStore.recordExerciseCompletion(exercise.id, score.overall, score.xpEarned);
+
+    // Update streak — mark today as practiced
+    const today = new Date().toISOString().split('T')[0];
+    const dayOfWeek = new Date().getDay(); // 0=Sun, 6=Sat
+    const { streakData } = progressStore;
+    const lastDate = streakData.lastPracticeDate;
+    const isNewDay = lastDate !== today;
+
+    if (isNewDay) {
+      const weeklyPractice = [...streakData.weeklyPractice];
+      weeklyPractice[dayOfWeek] = true;
+
+      // Calculate new streak
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      const isContinuation = lastDate === yesterdayStr;
+      const newStreak = isContinuation ? streakData.currentStreak + 1 : 1;
+
+      progressStore.updateStreakData({
+        currentStreak: newStreak,
+        longestStreak: Math.max(streakData.longestStreak, newStreak),
+        lastPracticeDate: today,
+        weeklyPractice,
+      });
+    }
+
+    if (Platform.OS === 'web') {
+      AccessibilityInfo.announceForAccessibility(
+        `Exercise complete! Score: ${score.overall}%`
+      );
+    }
+  }, [onExerciseComplete, exercise.id]);
 
   // Lock to landscape orientation on mount, restore portrait on unmount
   useEffect(() => {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(() => {});
     return () => {
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+      // Delay orientation reset so it doesn't race with navigation transition
+      setTimeout(() => {
+        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+      }, 300);
     };
   }, []);
 
@@ -151,8 +224,6 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     timestamp: 0,
   });
   const [comboCount, setComboCount] = useState(0);
-  const [showCompletion, setShowCompletion] = useState(false);
-  const [finalScore, setFinalScore] = useState<ExerciseScore | null>(null);
 
   // References
   const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -244,30 +315,29 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
 
   /**
    * Exit exercise without completing
+   * Uses setTimeout to defer navigation, letting state updates settle
    */
   const handleExit = useCallback(() => {
     stopPlayback();
     exerciseStore.clearSession();
-    // Defer navigation to let stopPlayback settle before unmount
-    InteractionManager.runAfterInteractions(() => {
+    // Small delay to let state updates settle before unmount
+    setTimeout(() => {
+      if (!mountedRef.current) return;
       if (onClose) {
         onClose();
       } else {
         navigation.goBack();
       }
-    });
+    }, 50);
   }, [stopPlayback, exerciseStore, onClose, navigation]);
 
   /**
    * Handle keyboard note press
+   * Always provides audio + visual feedback; scoring only during active playback
    */
   const handleKeyDown = useCallback(
     (midiNote: MidiNoteEvent) => {
-      if (!isPlaying || isPaused || !countInComplete) {
-        return;
-      }
-
-      // Play the note (handled by useExercisePlayback)
+      // Always play the note for audio feedback (playNote handles scoring guard internally)
       handleManualNoteOn(midiNote.note, midiNote.velocity / 127);
 
       // Visual feedback
@@ -276,13 +346,43 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       // Haptic feedback
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
-      // Check if this matches expected note
+      // Scoring feedback only during active playback
+      if (!isPlaying || isPaused || !countInComplete) return;
+
+      // Check if this matches expected note and calculate timing
       const isExpected = expectedNotes.has(midiNote.note);
 
       if (isExpected) {
+        // Find the matching expected note and calculate timing offset
+        const matchedNote = exercise.notes.find(
+          (n) =>
+            n.note === midiNote.note &&
+            n.startBeat >= currentBeat - 0.5 &&
+            n.startBeat < currentBeat + 0.5
+        );
+
+        let feedbackType: FeedbackState['type'] = 'good';
+
+        if (matchedNote) {
+          // Calculate timing offset in ms
+          const beatDiffMs =
+            Math.abs(currentBeat - matchedNote.startBeat) *
+            (60000 / exercise.settings.tempo);
+
+          if (beatDiffMs <= exercise.scoring.timingToleranceMs * 0.5) {
+            feedbackType = 'perfect';
+          } else if (beatDiffMs <= exercise.scoring.timingToleranceMs) {
+            feedbackType = 'good';
+          } else if (beatDiffMs <= exercise.scoring.timingGracePeriodMs) {
+            feedbackType = currentBeat < matchedNote.startBeat ? 'early' : 'late';
+          } else {
+            feedbackType = 'ok';
+          }
+        }
+
         setComboCount((prev) => prev + 1);
         setFeedback({
-          type: 'perfect',
+          type: feedbackType,
           noteIndex: exercise.notes.findIndex((n) => n.note === midiNote.note),
           timestamp: Date.now(),
         });
@@ -325,8 +425,12 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       isPlaying,
       isPaused,
       countInComplete,
+      currentBeat,
       expectedNotes,
       exercise.notes,
+      exercise.settings.tempo,
+      exercise.scoring.timingToleranceMs,
+      exercise.scoring.timingGracePeriodMs,
       comboScale,
       handleManualNoteOn,
     ]
@@ -351,26 +455,17 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   );
 
   /**
-   * Handle exercise completion (called by useExercisePlayback hook)
-   */
-  function handleExerciseCompletion(score: ExerciseScore) {
-    setFinalScore(score);
-    setShowCompletion(true);
-    onExerciseComplete?.(score);
-
-    if (Platform.OS === 'web') {
-      AccessibilityInfo.announceForAccessibility(
-        `Exercise complete! Score: ${score.overall}%`
-      );
-    }
-  }
-
-  /**
    * Handle completion modal close
+   * Dismiss modal first, then exit after a brief delay to avoid animation races
    */
   const handleCompletionClose = useCallback(() => {
     setShowCompletion(false);
-    handleExit();
+    // Brief delay so the Modal can unmount before we navigate away
+    setTimeout(() => {
+      if (mountedRef.current) {
+        handleExit();
+      }
+    }, 100);
   }, [handleExit]);
 
   // Show error if initialization failed
@@ -463,7 +558,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
             onNoteOff={handleKeyUp}
             highlightedNotes={highlightedKeys}
             expectedNotes={expectedNotes}
-            enabled={isPlaying && !isPaused}
+            enabled={true}
             hapticEnabled={true}
             showLabels={false}
             scrollable={true}

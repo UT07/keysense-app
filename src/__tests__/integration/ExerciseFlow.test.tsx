@@ -42,6 +42,24 @@ jest.mock('../../stores/exerciseStore', () => ({
   })),
 }));
 
+// Mock progress store
+jest.mock('../../stores/progressStore', () => ({
+  useProgressStore: Object.assign(jest.fn(() => ({})), {
+    getState: jest.fn(() => ({
+      recordExerciseCompletion: jest.fn(),
+      updateStreakData: jest.fn(),
+      streakData: {
+        currentStreak: 0,
+        longestStreak: 0,
+        lastPracticeDate: '2026-01-01',
+        freezesAvailable: 1,
+        freezesUsed: 0,
+        weeklyPractice: [false, false, false, false, false, false, false],
+      },
+    })),
+  }),
+}));
+
 // Mock useExercisePlayback hook
 const mockStartPlayback = jest.fn();
 const mockPausePlayback = jest.fn();
@@ -284,6 +302,7 @@ describe('Exercise Flow Integration Test', () => {
   });
 
   it('exits exercise properly', async () => {
+    jest.useFakeTimers();
     const onClose = jest.fn();
     const { getByTestId } = render(
       <ExercisePlayer exercise={TEST_EXERCISE} onClose={onClose} />
@@ -294,8 +313,14 @@ describe('Exercise Flow Integration Test', () => {
       fireEvent.press(exitButton);
     });
 
+    // handleExit defers navigation via setTimeout
+    act(() => {
+      jest.advanceTimersByTime(100);
+    });
+
     expect(onClose).toHaveBeenCalled();
     expect(mockStopPlayback).toHaveBeenCalled();
+    jest.useRealTimers();
   });
 
   it('displays hint before start', async () => {

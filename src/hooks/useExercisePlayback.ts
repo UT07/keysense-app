@@ -14,8 +14,7 @@ import { useEffect, useCallback, useRef, useState } from 'react';
 import type { Exercise, MidiNoteEvent, ExerciseScore } from '@/core/exercises/types';
 import { scoreExercise } from '@/core/exercises/ExerciseValidator';
 import { getMidiInput } from '@/input/MidiInput';
-// Use mock audio engine for now (replace with .native when native module is ready)
-import { getAudioEngine } from '@/audio/AudioEngine.mock';
+import { getAudioEngine } from '@/audio/ExpoAudioEngine';
 import { useExerciseStore } from '@/stores/exerciseStore';
 
 export interface UseExercisePlaybackOptions {
@@ -70,6 +69,7 @@ export function useExercisePlayback({
   const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const activeNotesRef = useRef<Map<number, any>>(new Map());
   const mountedRef = useRef(true);
+  const handleCompletionRef = useRef<() => void>(() => {});
 
   // Track component mount lifecycle
   useEffect(() => {
@@ -243,9 +243,9 @@ export function useExercisePlayback({
       setCurrentBeat(beat);
       exerciseStore.setCurrentBeat(beat);
 
-      // Check for completion
+      // Check for completion (use ref to avoid stale closure)
       if (beat > exerciseDuration) {
-        handleCompletion();
+        handleCompletionRef.current();
       }
     }, 16); // 60fps
 
@@ -349,11 +349,28 @@ export function useExercisePlayback({
     onComplete?.(score);
   }, [exercise, playedNotes, exerciseStore, onComplete]);
 
+  // Keep ref in sync so the interval always calls the latest handleCompletion
+  useEffect(() => {
+    handleCompletionRef.current = handleCompletion;
+  }, [handleCompletion]);
+
   /**
    * Manual note play (for touch keyboard)
+   * Always plays audio for feedback; only records notes for scoring during playback
    */
   const playNote = useCallback(
     (note: number, velocity: number = 0.8) => {
+      // Always play audio feedback regardless of playback state
+      if (enableAudio && isAudioReady) {
+        try {
+          const handle = audioEngine.playNote(note, velocity);
+          activeNotesRef.current.set(note, handle);
+        } catch (error) {
+          console.error('[useExercisePlayback] Manual playback error:', error);
+        }
+      }
+
+      // Only record notes for scoring when exercise is playing
       if (!isPlaying) return;
 
       const midiEvent: MidiNoteEvent = {
@@ -364,19 +381,8 @@ export function useExercisePlayback({
         channel: 0,
       };
 
-      // Add to played notes
       setPlayedNotes((prev) => [...prev, midiEvent]);
       exerciseStore.addPlayedNote(midiEvent);
-
-      // Play audio
-      if (enableAudio && isAudioReady) {
-        try {
-          const handle = audioEngine.playNote(note, velocity);
-          activeNotesRef.current.set(note, handle);
-        } catch (error) {
-          console.error('[useExercisePlayback] Manual playback error:', error);
-        }
-      }
     },
     [isPlaying, enableAudio, isAudioReady, audioEngine, exerciseStore]
   );

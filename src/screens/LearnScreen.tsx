@@ -15,65 +15,29 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useProgressStore } from '../stores/progressStore';
+import { getLessons } from '../content/ContentLoader';
+import type { LessonManifest } from '../content/ContentLoader';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
 
-interface Lesson {
-  id: string;
-  title: string;
-  description: string;
-  exerciseCount: number;
-  estimatedMinutes: number;
-  difficulty: 1 | 2 | 3 | 4 | 5;
-  icon: IconName;
-}
-
-// Mock lessons data - would come from content/lessons in production
-const LESSONS: Lesson[] = [
-  {
-    id: 'lesson-01',
-    title: 'Getting Started',
-    description: 'Learn the basics of the keyboard and find Middle C',
-    exerciseCount: 5,
-    estimatedMinutes: 10,
-    difficulty: 1,
-    icon: 'book-open-variant',
-  },
-  {
-    id: 'lesson-02',
-    title: 'Right Hand Melodies',
-    description: 'Play simple melodies using C-D-E-F-G',
-    exerciseCount: 8,
-    estimatedMinutes: 15,
-    difficulty: 1,
-    icon: 'hand-pointing-right',
-  },
-  {
-    id: 'lesson-03',
-    title: 'Left Hand Bass Notes',
-    description: 'Master the left hand with bass patterns',
-    exerciseCount: 6,
-    estimatedMinutes: 12,
-    difficulty: 2,
-    icon: 'hand-pointing-left',
-  },
-  {
-    id: 'lesson-04',
-    title: 'Hands Together',
-    description: 'Coordinate both hands playing at once',
-    exerciseCount: 10,
-    estimatedMinutes: 20,
-    difficulty: 3,
-    icon: 'hands-pray',
-  },
-];
+// Map lesson difficulty to icons
+const LESSON_ICONS: Record<number, IconName> = {
+  1: 'book-open-variant',
+  2: 'music-note',
+  3: 'hands-pray',
+  4: 'lightning-bolt',
+  5: 'star',
+};
 
 type LearnNavProp = NativeStackNavigationProp<RootStackParamList>;
 
 export function LearnScreen() {
   const navigation = useNavigation<LearnNavProp>();
   const { lessonProgress } = useProgressStore();
+
+  // Load lessons from content JSON files
+  const lessons: LessonManifest[] = getLessons();
 
   const getDifficultyColor = (difficulty: number) => {
     const colors = ['#4CAF50', '#8BC34A', '#FFC107', '#FF9800', '#F44336'];
@@ -101,10 +65,14 @@ export function LearnScreen() {
 
         {/* Lessons List */}
         <View style={styles.lessonsContainer}>
-          {LESSONS.map((lesson, index) => {
+          {lessons.map((lesson, index) => {
             const progress = lessonProgress[lesson.id];
             const isCompleted = progress?.status === 'completed';
-            const isLocked = index > 0 && lessonProgress[LESSONS[index - 1].id]?.status !== 'completed';
+            const prevLessonId = index > 0 ? lessons[index - 1].id : null;
+            const isLocked = index > 0 && lessonProgress[prevLessonId!]?.status !== 'completed';
+            const difficulty = lesson.metadata.difficulty;
+            const icon: IconName = LESSON_ICONS[difficulty] ?? 'book-open-variant';
+            const firstExerciseId = lesson.exercises[0]?.id;
 
             return (
               <TouchableOpacity
@@ -115,27 +83,29 @@ export function LearnScreen() {
                 ]}
                 disabled={isLocked}
                 onPress={() => {
-                  navigation.navigate('Exercise', { exerciseId: `${lesson.id}-ex-01` });
+                  if (firstExerciseId) {
+                    navigation.navigate('Exercise', { exerciseId: firstExerciseId });
+                  }
                 }}
               >
                 {/* Icon */}
                 <View
                   style={[
                     styles.iconContainer,
-                    { backgroundColor: getDifficultyColor(lesson.difficulty) + '20' },
+                    { backgroundColor: getDifficultyColor(difficulty) + '20' },
                   ]}
                 >
                   <MaterialCommunityIcons
-                    name={lesson.icon}
+                    name={icon}
                     size={32}
-                    color={getDifficultyColor(lesson.difficulty)}
+                    color={getDifficultyColor(difficulty)}
                   />
                 </View>
 
                 {/* Content */}
                 <View style={styles.lessonContent}>
                   <View style={styles.lessonHeader}>
-                    <Text style={styles.lessonTitle}>{lesson.title}</Text>
+                    <Text style={styles.lessonTitle}>{lesson.metadata.title}</Text>
                     {isCompleted && (
                       <MaterialCommunityIcons
                         name="check-circle"
@@ -153,7 +123,7 @@ export function LearnScreen() {
                   </View>
 
                   <Text style={styles.lessonDescription}>
-                    {lesson.description}
+                    {lesson.metadata.description}
                   </Text>
 
                   <View style={styles.lessonMeta}>
@@ -164,7 +134,7 @@ export function LearnScreen() {
                         color="#666"
                       />
                       <Text style={styles.metaText}>
-                        {lesson.exerciseCount} exercises
+                        {lesson.exercises.length} exercises
                       </Text>
                     </View>
 
@@ -182,11 +152,11 @@ export function LearnScreen() {
                     <View
                       style={[
                         styles.difficultyBadge,
-                        { backgroundColor: getDifficultyColor(lesson.difficulty) },
+                        { backgroundColor: getDifficultyColor(difficulty) },
                       ]}
                     >
                       <Text style={styles.difficultyText}>
-                        {getDifficultyLabel(lesson.difficulty)}
+                        {getDifficultyLabel(difficulty)}
                       </Text>
                     </View>
                   </View>
