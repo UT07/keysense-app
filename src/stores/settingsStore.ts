@@ -12,11 +12,11 @@
  */
 
 import { create } from 'zustand';
-import type { SettingsStoreState, AudioSettings, DisplaySettings, NotificationSettings, MidiSettings } from './types';
+import type { SettingsStoreState, AudioSettings, DisplaySettings, NotificationSettings, MidiSettings, OnboardingSettings } from './types';
 import { PersistenceManager, STORAGE_KEYS, createDebouncedSave } from './persistence';
 
 /** Data-only shape of settings state (excludes actions) */
-type SettingsData = AudioSettings & DisplaySettings & NotificationSettings & MidiSettings;
+type SettingsData = AudioSettings & DisplaySettings & NotificationSettings & MidiSettings & OnboardingSettings;
 
 const defaultSettings: SettingsData = {
   // Audio settings
@@ -45,6 +45,11 @@ const defaultSettings: SettingsData = {
   lastMidiDeviceId: null,
   lastMidiDeviceName: null,
   autoConnectMidi: true,
+
+  // Onboarding settings
+  hasCompletedOnboarding: false,
+  experienceLevel: null,
+  learningGoal: null,
 };
 
 // Create debounced save function
@@ -146,6 +151,22 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
       lastMidiDeviceName: deviceName,
     });
     debouncedSave(get());
+  },
+
+  // Onboarding settings
+  setHasCompletedOnboarding: (completed: boolean) => {
+    set({ hasCompletedOnboarding: completed });
+    debouncedSave({ ...get(), hasCompletedOnboarding: completed });
+  },
+
+  setExperienceLevel: (level: 'beginner' | 'intermediate' | 'returning') => {
+    set({ experienceLevel: level });
+    debouncedSave({ ...get(), experienceLevel: level });
+  },
+
+  setLearningGoal: (goal: 'songs' | 'technique' | 'exploration') => {
+    set({ learningGoal: goal });
+    debouncedSave({ ...get(), learningGoal: goal });
   },
 
   reset: () => {

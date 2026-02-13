@@ -140,7 +140,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             style={styles.settingsButton}
             onPress={onNavigateToSettings ?? (() => navigation.navigate('MidiSetup'))}
           >
-            <MaterialCommunityIcons name="cog" size={24} color="#666666" />
+            <MaterialCommunityIcons name="cog" size={24} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
 
@@ -329,14 +329,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
+    backgroundColor: '#1976D2',
+    shadowColor: '#1976D2',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   greeting: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333333',
+    color: '#FFFFFF',
   },
   settingsButton: {
     padding: 8,
@@ -460,11 +463,14 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: '48%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 8,
+    borderRadius: 12,
     paddingVertical: 20,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#EEEEEE',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   actionLabel: {
     fontSize: 12,

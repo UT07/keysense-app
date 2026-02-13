@@ -200,10 +200,16 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
           <View style={styles.scoreStarsRow}>
             {/* Score Display */}
             <View style={styles.scoreSection}>
-              <View style={styles.scoreCircle}>
+              <View style={[
+                styles.scoreCircle,
+                {
+                  borderColor: resultDisplay.color,
+                  backgroundColor: score.stars === 3 ? '#FFFDE7' : score.isPassed ? '#E8F5E9' : '#FFEBEE',
+                },
+              ]}>
                 <View style={styles.scoreRow}>
-                  <Text style={styles.scoreNumber}>{score.overall}</Text>
-                  <Text style={styles.scoreLabel}>%</Text>
+                  <Text style={[styles.scoreNumber, { color: resultDisplay.color }]}>{Math.round(score.overall)}</Text>
+                  <Text style={[styles.scoreLabel, { color: resultDisplay.color }]}>%</Text>
                 </View>
               </View>
             </View>
@@ -251,13 +257,13 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
                   style={[
                     styles.breakdownFill,
                     {
-                      width: `${score.breakdown.accuracy}%`,
+                      width: `${Math.round(score.breakdown.accuracy)}%`,
                       backgroundColor: '#4CAF50',
                     },
                   ]}
                 />
               </View>
-              <Text style={styles.breakdownValue}>{score.breakdown.accuracy}%</Text>
+              <Text style={styles.breakdownValue}>{Math.round(score.breakdown.accuracy)}%</Text>
             </View>
 
             <View style={styles.breakdownRow}>
@@ -267,13 +273,13 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
                   style={[
                     styles.breakdownFill,
                     {
-                      width: `${score.breakdown.timing}%`,
+                      width: `${Math.round(score.breakdown.timing)}%`,
                       backgroundColor: '#2196F3',
                     },
                   ]}
                 />
               </View>
-              <Text style={styles.breakdownValue}>{score.breakdown.timing}%</Text>
+              <Text style={styles.breakdownValue}>{Math.round(score.breakdown.timing)}%</Text>
             </View>
 
             <View style={styles.breakdownRow}>
@@ -283,13 +289,13 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
                   style={[
                     styles.breakdownFill,
                     {
-                      width: `${score.breakdown.completeness}%`,
+                      width: `${Math.round(score.breakdown.completeness)}%`,
                       backgroundColor: '#FF9800',
                     },
                   ]}
                 />
               </View>
-              <Text style={styles.breakdownValue}>{score.breakdown.completeness}%</Text>
+              <Text style={styles.breakdownValue}>{Math.round(score.breakdown.completeness)}%</Text>
             </View>
           </View>
 
@@ -305,7 +311,7 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
               <View style={styles.statItem}>
                 <MaterialCommunityIcons name="trophy" size={20} color="#FFD700" />
                 <Text style={styles.statLabel}>New Record!</Text>
-                <Text style={styles.statValue}>{score.overall}%</Text>
+                <Text style={styles.statValue}>{Math.round(score.overall)}%</Text>
               </View>
             )}
           </View>

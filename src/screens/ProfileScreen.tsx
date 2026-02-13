@@ -65,7 +65,7 @@ export function ProfileScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.avatarContainer}>
-            <MaterialCommunityIcons name="account-circle" size={80} color="#1976D2" />
+            <MaterialCommunityIcons name="account-circle" size={80} color="#FFFFFF" />
           </View>
           <Text style={styles.username}>Piano Student</Text>
           <Text style={styles.subtitle}>Keep practicing! 🎹</Text>
@@ -187,7 +187,12 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     paddingVertical: 32,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1976D2',
+    shadowColor: '#1976D2',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   avatarContainer: {
     marginBottom: 16,
@@ -195,12 +200,12 @@ const styles = StyleSheet.create({
   username: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#FFFFFF',
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: '#BBDEFB',
   },
   statsGrid: {
     flexDirection: 'row',

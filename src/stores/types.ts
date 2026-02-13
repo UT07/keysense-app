@@ -118,7 +118,13 @@ export interface MidiSettings {
   autoConnectMidi: boolean;
 }
 
-export interface SettingsStoreState extends AudioSettings, DisplaySettings, NotificationSettings, MidiSettings {
+export interface OnboardingSettings {
+  hasCompletedOnboarding: boolean;
+  experienceLevel: 'beginner' | 'intermediate' | 'returning' | null;
+  learningGoal: 'songs' | 'technique' | 'exploration' | null;
+}
+
+export interface SettingsStoreState extends AudioSettings, DisplaySettings, NotificationSettings, MidiSettings, OnboardingSettings {
   // Actions
   updateAudioSettings: (settings: Partial<AudioSettings>) => void;
   updateDisplaySettings: (settings: Partial<DisplaySettings>) => void;
@@ -134,6 +140,9 @@ export interface SettingsStoreState extends AudioSettings, DisplaySettings, Noti
   setDailyGoalMinutes: (minutes: number) => void;
   setLastMidiDevice: (deviceId: string | null, deviceName: string | null) => void;
   setDarkMode: (enabled: boolean) => void;
+  setHasCompletedOnboarding: (completed: boolean) => void;
+  setExperienceLevel: (level: 'beginner' | 'intermediate' | 'returning') => void;
+  setLearningGoal: (goal: 'songs' | 'technique' | 'exploration') => void;
   reset: () => void;
 }
 

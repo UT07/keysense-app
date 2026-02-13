@@ -11,6 +11,7 @@ import {
   getNextExerciseId,
   getLessonIdForExercise,
 } from '../ContentLoader';
+import { scoreExercise } from '../../core/exercises/ExerciseValidator';
 
 describe('ContentLoader', () => {
   describe('getExercise', () => {
@@ -170,6 +171,119 @@ describe('ContentLoader', () => {
       expect(lesson!.unlockRequirement).toEqual({
         type: 'lesson-complete',
         lessonId: 'lesson-01',
+      });
+    });
+  });
+
+  // ==========================================================================
+  // Lessons 2-6 Content Integrity
+  // ==========================================================================
+
+  describe('Lesson 2-6 content integrity', () => {
+    const lessonIds = ['lesson-02', 'lesson-03', 'lesson-04', 'lesson-05', 'lesson-06'];
+
+    lessonIds.forEach((lessonId) => {
+      describe(lessonId, () => {
+        it('should load lesson manifest', () => {
+          const lesson = getLesson(lessonId);
+          expect(lesson).not.toBeNull();
+          expect(lesson!.id).toBe(lessonId);
+          expect(lesson!.metadata.title).toBeTruthy();
+        });
+
+        it('should have valid exercises that load', () => {
+          const lesson = getLesson(lessonId);
+          expect(lesson).not.toBeNull();
+          const exercises = getLessonExercises(lessonId);
+          expect(exercises.length).toBe(lesson!.exercises.length);
+
+          exercises.forEach((ex) => {
+            expect(ex.id).toBeTruthy();
+            expect(ex.notes.length).toBeGreaterThan(0);
+            expect(ex.settings.tempo).toBeGreaterThan(0);
+            expect(ex.scoring.passingScore).toBeGreaterThanOrEqual(0);
+            expect(ex.scoring.passingScore).toBeLessThanOrEqual(100);
+          });
+        });
+
+        it('should have valid MIDI ranges', () => {
+          const exercises = getLessonExercises(lessonId);
+          exercises.forEach((ex) => {
+            ex.notes.forEach((note) => {
+              expect(note.note).toBeGreaterThanOrEqual(21);
+              expect(note.note).toBeLessThanOrEqual(108);
+              expect(note.startBeat).toBeGreaterThanOrEqual(0);
+              expect(note.durationBeats).toBeGreaterThan(0);
+            });
+          });
+        });
+
+        it('should have ascending star thresholds', () => {
+          const exercises = getLessonExercises(lessonId);
+          exercises.forEach((ex) => {
+            const [one, two, three] = ex.scoring.starThresholds;
+            expect(one).toBeLessThan(two);
+            expect(two).toBeLessThan(three);
+            expect(ex.scoring.passingScore).toBeLessThanOrEqual(one);
+          });
+        });
+
+        it('should have valid unlock requirements', () => {
+          const lesson = getLesson(lessonId);
+          if (lesson!.unlockRequirement) {
+            const reqLesson = getLesson(lesson!.unlockRequirement.lessonId);
+            expect(reqLesson).not.toBeNull();
+          }
+        });
+
+        it('should support next exercise navigation', () => {
+          const exercises = getLessonExercises(lessonId);
+          for (let i = 0; i < exercises.length - 1; i++) {
+            const nextId = getNextExerciseId(lessonId, exercises[i].id);
+            expect(nextId).toBe(exercises[i + 1].id);
+          }
+          // Last exercise returns null
+          const lastId = getNextExerciseId(lessonId, exercises[exercises.length - 1].id);
+          expect(lastId).toBeNull();
+        });
+      });
+    });
+  });
+
+  // ==========================================================================
+  // Scoring Pipeline for All Lessons
+  // ==========================================================================
+
+  describe('Scoring pipeline for all lessons', () => {
+    const lessonIds = ['lesson-01', 'lesson-02', 'lesson-03', 'lesson-04', 'lesson-05', 'lesson-06'];
+
+    lessonIds.forEach((lessonId) => {
+      it(`${lessonId}: perfect play should score high`, () => {
+        const exercises = getLessonExercises(lessonId);
+        exercises.forEach((ex) => {
+          // Simulate perfect play: each note played at exact expected time
+          const msPerBeat = 60000 / ex.settings.tempo;
+          const perfectNotes = ex.notes.map((note) => ({
+            type: 'noteOn' as const,
+            note: note.note,
+            velocity: 64,
+            timestamp: note.startBeat * msPerBeat,
+            channel: 0,
+          }));
+          const score = scoreExercise(ex, perfectNotes);
+          expect(score.overall).toBeGreaterThanOrEqual(90);
+          expect(score.isPassed).toBe(true);
+          expect(score.stars).toBeGreaterThanOrEqual(2);
+        });
+      });
+
+      it(`${lessonId}: no notes played should score low`, () => {
+        const exercises = getLessonExercises(lessonId);
+        exercises.forEach((ex) => {
+          const score = scoreExercise(ex, []);
+          expect(score.overall).toBeLessThanOrEqual(10);
+          expect(score.isPassed).toBe(false);
+        });
       });
     });
   });

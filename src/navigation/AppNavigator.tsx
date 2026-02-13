@@ -14,9 +14,12 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { ExercisePlayer } from '../screens/ExercisePlayer/ExercisePlayer';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { MidiSetupScreen } from '../screens/MidiSetupScreen';
-import { LearnScreen } from '../screens/LearnScreen';
+import { LevelMapScreen } from '../screens/LevelMapScreen';
 import { PlayScreen } from '../screens/PlayScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+
+// Stores
+import { useSettingsStore } from '../stores/settingsStore';
 
 // Types
 export type RootStackParamList = {
@@ -59,7 +62,7 @@ function MainTabs() {
       />
       <Tab.Screen
         name="Learn"
-        component={LearnScreen}
+        component={LevelMapScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="school" size={size} color={color} />
@@ -93,8 +96,7 @@ function MainTabs() {
  * Root navigation stack
  */
 export function AppNavigator() {
-  // TODO: Check if user has completed onboarding
-  const hasCompletedOnboarding = true; // Temporary - would check AsyncStorage
+  const hasCompletedOnboarding = useSettingsStore((s) => s.hasCompletedOnboarding);
 
   return (
     <NavigationContainer>

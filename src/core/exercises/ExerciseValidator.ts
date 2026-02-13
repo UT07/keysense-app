@@ -201,10 +201,10 @@ function calculateBreakdown(
   const extraNotes = Math.max(0, 100 - extraCount * 10);
 
   return {
-    accuracy,
-    timing,
-    completeness,
-    extraNotes,
+    accuracy: Math.round(accuracy),
+    timing: Math.round(timing),
+    completeness: Math.round(completeness),
+    extraNotes: Math.round(extraNotes),
   };
 }
 
@@ -253,7 +253,7 @@ export function scoreExercise(
   const isNewHighScore = overall > previousHighScore;
 
   return {
-    overall: Math.round(overall * 100) / 100,
+    overall: Math.round(overall),
     stars,
     breakdown,
     details: noteScores,

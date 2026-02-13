@@ -704,27 +704,28 @@ interface SyncProgressResponse {
 
 **Gate:** Complete one full exercise with accurate scoring. Passed.
 
-### Phase 2: Gamification (Weeks 6-7)
+### Phase 2: Gamification (Weeks 6-7) — IN PROGRESS
 
-| Task | Deliverable | Success Criteria |
-|------|-------------|------------------|
-| XP system | Earn and display XP | Level up celebration |
-| Streak tracking | Daily streak with UI | Streak maintained across days |
-| 20 more exercises | Content expansion | 3 complete lessons |
-| Onboarding flow | First-time user experience | <3 min to first note |
-| MIDI setup wizard | Device connection flow | 90% success rate |
+| Task | Deliverable | Success Criteria | Status |
+|------|-------------|------------------|--------|
+| XP system | Earn and display XP | Level up celebration | DONE |
+| Streak tracking | Daily streak with UI | Streak maintained across days | DONE |
+| 27 more exercises | Content expansion (30 total, 6 lessons) | All exercises loadable and scorable | DONE |
+| Onboarding flow | First-time user experience | <3 min to first note | DONE |
+| MIDI setup wizard | Device connection flow | 90% success rate | DONE |
+| Level Map UI | Duolingo-style lesson progression | Vertical map with node states | DONE |
+| AI Coach | Post-exercise feedback (Gemini 2.0 Flash) | Relevant, helpful advice | DONE (moved from Phase 3) |
 
 **Gate:** Day-3 retention >40% in internal testing
 
-### Phase 3: Polish & AI (Weeks 8-10)
+### Phase 3: Polish & Launch (Weeks 8-10)
 
-| Task | Deliverable | Success Criteria |
-|------|-------------|------------------|
-| Firebase integration | Auth + sync | Cross-device progress |
-| AI Coach | Post-exercise feedback | Relevant, helpful advice |
-| Microphone fallback | Basic pitch detection | Works for single notes |
-| UI polish | Animations, transitions | 60fps, delightful feel |
-| Sound design | UI sounds, celebrations | Cohesive audio identity |
+| Task | Deliverable | Success Criteria | Status |
+|------|-------------|------------------|--------|
+| Firebase integration | Auth + sync | Cross-device progress | PLANNED |
+| Microphone fallback | Basic pitch detection | Works for single notes | PLANNED |
+| UI polish | Animations, transitions | 60fps, delightful feel | IN PROGRESS |
+| Sound design | UI sounds, celebrations | Cohesive audio identity | PLANNED |
 
 **Gate:** NPS >40 in beta testing
 

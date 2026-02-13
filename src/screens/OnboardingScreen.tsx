@@ -24,6 +24,7 @@ import Animated, {
 import { Button, Card } from '../components/common';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+import { useSettingsStore } from '../stores/settingsStore';
 
 type OnboardingScreenProps = NativeStackNavigationProp<
   RootStackParamList,
@@ -324,14 +325,20 @@ export function OnboardingScreen({
   const [step, setStep] = useState(1);
   const [state, setState] = useState<OnboardingState>({});
 
+  const setHasCompletedOnboarding = useSettingsStore((s) => s.setHasCompletedOnboarding);
+  const setExperienceLevel = useSettingsStore((s) => s.setExperienceLevel);
+  const setLearningGoal = useSettingsStore((s) => s.setLearningGoal);
+
   const handleNext = () => {
+    if (step === 2 && state.experienceLevel) {
+      setExperienceLevel(state.experienceLevel);
+    }
     if (step === 4) {
-      // Onboarding complete
-      setState((prev) => ({
-        ...prev,
-        completedAt: new Date(),
-      }));
-      // Navigate to main app
+      // Persist goal and completion
+      if (state.goal) {
+        setLearningGoal(state.goal);
+      }
+      setHasCompletedOnboarding(true);
       navigation.navigate('MainTabs');
     } else {
       setStep((prev) => prev + 1);
