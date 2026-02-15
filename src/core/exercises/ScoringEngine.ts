@@ -316,6 +316,7 @@ export function buildExerciseScore(
       timing: timingAvg,
       completeness,
       extraNotes: precision,
+      duration: 70, // Neutral — ScoringEngine doesn't track hold duration yet
     },
     details: noteScores,
     perfectNotes: summary.perfectNotes,

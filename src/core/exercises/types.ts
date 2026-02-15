@@ -77,6 +77,7 @@ export interface NoteScore {
   played: MidiNoteEvent | null;
   timingOffsetMs: number; // Negative = early, positive = late
   timingScore: number; // 0-100
+  durationScore?: number; // 0-100 — how close to expected note duration
   velocityScore?: number; // 0-100 (optional, for dynamics exercises)
   isCorrectPitch: boolean;
   isExtraNote: boolean; // Played but not expected
@@ -89,6 +90,7 @@ export interface ExerciseScoreBreakdown {
   timing: number; // Average timing score
   completeness: number; // % of notes attempted
   extraNotes: number; // Penalty for wrong notes (0-100)
+  duration: number; // Average duration accuracy (0-100)
 }
 
 // Alias for backwards compatibility
@@ -119,6 +121,7 @@ export interface MidiNoteEvent {
   velocity: number; // 0-127
   timestamp: number; // High-resolution timestamp
   channel: number; // MIDI channel (usually 0)
+  durationMs?: number; // Time held (noteOff - noteOn), only for noteOn events used in scoring
 }
 
 // Progress tracking

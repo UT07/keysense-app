@@ -480,6 +480,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   // References
   const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const consumedNoteIndicesRef = useRef<Set<number>>(new Set());
+  const noteOnTimestamps = useRef<Map<number, number>>(new Map());
 
   // Animation values
   const comboScale = useRef(new Animated.Value(0)).current;
@@ -593,6 +594,9 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       // Always play the note for audio feedback (playNote handles scoring guard internally)
       handleManualNoteOn(midiNote.note, midiNote.velocity / 127);
 
+      // Track note-on time for duration scoring
+      noteOnTimestamps.current.set(midiNote.note, Date.now());
+
       // Visual feedback
       setHighlightedKeys((prev) => new Set([...prev, midiNote.note]));
 
@@ -697,6 +701,21 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
    */
   const handleKeyUp = useCallback(
     (midiNote: number) => {
+      // Compute hold duration and attach to the last noteOn for this pitch
+      const onTime = noteOnTimestamps.current.get(midiNote);
+      if (onTime) {
+        const durationMs = Date.now() - onTime;
+        noteOnTimestamps.current.delete(midiNote);
+        // Update the last played noteOn event for this pitch with duration
+        const playedNotes = useExerciseStore.getState().playedNotes;
+        for (let i = playedNotes.length - 1; i >= 0; i--) {
+          if (playedNotes[i].note === midiNote && playedNotes[i].type === 'noteOn' && !playedNotes[i].durationMs) {
+            playedNotes[i].durationMs = durationMs;
+            break;
+          }
+        }
+      }
+
       // Release note (handled by useExercisePlayback)
       handleManualNoteOff(midiNote);
 

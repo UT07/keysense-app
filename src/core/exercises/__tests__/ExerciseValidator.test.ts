@@ -4,6 +4,7 @@
 
 import {
   calculateTimingScore,
+  calculateDurationScore,
   scoreExercise,
   validateExercise,
 } from '../ExerciseValidator';
@@ -124,6 +125,54 @@ describe('ExerciseValidator', () => {
     it('should return 0 for no played notes', () => {
       const score = scoreExercise(mockExercise, []);
       expect(score.overall).toBeLessThan(50);
+    });
+
+    it('should include duration in breakdown', () => {
+      const playedNotes: MidiNoteEvent[] = [
+        { type: 'noteOn', note: 60, velocity: 100, timestamp: 0, channel: 0, durationMs: 500 },
+        { type: 'noteOn', note: 62, velocity: 100, timestamp: 500, channel: 0, durationMs: 500 },
+        { type: 'noteOn', note: 64, velocity: 100, timestamp: 1000, channel: 0, durationMs: 500 },
+      ];
+      const score = scoreExercise(mockExercise, playedNotes);
+      expect(score.breakdown.duration).toBeGreaterThanOrEqual(0);
+      expect(score.breakdown.duration).toBeLessThanOrEqual(100);
+    });
+
+    it('should give neutral duration score when no durationMs provided', () => {
+      const playedNotes: MidiNoteEvent[] = [
+        { type: 'noteOn', note: 60, velocity: 100, timestamp: 0, channel: 0 },
+        { type: 'noteOn', note: 62, velocity: 100, timestamp: 500, channel: 0 },
+        { type: 'noteOn', note: 64, velocity: 100, timestamp: 1000, channel: 0 },
+      ];
+      const score = scoreExercise(mockExercise, playedNotes);
+      // Neutral score for tap-only is 70
+      expect(score.breakdown.duration).toBe(70);
+    });
+  });
+
+  describe('calculateDurationScore', () => {
+    it('should return 100 for perfect duration (1.0x expected)', () => {
+      expect(calculateDurationScore(500, 500)).toBe(100);
+    });
+
+    it('should return 100 within acceptable range (0.7x - 1.3x)', () => {
+      expect(calculateDurationScore(350, 500)).toBe(100); // 0.7x
+      expect(calculateDurationScore(650, 500)).toBe(100); // 1.3x
+    });
+
+    it('should return partial credit for 0.5x expected', () => {
+      const score = calculateDurationScore(250, 500);
+      expect(score).toBeGreaterThan(0);
+      expect(score).toBeLessThan(100);
+    });
+
+    it('should return 70 for no duration data (tap-only)', () => {
+      expect(calculateDurationScore(undefined, 500)).toBe(70);
+      expect(calculateDurationScore(0, 500)).toBe(70);
+    });
+
+    it('should return 0 for extremely long hold (3x)', () => {
+      expect(calculateDurationScore(1500, 500)).toBe(0);
     });
   });
 });

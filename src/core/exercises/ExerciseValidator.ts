@@ -14,10 +14,11 @@ import type {
 } from './types';
 
 const SCORE_WEIGHTS = {
-  accuracy: 0.4, // Did you play the right notes?
-  timing: 0.35, // Did you play them at the right time?
-  completeness: 0.15, // Did you play all the notes?
-  extraNotes: 0.1, // Penalty for extra notes (inverted)
+  accuracy: 0.35, // Did you play the right notes?
+  timing: 0.30, // Did you play them at the right time?
+  completeness: 0.10, // Did you play all the notes?
+  extraNotes: 0.10, // Penalty for extra notes (inverted)
+  duration: 0.15, // Did you hold notes for the right length?
 };
 
 /**
@@ -45,6 +46,26 @@ export function calculateTimingScore(
   }
 
   return 0; // Missed
+}
+
+/**
+ * Calculate duration score based on how close the held duration is to expected
+ * Returns 0-100. Touch users (no durationMs) get a neutral 70.
+ */
+export function calculateDurationScore(
+  actualMs: number | undefined,
+  expectedMs: number
+): number {
+  if (actualMs == null || actualMs <= 0 || expectedMs <= 0) {
+    return 70; // Neutral score for tap-only (touch keyboard)
+  }
+  const ratio = actualMs / expectedMs;
+  // Perfect zone: 0.7x - 1.3x of expected
+  if (ratio >= 0.7 && ratio <= 1.3) return 100;
+  // Partial credit: linear falloff
+  if (ratio < 0.7 && ratio >= 0.4) return ((ratio - 0.4) / 0.3) * 100;
+  if (ratio > 1.3 && ratio <= 2.0) return ((2.0 - ratio) / 0.7) * 100;
+  return 0;
 }
 
 /**
@@ -118,6 +139,10 @@ function scoreNotes(
         exercise.scoring.timingGracePeriodMs
       );
 
+      // Duration scoring: compare actual hold time to expected
+      const expectedDurationMs = expected.durationBeats * tempoMs;
+      const durationScore = calculateDurationScore(played.durationMs, expectedDurationMs);
+
       // Velocity score (100 = perfect velocity)
       const velocityScore = Math.max(0, 100 - Math.abs(played.velocity - 64) / 0.64);
 
@@ -126,6 +151,7 @@ function scoreNotes(
         played,
         timingOffsetMs,
         timingScore,
+        durationScore,
         velocityScore,
         isCorrectPitch: true,
         isExtraNote: false,
@@ -178,6 +204,7 @@ function calculateBreakdown(
       timing: 0,
       completeness: 0,
       extraNotes: 0,
+      duration: 0,
     };
   }
 
@@ -200,11 +227,18 @@ function calculateBreakdown(
   const extraCount = noteScores.filter((n) => n.isExtraNote).length;
   const extraNotes = Math.max(0, 100 - extraCount * 10);
 
+  // Duration: average duration score of correctly pitched notes
+  const duration =
+    correctNoteScores.length > 0
+      ? correctNoteScores.reduce((sum, n) => sum + (n.durationScore ?? 70), 0) / correctNoteScores.length
+      : 0;
+
   return {
     accuracy: Math.round(accuracy),
     timing: Math.round(timing),
     completeness: Math.round(completeness),
     extraNotes: Math.round(extraNotes),
+    duration: Math.round(duration),
   };
 }
 
@@ -242,7 +276,8 @@ export function scoreExercise(
     breakdown.accuracy * SCORE_WEIGHTS.accuracy +
     breakdown.timing * SCORE_WEIGHTS.timing +
     breakdown.completeness * SCORE_WEIGHTS.completeness +
-    breakdown.extraNotes * SCORE_WEIGHTS.extraNotes;
+    breakdown.extraNotes * SCORE_WEIGHTS.extraNotes +
+    breakdown.duration * SCORE_WEIGHTS.duration;
 
   // Determine stars
   const starThresholds = exercise.scoring.starThresholds;
