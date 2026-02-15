@@ -163,8 +163,19 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     exerciseOverride || loadedExercise || exerciseStore.currentExercise || FALLBACK_EXERCISE;
 
   // Speed selector — adjusts exercise tempo for more comfortable playback
+  // MIDI keyboard users get 1.0x (real piano, 10 fingers), touch keyboard gets 0.75x
   const playbackSpeed = useSettingsStore((s) => s.playbackSpeed);
   const setPlaybackSpeed = useSettingsStore((s) => s.setPlaybackSpeed);
+  const lastMidiDeviceId = useSettingsStore((s) => s.lastMidiDeviceId);
+  const hasAutoSetSpeed = useRef(false);
+
+  useEffect(() => {
+    if (hasAutoSetSpeed.current) return;
+    hasAutoSetSpeed.current = true;
+    if (lastMidiDeviceId && playbackSpeed !== 1.0) {
+      setPlaybackSpeed(1.0);
+    }
+  }, [lastMidiDeviceId, playbackSpeed, setPlaybackSpeed]);
 
   // Apply speed multiplier to create the exercise used for playback + scoring
   const exercise = useMemo(() => {
