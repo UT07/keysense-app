@@ -1,6 +1,7 @@
 /**
  * Main App Navigation
  * Sets up the navigation structure for KeySense
+ * Auth flow → Onboarding → Main app
  */
 
 import React from 'react';
@@ -17,16 +18,23 @@ import { MidiSetupScreen } from '../screens/MidiSetupScreen';
 import { LevelMapScreen } from '../screens/LevelMapScreen';
 import { PlayScreen } from '../screens/PlayScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { AuthScreen } from '../screens/AuthScreen';
+import { EmailAuthScreen } from '../screens/EmailAuthScreen';
+import { AccountScreen } from '../screens/AccountScreen';
 
 // Stores
 import { useSettingsStore } from '../stores/settingsStore';
+import { useAuthStore } from '../stores/authStore';
 
 // Types
 export type RootStackParamList = {
+  Auth: undefined;
+  EmailAuth: undefined;
   Onboarding: undefined;
   MainTabs: undefined;
   Exercise: { exerciseId: string };
   MidiSetup: undefined;
+  Account: undefined;
 };
 
 export type MainTabParamList = {
@@ -98,43 +106,51 @@ function MainTabs() {
 
 /**
  * Root navigation stack
+ * Conditionally shows auth, onboarding, or main app screens
  */
 export function AppNavigator() {
   const hasCompletedOnboarding = useSettingsStore((s) => s.hasCompletedOnboarding);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isLoading = useAuthStore((s) => s.isLoading);
+
+  if (isLoading) {
+    return null;
+  }
 
   return (
     <NavigationContainer>
       <RootStack.Navigator
-        initialRouteName={hasCompletedOnboarding ? 'MainTabs' : 'Onboarding'}
         screenOptions={{
           headerShown: false,
         }}
       >
-        <RootStack.Screen
-          name="Onboarding"
-          component={OnboardingScreen}
-        />
-        <RootStack.Screen
-          name="MainTabs"
-          component={MainTabs}
-        />
-        <RootStack.Screen
-          name="Exercise"
-          component={ExercisePlayer as unknown as React.ComponentType<Record<string, unknown>>}
-          options={{
-            headerShown: false,
-            animation: 'fade',
-          }}
-        />
-        <RootStack.Screen
-          name="MidiSetup"
-          component={MidiSetupScreen}
-          options={{
-            presentation: 'modal',
-            headerShown: true,
-            title: 'MIDI Setup',
-          }}
-        />
+        {!isAuthenticated ? (
+          <>
+            <RootStack.Screen name="Auth" component={AuthScreen} />
+            <RootStack.Screen name="EmailAuth" component={EmailAuthScreen} />
+          </>
+        ) : !hasCompletedOnboarding ? (
+          <RootStack.Screen name="Onboarding" component={OnboardingScreen} />
+        ) : (
+          <>
+            <RootStack.Screen name="MainTabs" component={MainTabs} />
+            <RootStack.Screen
+              name="Exercise"
+              component={ExercisePlayer as unknown as React.ComponentType<Record<string, unknown>>}
+              options={{ animation: 'fade' }}
+            />
+            <RootStack.Screen
+              name="MidiSetup"
+              component={MidiSetupScreen}
+              options={{ presentation: 'modal', headerShown: true, title: 'MIDI Setup' }}
+            />
+            <RootStack.Screen
+              name="Account"
+              component={AccountScreen}
+              options={{ presentation: 'modal' }}
+            />
+          </>
+        )}
       </RootStack.Navigator>
     </NavigationContainer>
   );

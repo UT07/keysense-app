@@ -252,6 +252,14 @@ export function ProfileScreen() {
             <MaterialCommunityIcons name="chevron-right" size={24} color="#666" />
           </TouchableOpacity>
 
+          <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('Account')}>
+            <View style={styles.settingLeft}>
+              <MaterialCommunityIcons name="account-cog" size={24} color="#B0B0B0" />
+              <Text style={styles.settingLabel}>Account</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={24} color="#666" />
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.settingItem}
             onPress={() => Alert.alert('About KeySense', 'KeySense v1.0.0\nAI-Powered Piano Learning\n\nLearn piano with real-time feedback, MIDI support, and AI coaching.')}

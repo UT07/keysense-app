@@ -13,6 +13,7 @@ import { AppNavigator } from './navigation/AppNavigator';
 import { PersistenceManager, STORAGE_KEYS } from './stores/persistence';
 import { useProgressStore } from './stores/progressStore';
 import { useSettingsStore } from './stores/settingsStore';
+import { useAuthStore } from './stores/authStore';
 import { levelFromXp } from './core/progression/XpSystem';
 
 // Keep splash screen visible while loading
@@ -26,6 +27,9 @@ export default function App(): React.ReactElement {
   useEffect(() => {
     async function prepare(): Promise<void> {
       try {
+        // Initialize Firebase Auth (resolves current user state)
+        await useAuthStore.getState().initAuth();
+
         // Hydrate progress state from AsyncStorage
         const savedProgress = await PersistenceManager.loadState(
           STORAGE_KEYS.PROGRESS,
