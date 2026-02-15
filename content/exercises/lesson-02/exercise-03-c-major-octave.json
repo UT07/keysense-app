@@ -6,12 +6,22 @@
     "description": "Play the complete C major scale up and down one octave",
     "difficulty": 2,
     "estimatedMinutes": 4,
-    "skills": ["right-hand", "c-major", "scale-technique", "finger-crossing"],
-    "prerequisites": ["lesson-02-ex-02"]
+    "skills": [
+      "right-hand",
+      "c-major",
+      "scale-technique",
+      "finger-crossing"
+    ],
+    "prerequisites": [
+      "lesson-02-ex-02"
+    ]
   },
   "settings": {
-    "tempo": 60,
-    "timeSignature": [4, 4],
+    "tempo": 50,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -129,7 +139,11 @@
     "timingGracePeriodMs": 150,
     "velocitySensitive": false,
     "passingScore": 75,
-    "starThresholds": [75, 88, 95]
+    "starThresholds": [
+      75,
+      88,
+      95
+    ]
   },
   "hints": {
     "beforeStart": "Play the full C major scale with eighth notes: C-D-E-F-G-A-B-C then back down. Notice how you use fingers 1-2-3-4-5-4-3-2-3-4-5-4-3-2-1. The finger pattern is symmetrical!",

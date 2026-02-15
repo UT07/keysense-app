@@ -6,12 +6,22 @@
     "description": "Comprehensive review of all C major scale techniques learned",
     "difficulty": 3,
     "estimatedMinutes": 5,
-    "skills": ["scales", "technique", "both-hands", "musical-expression"],
-    "prerequisites": ["lesson-05-ex-03"]
+    "skills": [
+      "scales",
+      "technique",
+      "both-hands",
+      "musical-expression"
+    ],
+    "prerequisites": [
+      "lesson-05-ex-03"
+    ]
   },
   "settings": {
-    "tempo": 85,
-    "timeSignature": [4, 4],
+    "tempo": 72,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -185,7 +195,11 @@
     "timingGracePeriodMs": 145,
     "velocitySensitive": false,
     "passingScore": 74,
-    "starThresholds": [74, 86, 95]
+    "starThresholds": [
+      74,
+      86,
+      95
+    ]
   },
   "hints": {
     "beforeStart": "This review combines ascending and descending C major scales with left-hand bass accompaniment. The left hand plays steady alternating bass (C-G), while the right hand ascends and descends in eighth and quarter notes. Focus on smooth coordination and even technique.",

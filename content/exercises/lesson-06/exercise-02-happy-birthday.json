@@ -1,17 +1,28 @@
 {
   "id": "lesson-06-ex-02",
-      "version": 1,
+  "version": 1,
   "metadata": {
     "title": "Happy Birthday",
     "description": "The world's most sung song! Play with both hands",
     "difficulty": 3,
     "estimatedMinutes": 5,
-    "skills": ["both-hands", "melody", "song", "coordination", "classic-tune"],
-    "prerequisites": ["lesson-05-ex-04"]
+    "skills": [
+      "both-hands",
+      "melody",
+      "song",
+      "coordination",
+      "classic-tune"
+    ],
+    "prerequisites": [
+      "lesson-05-ex-04"
+    ]
   },
   "settings": {
-    "tempo": 90,
-    "timeSignature": [4, 4],
+    "tempo": 76,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -136,7 +147,11 @@
     "timingGracePeriodMs": 155,
     "velocitySensitive": false,
     "passingScore": 71,
-    "starThresholds": [71, 84, 94]
+    "starThresholds": [
+      71,
+      84,
+      94
+    ]
   },
   "hints": {
     "beforeStart": "Happy Birthday has a distinctive rhythm: C-C-D-C-F-E. The pattern repeats with slight variations. With left-hand bass, you'll coordinate the steady bass with the somewhat syncopated melody. This is a real test of hand independence!",

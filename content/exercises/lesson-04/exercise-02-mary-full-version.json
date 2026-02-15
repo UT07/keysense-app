@@ -6,12 +6,23 @@
     "description": "Play the complete song with melody and bass accompaniment",
     "difficulty": 3,
     "estimatedMinutes": 5,
-    "skills": ["both-hands", "coordination", "melody", "accompaniment", "song-arrangement"],
-    "prerequisites": ["lesson-04-ex-01"]
+    "skills": [
+      "both-hands",
+      "coordination",
+      "melody",
+      "accompaniment",
+      "song-arrangement"
+    ],
+    "prerequisites": [
+      "lesson-04-ex-01"
+    ]
   },
   "settings": {
-    "tempo": 75,
-    "timeSignature": [4, 4],
+    "tempo": 62,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -192,7 +203,11 @@
     "timingGracePeriodMs": 160,
     "velocitySensitive": false,
     "passingScore": 72,
-    "starThresholds": [72, 84, 94]
+    "starThresholds": [
+      72,
+      84,
+      94
+    ]
   },
   "hints": {
     "beforeStart": "This is the complete 'Mary Had a Little Lamb' with left-hand bass accompaniment. The bass alternates C (36) and G (48) each beat. The melody descends from E with a rest in the middle. Play slowly and focus on hand independence.",

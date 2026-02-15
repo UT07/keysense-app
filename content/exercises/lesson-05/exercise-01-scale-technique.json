@@ -6,12 +6,22 @@
     "description": "Master proper finger crossing technique for scale playing",
     "difficulty": 2,
     "estimatedMinutes": 4,
-    "skills": ["scales", "finger-crossing", "technique", "right-hand"],
-    "prerequisites": ["lesson-04-ex-06"]
+    "skills": [
+      "scales",
+      "finger-crossing",
+      "technique",
+      "right-hand"
+    ],
+    "prerequisites": [
+      "lesson-04-ex-06"
+    ]
   },
   "settings": {
-    "tempo": 80,
-    "timeSignature": [4, 4],
+    "tempo": 68,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -122,7 +132,11 @@
     "timingGracePeriodMs": 130,
     "velocitySensitive": false,
     "passingScore": 74,
-    "starThresholds": [74, 87, 96]
+    "starThresholds": [
+      74,
+      87,
+      96
+    ]
   },
   "hints": {
     "beforeStart": "This exercise spans two octaves with finger crossing: C to C to G. At C5 (note 72), your thumb crosses under your fingers to reach the next C (74). This crossing motion should be smooth and relaxed. Up to G uses 1-2-3-4-5-4-3-2-1-2-3-4-5 pattern.",

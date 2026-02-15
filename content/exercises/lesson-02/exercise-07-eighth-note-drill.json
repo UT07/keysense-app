@@ -6,12 +6,22 @@
     "description": "Practice playing eighth notes with consistent timing and touch",
     "difficulty": 2,
     "estimatedMinutes": 3,
-    "skills": ["right-hand", "eighth-notes", "rhythm-precision", "finger-dexterity"],
-    "prerequisites": ["lesson-02-ex-03"]
+    "skills": [
+      "right-hand",
+      "eighth-notes",
+      "rhythm-precision",
+      "finger-dexterity"
+    ],
+    "prerequisites": [
+      "lesson-02-ex-03"
+    ]
   },
   "settings": {
-    "tempo": 90,
-    "timeSignature": [4, 4],
+    "tempo": 76,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -136,7 +146,11 @@
     "timingGracePeriodMs": 120,
     "velocitySensitive": false,
     "passingScore": 75,
-    "starThresholds": [75, 87, 95]
+    "starThresholds": [
+      75,
+      87,
+      95
+    ]
   },
   "hints": {
     "beforeStart": "Eighth notes move twice as fast as quarter notes. Each note is half a beat. Keep your hand relaxed and let your fingers do the work. The metronome helps you stay steady.",

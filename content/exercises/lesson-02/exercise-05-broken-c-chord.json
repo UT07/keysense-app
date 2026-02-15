@@ -6,12 +6,22 @@
     "description": "Play a broken C major chord using ascending notes",
     "difficulty": 2,
     "estimatedMinutes": 3,
-    "skills": ["right-hand", "arpeggios", "chord-knowledge", "c-major"],
-    "prerequisites": ["lesson-02-ex-03"]
+    "skills": [
+      "right-hand",
+      "arpeggios",
+      "chord-knowledge",
+      "c-major"
+    ],
+    "prerequisites": [
+      "lesson-02-ex-03"
+    ]
   },
   "settings": {
-    "tempo": 80,
-    "timeSignature": [4, 4],
+    "tempo": 68,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -80,7 +90,11 @@
     "timingGracePeriodMs": 150,
     "velocitySensitive": false,
     "passingScore": 72,
-    "starThresholds": [72, 86, 95]
+    "starThresholds": [
+      72,
+      86,
+      95
+    ]
   },
   "hints": {
     "beforeStart": "A C major chord is made of the notes C-E-G. This exercise plays them broken (arpeggio): C-E-G-C up, then back down C-G-E-C. Use fingers 1-3-5-3 for a comfortable stretch.",

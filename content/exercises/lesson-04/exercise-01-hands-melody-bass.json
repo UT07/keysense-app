@@ -6,12 +6,22 @@
     "description": "Play right hand melody while left hand plays steady bass notes",
     "difficulty": 2,
     "estimatedMinutes": 4,
-    "skills": ["both-hands", "coordination", "melody", "accompaniment"],
-    "prerequisites": ["lesson-03-ex-05"]
+    "skills": [
+      "both-hands",
+      "coordination",
+      "melody",
+      "accompaniment"
+    ],
+    "prerequisites": [
+      "lesson-03-ex-05"
+    ]
   },
   "settings": {
-    "tempo": 70,
-    "timeSignature": [4, 4],
+    "tempo": 60,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -136,7 +146,11 @@
     "timingGracePeriodMs": 160,
     "velocitySensitive": false,
     "passingScore": 70,
-    "starThresholds": [70, 83, 94]
+    "starThresholds": [
+      70,
+      83,
+      94
+    ]
   },
   "hints": {
     "beforeStart": "Both hands play simultaneously, but different notes. Left hand plays steady C bass on every beat. Right hand plays a descending melody: E-F-G-F-E-D-C-C. Focus on the steady left hand first, then add right hand.",

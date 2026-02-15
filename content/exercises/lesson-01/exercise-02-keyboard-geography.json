@@ -6,12 +6,21 @@
     "description": "Learn to navigate the keyboard by playing different C notes",
     "difficulty": 1,
     "estimatedMinutes": 3,
-    "skills": ["orientation", "keyboard-navigation", "note-finding"],
-    "prerequisites": ["lesson-01-ex-01"]
+    "skills": [
+      "orientation",
+      "keyboard-navigation",
+      "note-finding"
+    ],
+    "prerequisites": [
+      "lesson-01-ex-01"
+    ]
   },
   "settings": {
-    "tempo": 60,
-    "timeSignature": [4, 4],
+    "tempo": 50,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -52,7 +61,11 @@
     "timingGracePeriodMs": 200,
     "velocitySensitive": false,
     "passingScore": 65,
-    "starThresholds": [70, 85, 95]
+    "starThresholds": [
+      70,
+      85,
+      95
+    ]
   },
   "hints": {
     "beforeStart": "This exercise explores the keyboard vertically. Find the low C below Middle C (C3, 48 MIDI), then Middle C (C4, 60 MIDI), then the high C above it (C5, 72 MIDI). All C notes have the same pattern of black keys between them.",

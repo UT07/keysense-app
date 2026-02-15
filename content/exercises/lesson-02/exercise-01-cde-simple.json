@@ -6,12 +6,22 @@
     "description": "Play the first three notes of the C major scale using quarter notes",
     "difficulty": 1,
     "estimatedMinutes": 3,
-    "skills": ["right-hand", "quarter-notes", "c-major", "finger-placement"],
-    "prerequisites": ["lesson-01-ex-03"]
+    "skills": [
+      "right-hand",
+      "quarter-notes",
+      "c-major",
+      "finger-placement"
+    ],
+    "prerequisites": [
+      "lesson-01-ex-03"
+    ]
   },
   "settings": {
-    "tempo": 60,
-    "timeSignature": [4, 4],
+    "tempo": 50,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -66,7 +76,11 @@
     "timingGracePeriodMs": 150,
     "velocitySensitive": false,
     "passingScore": 70,
-    "starThresholds": [70, 85, 95]
+    "starThresholds": [
+      70,
+      85,
+      95
+    ]
   },
   "hints": {
     "beforeStart": "Place your thumb (1) on Middle C, index (2) on D, middle (3) on E. Keep your hand relaxed and curved. Play each note clearly with a quarter-note rhythm.",

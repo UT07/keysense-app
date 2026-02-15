@@ -6,12 +6,22 @@
     "description": "Play the complete melody of this beloved lullaby",
     "difficulty": 2,
     "estimatedMinutes": 4,
-    "skills": ["right-hand", "melody", "c-major", "mixed-rhythms"],
-    "prerequisites": ["lesson-02-ex-04"]
+    "skills": [
+      "right-hand",
+      "melody",
+      "c-major",
+      "mixed-rhythms"
+    ],
+    "prerequisites": [
+      "lesson-02-ex-04"
+    ]
   },
   "settings": {
-    "tempo": 75,
-    "timeSignature": [4, 4],
+    "tempo": 62,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -122,7 +132,11 @@
     "timingGracePeriodMs": 150,
     "velocitySensitive": false,
     "passingScore": 72,
-    "starThresholds": [72, 86, 95]
+    "starThresholds": [
+      72,
+      86,
+      95
+    ]
   },
   "hints": {
     "beforeStart": "This melody uses mostly quarter notes with half notes at phrase endings. The notes are C-C-G-G-A-A-G / F-F-E-E-D-D-C. Notice the shape: up to G, then step down one note at a time.",

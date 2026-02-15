@@ -6,12 +6,22 @@
     "description": "Play a descending C major scale with your left hand",
     "difficulty": 1,
     "estimatedMinutes": 3,
-    "skills": ["left-hand", "scales", "c-major", "finger-placement"],
-    "prerequisites": ["lesson-03-ex-01"]
+    "skills": [
+      "left-hand",
+      "scales",
+      "c-major",
+      "finger-placement"
+    ],
+    "prerequisites": [
+      "lesson-03-ex-01"
+    ]
   },
   "settings": {
-    "tempo": 60,
-    "timeSignature": [4, 4],
+    "tempo": 50,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -80,7 +90,11 @@
     "timingGracePeriodMs": 150,
     "velocitySensitive": false,
     "passingScore": 70,
-    "starThresholds": [70, 85, 95]
+    "starThresholds": [
+      70,
+      85,
+      95
+    ]
   },
   "hints": {
     "beforeStart": "Start from Middle C (pinky, 5) and descend: C-B-A-G-F-E-D-C. Use fingers 5-4-3-2-1-3-2-1, with thumb crossing under at F.",

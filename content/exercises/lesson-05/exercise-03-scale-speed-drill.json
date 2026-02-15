@@ -6,12 +6,23 @@
     "description": "Practice C major scale at increasing speeds to build finger dexterity",
     "difficulty": 3,
     "estimatedMinutes": 5,
-    "skills": ["scales", "finger-dexterity", "speed", "right-hand", "sixteen-notes"],
-    "prerequisites": ["lesson-05-ex-01"]
+    "skills": [
+      "scales",
+      "finger-dexterity",
+      "speed",
+      "right-hand",
+      "sixteen-notes"
+    ],
+    "prerequisites": [
+      "lesson-05-ex-01"
+    ]
   },
   "settings": {
-    "tempo": 100,
-    "timeSignature": [4, 4],
+    "tempo": 84,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -129,7 +140,11 @@
     "timingGracePeriodMs": 100,
     "velocitySensitive": false,
     "passingScore": 76,
-    "starThresholds": [76, 88, 97]
+    "starThresholds": [
+      76,
+      88,
+      97
+    ]
   },
   "hints": {
     "beforeStart": "This exercise uses sixteenth notes (4 per beat) to challenge your finger speed and precision. Start slowly with the metronome and only increase speed when you're comfortable. Accuracy is more important than speed.",

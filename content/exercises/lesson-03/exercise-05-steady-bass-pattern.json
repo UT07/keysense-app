@@ -6,12 +6,22 @@
     "description": "Play a consistent bass accompaniment pattern with left hand",
     "difficulty": 2,
     "estimatedMinutes": 3,
-    "skills": ["left-hand", "accompaniment", "rhythm-consistency", "bass-pattern"],
-    "prerequisites": ["lesson-03-ex-04"]
+    "skills": [
+      "left-hand",
+      "accompaniment",
+      "rhythm-consistency",
+      "bass-pattern"
+    ],
+    "prerequisites": [
+      "lesson-03-ex-04"
+    ]
   },
   "settings": {
-    "tempo": 80,
-    "timeSignature": [4, 4],
+    "tempo": 68,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -80,7 +90,11 @@
     "timingGracePeriodMs": 150,
     "velocitySensitive": false,
     "passingScore": 72,
-    "starThresholds": [72, 85, 95]
+    "starThresholds": [
+      72,
+      85,
+      95
+    ]
   },
   "hints": {
     "beforeStart": "This is a waltz-style bass pattern: strong beat on C (36), then alternating notes between E (48) and G (43) in eighth notes. The pattern provides steady rhythmic support for melodies above.",

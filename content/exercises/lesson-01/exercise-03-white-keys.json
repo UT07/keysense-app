@@ -6,12 +6,21 @@
     "description": "Learn the names of white keys using the white key pattern",
     "difficulty": 1,
     "estimatedMinutes": 3,
-    "skills": ["orientation", "note-names", "white-keys"],
-    "prerequisites": ["lesson-01-ex-01"]
+    "skills": [
+      "orientation",
+      "note-names",
+      "white-keys"
+    ],
+    "prerequisites": [
+      "lesson-01-ex-01"
+    ]
   },
   "settings": {
-    "tempo": 60,
-    "timeSignature": [4, 4],
+    "tempo": 50,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -80,7 +89,11 @@
     "timingGracePeriodMs": 200,
     "velocitySensitive": false,
     "passingScore": 65,
-    "starThresholds": [70, 85, 95]
+    "starThresholds": [
+      70,
+      85,
+      95
+    ]
   },
   "hints": {
     "beforeStart": "Play the white keys from C to C using eighth notes: C-D-E-F-G-A-B-C. Notice there are no black keys between E-F and B-C. Use fingers 1-2-3-4-5-4-3-2 to maintain good technique.",

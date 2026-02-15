@@ -6,12 +6,22 @@
     "description": "Play the opening phrase of this classic melody using right hand",
     "difficulty": 2,
     "estimatedMinutes": 4,
-    "skills": ["right-hand", "melody", "c-major", "quarter-notes"],
-    "prerequisites": ["lesson-02-ex-03"]
+    "skills": [
+      "right-hand",
+      "melody",
+      "c-major",
+      "quarter-notes"
+    ],
+    "prerequisites": [
+      "lesson-02-ex-03"
+    ]
   },
   "settings": {
-    "tempo": 80,
-    "timeSignature": [4, 4],
+    "tempo": 68,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -94,7 +104,11 @@
     "timingGracePeriodMs": 150,
     "velocitySensitive": false,
     "passingScore": 72,
-    "starThresholds": [72, 85, 95]
+    "starThresholds": [
+      72,
+      85,
+      95
+    ]
   },
   "hints": {
     "beforeStart": "This is 'Mary Had a Little Lamb'! The melody starts on E (finger 3), then descends to D-C, then ascends E-E-E. The rhythm has one half note at the end (F) that lasts 2 beats.",

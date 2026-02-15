@@ -6,12 +6,22 @@
     "description": "Learn left hand finger placement starting from Middle C",
     "difficulty": 1,
     "estimatedMinutes": 3,
-    "skills": ["left-hand", "c-position", "finger-placement", "note-finding"],
-    "prerequisites": ["lesson-02-ex-08"]
+    "skills": [
+      "left-hand",
+      "c-position",
+      "finger-placement",
+      "note-finding"
+    ],
+    "prerequisites": [
+      "lesson-02-ex-08"
+    ]
   },
   "settings": {
-    "tempo": 60,
-    "timeSignature": [4, 4],
+    "tempo": 50,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -66,7 +76,11 @@
     "timingGracePeriodMs": 200,
     "velocitySensitive": false,
     "passingScore": 65,
-    "starThresholds": [70, 85, 95]
+    "starThresholds": [
+      70,
+      85,
+      95
+    ]
   },
   "hints": {
     "beforeStart": "For left hand, the finger numbering is reversed: pinky=5, ring=4, middle=3, index=2, thumb=1. Place your pinky (5) on Middle C for the C position with left hand.",

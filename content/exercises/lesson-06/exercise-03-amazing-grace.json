@@ -6,12 +6,23 @@
     "description": "Play the beloved hymn with both hands and smooth phrasing",
     "difficulty": 3,
     "estimatedMinutes": 5,
-    "skills": ["both-hands", "melody", "song", "legato", "musical-expression"],
-    "prerequisites": ["lesson-06-ex-02"]
+    "skills": [
+      "both-hands",
+      "melody",
+      "song",
+      "legato",
+      "musical-expression"
+    ],
+    "prerequisites": [
+      "lesson-06-ex-02"
+    ]
   },
   "settings": {
-    "tempo": 70,
-    "timeSignature": [3, 4],
+    "tempo": 60,
+    "timeSignature": [
+      3,
+      4
+    ],
     "keySignature": "C",
     "countIn": 3,
     "metronomeEnabled": true,
@@ -122,7 +133,11 @@
     "timingGracePeriodMs": 160,
     "velocitySensitive": false,
     "passingScore": 72,
-    "starThresholds": [72, 85, 95]
+    "starThresholds": [
+      72,
+      85,
+      95
+    ]
   },
   "hints": {
     "beforeStart": "Amazing Grace is in 3/4 waltz time (not 4/4). Count in threes: 1-2-3, 1-2-3. The melody is characterized by long notes that should sound smooth and connected (legato). The opening notes are G-A (ascending by step with long durations).",

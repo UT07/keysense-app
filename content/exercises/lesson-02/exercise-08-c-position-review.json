@@ -6,12 +6,22 @@
     "description": "Review C position with a mixed rhythm combining quarter and eighth notes",
     "difficulty": 2,
     "estimatedMinutes": 3,
-    "skills": ["right-hand", "c-position", "mixed-rhythms", "finger-placement"],
-    "prerequisites": ["lesson-02-ex-07"]
+    "skills": [
+      "right-hand",
+      "c-position",
+      "mixed-rhythms",
+      "finger-placement"
+    ],
+    "prerequisites": [
+      "lesson-02-ex-07"
+    ]
   },
   "settings": {
-    "tempo": 80,
-    "timeSignature": [4, 4],
+    "tempo": 68,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -94,7 +104,11 @@
     "timingGracePeriodMs": 150,
     "velocitySensitive": false,
     "passingScore": 72,
-    "starThresholds": [72, 85, 95]
+    "starThresholds": [
+      72,
+      85,
+      95
+    ]
   },
   "hints": {
     "beforeStart": "This review combines everything from Lesson 2: finger placement in C position, both quarter notes and eighth notes, and ascending/descending patterns. Stay focused on accurate finger placement and consistent timing.",

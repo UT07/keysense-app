@@ -6,12 +6,23 @@
     "description": "Play a modern melody inspired by contemporary music",
     "difficulty": 3,
     "estimatedMinutes": 5,
-    "skills": ["both-hands", "melody", "contemporary-music", "coordination", "mixed-rhythms"],
-    "prerequisites": ["lesson-06-ex-03"]
+    "skills": [
+      "both-hands",
+      "melody",
+      "contemporary-music",
+      "coordination",
+      "mixed-rhythms"
+    ],
+    "prerequisites": [
+      "lesson-06-ex-03"
+    ]
   },
   "settings": {
-    "tempo": 85,
-    "timeSignature": [4, 4],
+    "tempo": 72,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -164,7 +175,11 @@
     "timingGracePeriodMs": 155,
     "velocitySensitive": false,
     "passingScore": 73,
-    "starThresholds": [73, 85, 95]
+    "starThresholds": [
+      73,
+      85,
+      95
+    ]
   },
   "hints": {
     "beforeStart": "This modern melody combines quarter and eighth notes in a contemporary style. The rhythm is syncopated and the melody jumps around expressively (G-F-E-D-C-D-E-F-G). Left hand provides steady C-G bass throughout. This style is common in modern music.",

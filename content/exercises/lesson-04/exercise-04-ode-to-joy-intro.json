@@ -6,12 +6,23 @@
     "description": "Play the opening phrase of Beethoven's Ode to Joy with both hands",
     "difficulty": 3,
     "estimatedMinutes": 5,
-    "skills": ["both-hands", "coordination", "melody", "classic-music", "accompaniment"],
-    "prerequisites": ["lesson-04-ex-03"]
+    "skills": [
+      "both-hands",
+      "coordination",
+      "melody",
+      "classic-music",
+      "accompaniment"
+    ],
+    "prerequisites": [
+      "lesson-04-ex-03"
+    ]
   },
   "settings": {
-    "tempo": 70,
-    "timeSignature": [4, 4],
+    "tempo": 60,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -136,7 +147,11 @@
     "timingGracePeriodMs": 160,
     "velocitySensitive": false,
     "passingScore": 72,
-    "starThresholds": [72, 84, 94]
+    "starThresholds": [
+      72,
+      84,
+      94
+    ]
   },
   "hints": {
     "beforeStart": "This is the opening of Beethoven's immortal Ode to Joy! The melody ascends from G: G-G-A-B-C-B-A-G, while the left hand maintains steady C and G bass. The melody is mostly quarter notes with a final half note.",

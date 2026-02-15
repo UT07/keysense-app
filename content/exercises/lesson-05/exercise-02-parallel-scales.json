@@ -6,12 +6,22 @@
     "description": "Play matching scale patterns with both hands simultaneously",
     "difficulty": 3,
     "estimatedMinutes": 4,
-    "skills": ["scales", "parallel-motion", "both-hands", "coordination"],
-    "prerequisites": ["lesson-05-ex-01"]
+    "skills": [
+      "scales",
+      "parallel-motion",
+      "both-hands",
+      "coordination"
+    ],
+    "prerequisites": [
+      "lesson-05-ex-01"
+    ]
   },
   "settings": {
-    "tempo": 75,
-    "timeSignature": [4, 4],
+    "tempo": 62,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -150,7 +160,11 @@
     "timingGracePeriodMs": 130,
     "velocitySensitive": false,
     "passingScore": 75,
-    "starThresholds": [75, 87, 96]
+    "starThresholds": [
+      75,
+      87,
+      96
+    ]
   },
   "hints": {
     "beforeStart": "Both hands play the same pattern at the same time, ascending and descending. Left hand in lower register (C3-G3 range), right hand in higher register (C4-G4 range). Both hands use the exact same fingering and rhythm, creating perfect parallel motion.",

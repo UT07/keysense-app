@@ -6,12 +6,22 @@
     "description": "Learn to play bass notes used in accompanying patterns",
     "difficulty": 2,
     "estimatedMinutes": 3,
-    "skills": ["left-hand", "bass-notes", "low-register", "accompaniment"],
-    "prerequisites": ["lesson-03-ex-02"]
+    "skills": [
+      "left-hand",
+      "bass-notes",
+      "low-register",
+      "accompaniment"
+    ],
+    "prerequisites": [
+      "lesson-03-ex-02"
+    ]
   },
   "settings": {
-    "tempo": 70,
-    "timeSignature": [4, 4],
+    "tempo": 60,
+    "timeSignature": [
+      4,
+      4
+    ],
     "keySignature": "C",
     "countIn": 4,
     "metronomeEnabled": true,
@@ -80,7 +90,11 @@
     "timingGracePeriodMs": 200,
     "velocitySensitive": false,
     "passingScore": 68,
-    "starThresholds": [68, 82, 94]
+    "starThresholds": [
+      68,
+      82,
+      94
+    ]
   },
   "hints": {
     "beforeStart": "Bass notes are the deep notes on the left side of the keyboard. This exercise explores C (36, 48, 60) and nearby notes (55=F). In real music, these form the 'bass line' that accompanies the melody.",
