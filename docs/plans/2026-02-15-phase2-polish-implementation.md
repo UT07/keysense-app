@@ -8,6 +8,24 @@
 
 **Tech Stack:** react-native-svg (installed), react-native-reanimated (installed), expo-linear-gradient (installed), Jest + RNTL
 
+**Progress (updated 2026-02-15):**
+| Task | Status |
+|------|--------|
+| Task 1: KeysieSvg | DONE |
+| Task 2: KeysieAvatar | DONE |
+| Task 3: MascotBubble refactor | Pending |
+| Task 4: ExerciseCard integration | Pending |
+| Task 5: CompletionModal integration | Pending |
+| Task 6: LevelMap Keysie | Pending |
+| Task 7: HomeScreen Keysie | Pending |
+| Task 8: LessonComplete Keysie | Pending |
+| Task 9: Gradient headers + shadows | Pending |
+| Task 10: ScoreRing | DONE |
+| Task 11: PressableScale | DONE |
+| Task 12: Keyboard gradients | Pending |
+| Task 13: Onboarding E2E + Keysie | Pending |
+| Task 14: Final verification | Pending |
+
 ---
 
 ### Task 1: Create KeysieSvg — Static SVG Cat Character

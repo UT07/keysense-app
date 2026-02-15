@@ -7,8 +7,8 @@
 
 | Metric | Before | After |
 |--------|--------|-------|
-| Test Suites | 18 (many failing) | 19 passed |
-| Tests | ~393 passing, 40+ failing | 506 passed, 0 failing |
+| Test Suites | 18 (many failing) | 23 passed |
+| Tests | ~393 passing, 40+ failing | 518 passed, 0 failing |
 | TypeScript Errors | 144+ | 0 |
 | Navigation Buttons Working | ~30% | 100% |
 | App Runs on Simulator | No (build issues) | Yes (iPhone 17 Pro) |
@@ -574,3 +574,71 @@
 #### Verification
 - TypeScript: 0 errors
 - Tests: 506/506 passed, 19 suites
+
+---
+
+### 33. Low-Latency Audio Engine (react-native-audio-api)
+
+**Problem:** ExpoAudioEngine (expo-av) has inherent latency from the bridge layer. Need JSI-based audio for <20ms touch-to-sound.
+
+**`src/audio/WebAudioEngine.ts` (new):**
+- Uses `react-native-audio-api@0.9.3` (v0.11.x incompatible with RN 0.76 codegen)
+- JSI-based Web Audio API: `AudioContext`, `AudioBufferSourceNode`, `GainNode`
+- Pre-loads piano samples during `initialize()`
+- Pitch shifting via `playbackRate` from nearest sample
+- ADSR envelope for natural note attack/release
+
+**`src/audio/AudioEngineFactory.ts` (new):**
+- Factory pattern: `createAudioEngine()` tries `WebAudioEngine` first
+- Falls back to `ExpoAudioEngine` if native module unavailable
+- Dynamic `require()` with try/catch for graceful degradation
+
+**Dev Build:** Compiled and running on iPhone 13 Pro simulator with react-native-audio-api native module included via `npx expo prebuild` + CocoaPods.
+
+### 34. Keysie SVG Avatar System
+
+**Problem:** Mascot was a single emoji (🎹/🎵) in a colored circle — no personality, no brand identity.
+
+**New files created:**
+
+**`src/components/Mascot/types.ts`:**
+- `MascotMood`: 'happy' | 'encouraging' | 'excited' | 'teaching' | 'celebrating'
+- `MascotSize`: 'tiny' (24px) | 'small' (40px) | 'medium' (56px) | 'large' (80px)
+- `MASCOT_SIZES`: size-to-pixels mapping
+
+**`src/components/Mascot/KeysieSvg.tsx`:**
+- SVG cat character using react-native-svg (Svg, G, Circle, Path, Rect, Ellipse, Line)
+- ViewBox 0 0 100 100, scaled by MASCOT_SIZES
+- Features: dark grey body (#2A2A2A/#3A3A3A), crimson ear interiors (#DC143C), headphones band + cups, piano-key collar (alternating white/black Rects), eighth-note tail, mood-dependent eyes (crescents/wide/sparkle/soft/big), mood-dependent mouth, whiskers, crimson nose
+- 5 mood variants via conditional eye/mouth rendering
+
+**`src/components/Mascot/KeysieAvatar.tsx`:**
+- Animated wrapper around KeysieSvg using react-native-reanimated
+- Per-mood animation hooks:
+  - `useIdleAnimation`: scale 1.0→1.03→1.0, 2.5s loop (happy mood)
+  - `useCelebratingAnimation`: translateY 0→-6→0, 800ms loop
+  - `useEncouragingAnimation`: rotate 0→4→-4→0, once
+  - `useTeachingAnimation`: rotate 0→-6, hold
+  - `useExcitedAnimation`: scale 1.0→1.08→1.0, 500ms loop
+- `StarParticles` sub-component: 5 animated stars floating up when celebrating + showParticles
+- Props: `{ mood, size?, animated?, showParticles? }`
+
+### 35. ScoreRing and PressableScale Components
+
+**`src/components/common/ScoreRing.tsx`:**
+- Animated SVG circle score indicator using strokeDasharray/strokeDashoffset
+- Conditional rendering: `AnimatedForeground` (useAnimatedProps) when animated=true, plain Circle when animated=false
+- Color thresholds: red (<60), orange (60-79), green (80-94), gold (95+)
+- Center text: score number (large) + % (small)
+
+**`src/components/common/PressableScale.tsx`:**
+- `Animated.createAnimatedComponent(Pressable)` wrapper
+- Spring-based scale animation: press → 0.97, release → 1.0
+- Props: `{ onPress?, scaleDown?, style?, children, testID? }`
+
+**`src/components/common/index.ts` updated:**
+- Added barrel exports for ScoreRing, ScoreRingProps, PressableScale, PressableScaleProps
+
+#### Verification
+- TypeScript: 0 errors
+- Tests: 518/518 passed, 23 suites (12 new tests across 4 new test files)

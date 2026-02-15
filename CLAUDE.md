@@ -55,6 +55,8 @@ src/
 ├── audio/                # Audio engine abstraction
 │   ├── AudioEngine.ts    # Interface definition
 │   ├── ExpoAudioEngine.ts # expo-av implementation with sound pooling
+│   ├── WebAudioEngine.ts  # react-native-audio-api JSI implementation
+│   ├── createAudioEngine.ts # Factory: tries WebAudio, falls back to Expo
 │   └── samples/          # Piano sample management
 ├── input/                # Input handling
 │   ├── MidiInput.ts      # MIDI device handling
@@ -68,9 +70,9 @@ src/
 ├── components/           # Reusable UI components
 │   ├── Keyboard/         # Piano keyboard (dynamic range from exercise)
 │   ├── PianoRoll/        # Scrolling note display (dynamic MIDI range)
-│   ├── Mascot/           # Keysie mascot (MascotBubble + 55 tips)
+│   ├── Mascot/           # Keysie mascot (KeysieSvg, KeysieAvatar, MascotBubble, 55 tips)
 │   ├── transitions/      # ExerciseCard, LessonCompleteScreen, AchievementToast, ConfettiEffect
-│   └── common/           # Buttons, cards, etc.
+│   └── common/           # ScoreRing, PressableScale, buttons, cards
 ├── hooks/                # Custom React hooks
 │   └── useExercisePlayback.ts  # Playback timing, completion, MIDI events
 ├── navigation/           # React Navigation setup
@@ -86,6 +88,7 @@ src/
 | File | Purpose |
 |------|---------|
 | `src/content/ContentLoader.ts` | Exercise/lesson loading from JSON (static require registry) |
+| `src/audio/createAudioEngine.ts` | Audio factory: WebAudioEngine (JSI) with ExpoAudioEngine fallback |
 | `src/audio/ExpoAudioEngine.ts` | Audio playback with round-robin voice pools (50 pre-loaded sounds) |
 | `src/core/exercises/ExerciseValidator.ts` | Core scoring logic - pure TS, heavily tested |
 | `src/core/exercises/types.ts` | Exercise and score type definitions |
@@ -97,6 +100,8 @@ src/
 | `src/components/PianoRoll/PianoRoll.tsx` | Transform-based scrolling note display |
 | `src/services/ai/GeminiCoach.ts` | AI coaching via Gemini 2.0 Flash with fallback |
 | `src/hooks/useExercisePlayback.ts` | Playback timing, MIDI events, completion handler |
+| `src/components/Mascot/KeysieAvatar.tsx` | Animated SVG cat mascot (5 moods, 4 sizes) |
+| `src/components/common/ScoreRing.tsx` | Animated SVG circle score indicator |
 | `content/exercises/` | JSON exercise definitions (30 exercises, 6 lessons) |
 
 ## Code Style
