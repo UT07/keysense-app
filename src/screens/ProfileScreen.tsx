@@ -329,7 +329,7 @@ export function ProfileScreen(): React.ReactElement {
         >
           <TouchableOpacity
             style={styles.avatarContainer}
-            onPress={() => setShowCatPicker(true)}
+            onPress={() => navigation.navigate('CatSwitch')}
             activeOpacity={0.7}
           >
             <CatAvatar catId={selectedCatId} size="large" showTooltipOnTap={false} />

@@ -22,6 +22,7 @@ import { AuthScreen } from '../screens/AuthScreen';
 import { EmailAuthScreen } from '../screens/EmailAuthScreen';
 import { AccountScreen } from '../screens/AccountScreen';
 import { LessonIntroScreen } from '../screens/LessonIntroScreen';
+import { CatSwitchScreen } from '../screens/CatSwitchScreen';
 
 // Stores
 import { useAuthStore } from '../stores/authStore';
@@ -36,6 +37,7 @@ export type RootStackParamList = {
   LessonIntro: { lessonId: string };
   MidiSetup: undefined;
   Account: undefined;
+  CatSwitch: undefined;
 };
 
 export type MainTabParamList = {
@@ -158,6 +160,11 @@ export function AppNavigator() {
               name="Account"
               component={AccountScreen}
               options={{ presentation: 'modal' }}
+            />
+            <RootStack.Screen
+              name="CatSwitch"
+              component={CatSwitchScreen}
+              options={{ animation: 'slide_from_right' }}
             />
           </>
         )}
