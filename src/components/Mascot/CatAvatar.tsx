@@ -96,7 +96,7 @@ export function CatAvatar({
           testID="cat-avatar"
         >
           <KeysieSvg
-            mood="happy"
+            mood="encouraging"
             size="medium"
             accentColor={cat.color}
             pixelSize={Math.round(dimension * 0.75)}

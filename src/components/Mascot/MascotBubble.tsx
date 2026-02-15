@@ -21,6 +21,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { KeysieSvg } from './KeysieSvg';
 import type { MascotMood } from './mascotTips';
 
 export interface MascotBubbleProps {
@@ -47,24 +48,10 @@ const MOOD_BORDER_COLORS: Record<MascotMood, string> = {
   celebrating: '#DC143C',
 };
 
-const MOOD_EXPRESSIONS: Record<MascotMood, string> = {
-  happy: '\u{1F3B9}',
-  encouraging: '\u{1F3B5}',
-  excited: '\u{1F3B6}',
-  teaching: '\u{1F3BC}',
-  celebrating: '\u{1F3B9}',
-};
-
 const AVATAR_SIZES = {
   small: 36,
   medium: 48,
   large: 64,
-};
-
-const EMOJI_SIZES = {
-  small: 18,
-  medium: 24,
-  large: 32,
 };
 
 const MESSAGE_FONT_SIZES = {
@@ -130,7 +117,6 @@ export const MascotBubble: React.FC<MascotBubbleProps> = ({
   }));
 
   const avatarSize = AVATAR_SIZES[size];
-  const emojiSize = EMOJI_SIZES[size];
   const fontSize = MESSAGE_FONT_SIZES[size];
   const bgColor = MOOD_COLORS[mood];
   const borderColor = MOOD_BORDER_COLORS[mood];
@@ -154,7 +140,7 @@ export const MascotBubble: React.FC<MascotBubbleProps> = ({
         ]}
         testID="mascot-avatar"
       >
-        <Text style={{ fontSize: emojiSize }}>{MOOD_EXPRESSIONS[mood]}</Text>
+        <KeysieSvg mood={mood} size="small" pixelSize={Math.round(avatarSize * 0.8)} />
       </View>
 
       {/* Speech Bubble */}
