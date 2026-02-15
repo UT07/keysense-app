@@ -13,66 +13,40 @@
 import type { User } from 'firebase/auth';
 
 // ============================================================================
-// Mocks
+// Mocks — use jest.mock() with inline factories
 // ============================================================================
 
-const mockOnAuthStateChanged = jest.fn();
-const mockSignInAnonymously = jest.fn();
-const mockSignInWithEmailAndPassword = jest.fn();
-const mockCreateUserWithEmailAndPassword = jest.fn();
-const mockFirebaseSignOut = jest.fn();
-const mockDeleteUser = jest.fn();
-const mockUpdateProfile = jest.fn();
-const mockSendPasswordResetEmail = jest.fn();
-const mockLinkWithCredential = jest.fn();
-const mockEmailAuthProvider = {
-  credential: jest.fn(),
-};
-const mockGoogleAuthProvider = {
-  credential: jest.fn(),
-};
-const mockOAuthProvider = jest.fn().mockImplementation(() => ({
-  credential: jest.fn(),
-}));
-
 jest.mock('firebase/auth', () => ({
-  onAuthStateChanged: mockOnAuthStateChanged,
-  signInAnonymously: mockSignInAnonymously,
-  signInWithEmailAndPassword: mockSignInWithEmailAndPassword,
-  createUserWithEmailAndPassword: mockCreateUserWithEmailAndPassword,
-  signOut: mockFirebaseSignOut,
-  deleteUser: mockDeleteUser,
-  updateProfile: mockUpdateProfile,
-  sendPasswordResetEmail: mockSendPasswordResetEmail,
-  linkWithCredential: mockLinkWithCredential,
-  EmailAuthProvider: mockEmailAuthProvider,
-  GoogleAuthProvider: mockGoogleAuthProvider,
-  OAuthProvider: mockOAuthProvider,
+  onAuthStateChanged: jest.fn(),
+  signInAnonymously: jest.fn(),
+  signInWithEmailAndPassword: jest.fn(),
+  createUserWithEmailAndPassword: jest.fn(),
+  signOut: jest.fn(),
+  deleteUser: jest.fn(),
+  updateProfile: jest.fn(),
+  sendPasswordResetEmail: jest.fn(),
+  linkWithCredential: jest.fn(),
+  EmailAuthProvider: { credential: jest.fn() },
+  GoogleAuthProvider: { credential: jest.fn() },
+  OAuthProvider: jest.fn().mockImplementation(() => ({
+    credential: jest.fn(),
+  })),
 }));
-
-const mockAuth = { currentUser: null };
-const mockDb = {};
 
 jest.mock('../../services/firebase/config', () => ({
-  auth: mockAuth,
-  db: mockDb,
+  auth: { currentUser: null },
+  db: {},
 }));
-
-const mockCreateUserProfile = jest.fn();
-const mockGetUserProfile = jest.fn();
-const mockDeleteUserData = jest.fn();
 
 jest.mock('../../services/firebase/firestore', () => ({
-  createUserProfile: mockCreateUserProfile,
-  getUserProfile: mockGetUserProfile,
-  deleteUserData: mockDeleteUserData,
+  createUserProfile: jest.fn(),
+  getUserProfile: jest.fn(),
+  deleteUserData: jest.fn(),
 }));
-
-const mockClearAll = jest.fn();
 
 jest.mock('../persistence', () => ({
   PersistenceManager: {
-    clearAll: mockClearAll,
+    clearAll: jest.fn(),
   },
   STORAGE_KEYS: {
     EXERCISE: 'keysense_exercise_state',
@@ -83,10 +57,37 @@ jest.mock('../persistence', () => ({
 }));
 
 // ============================================================================
-// Import store (after mocks)
+// Import mocked modules to get references
 // ============================================================================
 
+import {
+  onAuthStateChanged,
+  signInAnonymously as firebaseSignInAnonymously,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  deleteUser,
+  updateProfile,
+  sendPasswordResetEmail,
+} from 'firebase/auth';
+import { auth } from '../../services/firebase/config';
+import { createUserProfile, deleteUserData } from '../../services/firebase/firestore';
+import { PersistenceManager } from '../persistence';
 import { useAuthStore } from '../authStore';
+
+// Cast to jest mocks for easy access
+const mockOnAuthStateChanged = onAuthStateChanged as jest.Mock;
+const mockSignInAnonymously = firebaseSignInAnonymously as jest.Mock;
+const mockSignInWithEmailAndPassword = signInWithEmailAndPassword as jest.Mock;
+const mockCreateUserWithEmailAndPassword = createUserWithEmailAndPassword as jest.Mock;
+const mockFirebaseSignOut = firebaseSignOut as jest.Mock;
+const mockDeleteUser = deleteUser as jest.Mock;
+const mockUpdateProfile = updateProfile as jest.Mock;
+const mockSendPasswordResetEmail = sendPasswordResetEmail as jest.Mock;
+const mockCreateUserProfile = createUserProfile as jest.Mock;
+const mockDeleteUserData = deleteUserData as jest.Mock;
+const mockClearAll = PersistenceManager.clearAll as jest.Mock;
+const mockAuth = auth;
 
 // ============================================================================
 // Helpers
