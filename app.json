@@ -48,6 +48,13 @@
           "iosBackgroundMode": false,
           "androidForegroundService": false
         }
+      ],
+      "expo-apple-authentication",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.GOOGLE_IOS_CLIENT_ID"
+        }
       ]
     ]
   }
