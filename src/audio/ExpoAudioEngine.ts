@@ -1,24 +1,24 @@
 /**
- * Expo Audio Engine
- * Uses expo-av for audio playback on Expo Go / simulator
+ * Expo Audio Engine — Round-Robin Sound Pool
  *
- * Strategy: Generates a sine wave WAV in-memory, writes it to cache,
- * then plays it with different rates for pitch shifting.
+ * Uses expo-av with a round-robin pool of Audio.Sound objects per note.
+ * Each note gets VOICES_PER_NOTE sound objects. On each play, we cycle
+ * to the next voice using replayAsync() which atomically resets and plays.
+ * This eliminates the stop/play race condition that caused dropped notes.
  *
  * Middle C (MIDI 60) = 261.63 Hz is the base note.
- * Other notes are played by adjusting the playback rate:
- *   rate = 2^((targetMidi - 60) / 12)
+ * Other notes use playback rate shifting: rate = 2^((note - 60) / 12)
  */
 
 import { Audio, AVPlaybackSource } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import type { IAudioEngine, NoteHandle, AudioContextState } from './types';
 
-const BASE_MIDI_NOTE = 60; // Middle C
-const BASE_FREQUENCY = 261.63; // Hz
+const BASE_MIDI_NOTE = 60;
+const BASE_FREQUENCY = 261.63;
 const SAMPLE_RATE = 44100;
 const DURATION = 1.5; // seconds
-const MAX_POLYPHONY = 8;
+const VOICES_PER_NOTE = 2; // Round-robin voices per note
 
 /**
  * Generate a WAV file buffer containing a piano-like tone
@@ -37,7 +37,6 @@ function generatePianoWav(): ArrayBuffer {
   const buffer = new ArrayBuffer(totalSize);
   const view = new DataView(buffer);
 
-  // WAV header
   const writeString = (offset: number, str: string) => {
     for (let i = 0; i < str.length; i++) {
       view.setUint8(offset + i, str.charCodeAt(i));
@@ -48,8 +47,8 @@ function generatePianoWav(): ArrayBuffer {
   view.setUint32(4, totalSize - 8, true);
   writeString(8, 'WAVE');
   writeString(12, 'fmt ');
-  view.setUint32(16, 16, true); // PCM format chunk size
-  view.setUint16(20, 1, true); // PCM format
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
   view.setUint16(22, numChannels, true);
   view.setUint32(24, SAMPLE_RATE, true);
   view.setUint32(28, byteRate, true);
@@ -58,38 +57,24 @@ function generatePianoWav(): ArrayBuffer {
   writeString(36, 'data');
   view.setUint32(40, dataSize, true);
 
-  // Generate piano-like waveform: fundamental + harmonics with decay
   const freq = BASE_FREQUENCY;
   for (let i = 0; i < numSamples; i++) {
     const t = i / SAMPLE_RATE;
-
-    // Exponential decay envelope
     const envelope = Math.exp(-t * 3.0);
-
-    // Attack (first 10ms ramp)
     const attack = Math.min(1.0, t / 0.01);
-
-    // Fundamental + harmonics for richer tone
     const fundamental = Math.sin(2 * Math.PI * freq * t);
     const harmonic2 = 0.5 * Math.sin(2 * Math.PI * freq * 2 * t);
     const harmonic3 = 0.25 * Math.sin(2 * Math.PI * freq * 3 * t);
     const harmonic4 = 0.1 * Math.sin(2 * Math.PI * freq * 4 * t);
-
     const sample = (fundamental + harmonic2 + harmonic3 + harmonic4) / 1.85;
     const amplitude = sample * envelope * attack * 0.8;
-
-    // Clamp and convert to 16-bit
     const clamped = Math.max(-1, Math.min(1, amplitude));
-    const int16 = Math.floor(clamped * 32767);
-    view.setInt16(headerSize + i * 2, int16, true);
+    view.setInt16(headerSize + i * 2, Math.floor(clamped * 32767), true);
   }
 
   return buffer;
 }
 
-/**
- * Convert ArrayBuffer to base64 string
- */
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let binary = '';
@@ -99,34 +84,30 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-interface ActiveSound {
-  sound: Audio.Sound;
-  note: number;
-  startTime: number;
+/**
+ * Round-robin voice pool for a single note.
+ * Contains VOICES_PER_NOTE sound objects that cycle on each play.
+ */
+interface NoteVoicePool {
+  sounds: Audio.Sound[];
+  nextVoice: number; // Index of the next voice to use
 }
 
-// Pre-loaded sound pool for instant replay (no async gap)
-interface PooledSound {
-  sound: Audio.Sound;
-  note: number;
-  ready: boolean;
-}
-
-// Notes to pre-load: C4 (60) through B4 (71) — covers Lesson 1 range
-const PRELOAD_NOTES = [48, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72];
+// Notes to pre-load: C3 through C5 — covers all lesson ranges
+const PRELOAD_NOTES = [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
+                       60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72];
 
 export class ExpoAudioEngine implements IAudioEngine {
   private initialized = false;
   private volume = 0.8;
-  private activeSounds: Map<number, ActiveSound> = new Map();
   private soundSource: AVPlaybackSource | null = null;
-  private soundPool: Map<number, PooledSound> = new Map();
+  private voicePools: Map<number, NoteVoicePool> = new Map();
+  private activeNotes: Set<number> = new Set();
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
     try {
-      // Configure audio session for low-latency playback
       await Audio.setAudioModeAsync({
         playsInSilentModeIOS: true,
         staysActiveInBackground: false,
@@ -134,34 +115,31 @@ export class ExpoAudioEngine implements IAudioEngine {
       });
       console.log('[ExpoAudioEngine] Audio mode configured');
 
-      // Generate the base piano tone WAV and write to temp file
-      // (iOS AVURLAsset does not support data: URIs — must use file://)
+      // Generate and write base WAV
       const wavBuffer = generatePianoWav();
       console.log(`[ExpoAudioEngine] WAV generated: ${wavBuffer.byteLength} bytes`);
 
       const base64 = arrayBufferToBase64(wavBuffer);
       const cacheDir = FileSystem.cacheDirectory;
       if (!cacheDir) {
-        throw new Error('FileSystem.cacheDirectory is null — cannot write audio file');
+        throw new Error('FileSystem.cacheDirectory is null');
       }
       const fileUri = cacheDir + 'piano-tone.wav';
       await FileSystem.writeAsStringAsync(fileUri, base64, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Verify the file was written
       const fileInfo = await FileSystem.getInfoAsync(fileUri);
-      console.log(`[ExpoAudioEngine] WAV file written: ${fileUri}, exists=${fileInfo.exists}, size=${fileInfo.exists ? (fileInfo as { size: number }).size : 0}`);
+      console.log(`[ExpoAudioEngine] WAV file: ${fileUri}, exists=${fileInfo.exists}`);
 
       this.soundSource = { uri: fileUri };
 
-      // Pre-create sound objects for common notes (sound pool)
-      await this.preloadSoundPool();
+      // Pre-create round-robin voice pools
+      await this.preloadVoicePools();
 
       this.initialized = true;
-      console.log(`[ExpoAudioEngine] Initialized successfully with ${this.soundPool.size}/${PRELOAD_NOTES.length} pre-loaded sounds`);
+      console.log(`[ExpoAudioEngine] Initialized: ${this.voicePools.size} notes × ${VOICES_PER_NOTE} voices`);
 
-      // Play a brief silent test to warm up the audio pipeline
       await this.warmUpAudio();
     } catch (error) {
       console.error('[ExpoAudioEngine] Initialization failed:', error);
@@ -169,55 +147,52 @@ export class ExpoAudioEngine implements IAudioEngine {
     }
   }
 
-  /**
-   * Warm up the audio pipeline by playing a note at zero volume.
-   * iOS requires the first audio play to happen from a user gesture context,
-   * but in Expo Go this usually works from initialization.
-   */
   private async warmUpAudio(): Promise<void> {
     try {
-      const pooled = this.soundPool.get(60); // Middle C
-      if (pooled) {
-        await pooled.sound.setStatusAsync({
+      const pool = this.voicePools.get(60);
+      if (pool) {
+        await pool.sounds[0].replayAsync({
           positionMillis: 0,
-          volume: 0.01, // Near-silent
+          volume: 0.01,
           shouldPlay: true,
         });
-        // Stop after a brief moment
         setTimeout(() => {
-          pooled.sound.stopAsync().catch(() => {});
+          pool.sounds[0].stopAsync().catch(() => {});
         }, 50);
         console.log('[ExpoAudioEngine] Audio warm-up complete');
       }
     } catch (error) {
-      console.warn('[ExpoAudioEngine] Audio warm-up failed (non-critical):', error);
+      console.warn('[ExpoAudioEngine] Warm-up failed (non-critical):', error);
     }
   }
 
   /**
-   * Pre-load Audio.Sound objects for the most-used note range.
-   * These can be replayed instantly via replayAsync() without
-   * the async overhead of Audio.Sound.createAsync().
+   * Create VOICES_PER_NOTE Audio.Sound objects per note, each pre-configured
+   * with the correct playback rate. On play, we just call replayAsync().
    */
-  private async preloadSoundPool(): Promise<void> {
+  private async preloadVoicePools(): Promise<void> {
     if (!this.soundSource) return;
 
     const loadPromises = PRELOAD_NOTES.map(async (note) => {
       try {
         const rate = Math.pow(2, (note - BASE_MIDI_NOTE) / 12);
         const clampedRate = Math.max(0.25, Math.min(4.0, rate));
+        const sounds: Audio.Sound[] = [];
 
-        const { sound } = await Audio.Sound.createAsync(
-          this.soundSource!,
-          {
-            shouldPlay: false,
-            volume: this.volume,
-            rate: clampedRate,
-            shouldCorrectPitch: false,
-          }
-        );
+        for (let v = 0; v < VOICES_PER_NOTE; v++) {
+          const { sound } = await Audio.Sound.createAsync(
+            this.soundSource!,
+            {
+              shouldPlay: false,
+              volume: this.volume,
+              rate: clampedRate,
+              shouldCorrectPitch: false,
+            }
+          );
+          sounds.push(sound);
+        }
 
-        this.soundPool.set(note, { sound, note, ready: true });
+        this.voicePools.set(note, { sounds, nextVoice: 0 });
       } catch (error) {
         console.warn(`[ExpoAudioEngine] Failed to pre-load note ${note}:`, error);
       }
@@ -227,35 +202,41 @@ export class ExpoAudioEngine implements IAudioEngine {
   }
 
   async suspend(): Promise<void> {
-    // Pause all active sounds
-    for (const [, active] of this.activeSounds) {
-      try {
-        await active.sound.pauseAsync();
-      } catch {
-        // Already stopped
+    for (const [, pool] of this.voicePools) {
+      for (const sound of pool.sounds) {
+        sound.stopAsync().catch(() => {});
       }
     }
   }
 
   async resume(): Promise<void> {
-    // Nothing to resume - sounds are one-shot
+    // One-shot sounds, nothing to resume
   }
 
   dispose(): void {
-    this.releaseAllNotes();
-    // Unload pooled sounds
-    for (const [, pooled] of this.soundPool) {
-      pooled.sound.unloadAsync().catch(() => {});
+    for (const [, pool] of this.voicePools) {
+      for (const sound of pool.sounds) {
+        sound.unloadAsync().catch(() => {});
+      }
     }
-    this.soundPool.clear();
+    this.voicePools.clear();
+    this.activeNotes.clear();
     this.soundSource = null;
     this.initialized = false;
     console.log('[ExpoAudioEngine] Disposed');
   }
 
+  /**
+   * Play a note using the round-robin voice pool.
+   *
+   * Key design: replayAsync() is a SINGLE atomic bridge call that resets
+   * position and starts playback. No race condition between stop + play.
+   * Round-robin ensures rapid re-triggers of the same note always have
+   * a fresh voice available (voice 0 may still be fading while voice 1 plays).
+   */
   playNote(note: number, velocity: number = 0.8): NoteHandle {
     if (!this.initialized || !this.soundSource) {
-      console.warn(`[ExpoAudioEngine] Not initialized (init=${this.initialized}, source=${!!this.soundSource}), skipping note ${note}`);
+      console.warn(`[ExpoAudioEngine] playNote(${note}) skipped: initialized=${this.initialized}, soundSource=${!!this.soundSource}, pools=${this.voicePools.size}`);
       return {
         note,
         startTime: Date.now() / 1000,
@@ -263,84 +244,44 @@ export class ExpoAudioEngine implements IAudioEngine {
       };
     }
 
-    // Enforce polyphony limit — evict by oldest startTime
-    if (this.activeSounds.size >= MAX_POLYPHONY) {
-      let oldestNote = -1;
-      let oldestTime = Infinity;
-      for (const [n, active] of this.activeSounds) {
-        if (active.startTime < oldestTime) {
-          oldestTime = active.startTime;
-          oldestNote = n;
-        }
-      }
-      if (oldestNote >= 0) {
-        this.doRelease(oldestNote);
-      }
-    }
-
-    // Stop existing note at same pitch
-    if (this.activeSounds.has(note)) {
-      this.doRelease(note);
-    }
-
     const clampedVelocity = Math.max(0.1, Math.min(1.0, velocity));
     const startTime = Date.now() / 1000;
+    const vol = clampedVelocity * this.volume;
 
-    // Try sound pool first (near-synchronous replay)
-    const pooled = this.soundPool.get(note);
-    if (pooled?.ready) {
-      this.replayPooledSound(pooled, note, clampedVelocity, startTime);
+    const pool = this.voicePools.get(note);
+    if (pool) {
+      // Round-robin: pick the next voice and advance the index
+      const voice = pool.sounds[pool.nextVoice];
+      pool.nextVoice = (pool.nextVoice + 1) % pool.sounds.length;
+
+      // Fire-and-forget: replayAsync atomically resets and plays
+      voice.replayAsync({
+        positionMillis: 0,
+        volume: vol,
+        shouldPlay: true,
+      }).catch(() => {
+        // If replay fails, try the other voice
+        const fallbackVoice = pool.sounds[pool.nextVoice];
+        fallbackVoice.replayAsync({
+          positionMillis: 0,
+          volume: vol,
+          shouldPlay: true,
+        }).catch(() => {});
+      });
+
+      this.activeNotes.add(note);
     } else {
-      // Fallback: fire-and-forget async sound creation for non-pooled notes
+      // Non-pooled note: create on the fly (higher latency)
       const rate = Math.pow(2, (note - BASE_MIDI_NOTE) / 12);
       const clampedRate = Math.max(0.25, Math.min(4.0, rate));
       this.createAndPlaySound(note, clampedRate, clampedVelocity);
     }
 
-    const handle: NoteHandle = {
+    return {
       note,
       startTime,
       release: () => this.doRelease(note),
     };
-
-    return handle;
-  }
-
-  /**
-   * Replay a pre-loaded sound from the pool (minimal latency).
-   */
-  private replayPooledSound(
-    pooled: PooledSound,
-    note: number,
-    velocity: number,
-    startTime: number
-  ): void {
-    pooled.ready = false;
-
-    // setPositionAsync(0) + playAsync is faster than createAsync
-    const vol = velocity * this.volume;
-    pooled.sound
-      .setStatusAsync({
-        positionMillis: 0,
-        volume: vol,
-        shouldPlay: true,
-      })
-      .then(() => {
-        this.activeSounds.set(note, {
-          sound: pooled.sound,
-          note,
-          startTime,
-        });
-        pooled.ready = true;
-      })
-      .catch((err) => {
-        console.warn(`[ExpoAudioEngine] Pool replay failed for note ${note} (vol=${vol}):`, err);
-        pooled.ready = true;
-        // Fallback: try creating a fresh sound
-        const rate = Math.pow(2, (note - BASE_MIDI_NOTE) / 12);
-        const clampedRate = Math.max(0.25, Math.min(4.0, rate));
-        this.createAndPlaySound(note, clampedRate, velocity);
-      });
   }
 
   private async createAndPlaySound(
@@ -357,43 +298,27 @@ export class ExpoAudioEngine implements IAudioEngine {
           shouldPlay: true,
           volume: velocity * this.volume,
           rate,
-          shouldCorrectPitch: false, // We want pitch to change with rate
+          shouldCorrectPitch: false,
         }
       );
 
-      // Track the active sound
-      this.activeSounds.set(note, {
-        sound,
-        note,
-        startTime: Date.now() / 1000,
-      });
-
-      // Auto-cleanup when playback finishes
       sound.setOnPlaybackStatusUpdate((status) => {
         if ('didJustFinish' in status && status.didJustFinish) {
           sound.unloadAsync().catch(() => {});
-          this.activeSounds.delete(note);
+          this.activeNotes.delete(note);
         }
       });
+
+      this.activeNotes.add(note);
     } catch (error) {
       console.error(`[ExpoAudioEngine] Failed to play note ${note}:`, error);
     }
   }
 
   private doRelease(note: number): void {
-    const active = this.activeSounds.get(note);
-    if (active) {
-      if (this.soundPool.has(note)) {
-        // Pooled sound: stop only, never unload (it will be reused)
-        active.sound.stopAsync().catch(() => {});
-      } else {
-        // Dynamic sound: stop and unload to free memory
-        active.sound.stopAsync().then(() => {
-          active.sound.unloadAsync().catch(() => {});
-        }).catch(() => {});
-      }
-      this.activeSounds.delete(note);
-    }
+    // For pooled sounds, let them decay naturally (WAV has built-in decay)
+    // For rapid re-trigger, round-robin handles it
+    this.activeNotes.delete(note);
   }
 
   releaseNote(handle: NoteHandle): void {
@@ -401,16 +326,12 @@ export class ExpoAudioEngine implements IAudioEngine {
   }
 
   releaseAllNotes(): void {
-    for (const [note, active] of this.activeSounds) {
-      if (this.soundPool.has(note)) {
-        // Pooled sound: stop only, preserve for reuse
-        active.sound.stopAsync().catch(() => {});
-      } else {
-        // Dynamic sound: fully unload
-        active.sound.unloadAsync().catch(() => {});
+    for (const [, pool] of this.voicePools) {
+      for (const sound of pool.sounds) {
+        sound.stopAsync().catch(() => {});
       }
     }
-    this.activeSounds.clear();
+    this.activeNotes.clear();
   }
 
   setVolume(volume: number): void {
@@ -418,7 +339,7 @@ export class ExpoAudioEngine implements IAudioEngine {
   }
 
   getLatency(): number {
-    return 30; // expo-av has higher latency than native audio
+    return 20;
   }
 
   isReady(): boolean {
@@ -430,7 +351,7 @@ export class ExpoAudioEngine implements IAudioEngine {
   }
 
   getActiveNoteCount(): number {
-    return this.activeSounds.size;
+    return this.activeNotes.size;
   }
 
   getMemoryUsage(): { samples: number; total: number } {

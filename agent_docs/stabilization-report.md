@@ -8,12 +8,16 @@
 | Metric | Before | After |
 |--------|--------|-------|
 | Test Suites | 18 (many failing) | 19 passed |
-| Tests | ~393 passing, 40+ failing | 464 passed, 0 failing |
+| Tests | ~393 passing, 40+ failing | 506 passed, 0 failing |
 | TypeScript Errors | 144+ | 0 |
 | Navigation Buttons Working | ~30% | 100% |
 | App Runs on Simulator | No (build issues) | Yes (iPhone 17 Pro) |
+| App Runs on Device | No | Yes (iPhone 13 Pro, Dev Build) |
 | Hardcoded Exercise Data | 5+ locations | 0 (all from ContentLoader) |
-| Lesson 1 E2E | Not working | Fully functional |
+| Lessons E2E | Lesson 1 only | All 6 lessons, 30 exercises validated |
+| Audio Engine | Dropped notes, race conditions | Round-robin voice pools, atomic replay |
+| Pause/Resume | Reset exercise on resume | Properly resumes from pause point |
+| MIDI Scoring | noteOff double-counted | noteOn only, timestamp normalized |
 
 ---
 
@@ -453,9 +457,120 @@
 3. ~~**Greeting time-of-day**: HomeScreen shows "Good Evening" regardless of time~~ **RESOLVED** (#18)
 4. ~~**ProfileScreen settings**: "Daily Goal" and "Volume" buttons don't open settings UI~~ **RESOLVED** (#20)
 5. ~~**PlayScreen keyboard**: Shows placeholder instead of actual piano keyboard~~ **RESOLVED** (PlayScreen rewrite)
-6. **Audio on simulator**: Audio playback may require Mac volume to be on and iOS Simulator unmuted. `ExpoAudioEngine` uses in-memory WAV generation with expo-av. Logs now show initialization status for debugging. Physical device recommended for reliable audio testing.
+6. ~~**Audio on simulator**: Audio drops notes~~ **RESOLVED** (#27 — round-robin voice pools)
 7. **Worker teardown warning**: Jest reports "worker process has failed to exit gracefully" (timer leak in tests, non-blocking)
-8. **Native audio engine**: Replace ExpoAudioEngine with react-native-audio-api (requires Expo Development Build)
+8. **Native audio engine**: Replace ExpoAudioEngine with react-native-audio-api (requires RN 0.77+ for codegen)
 9. ~~**Session time tracking**: exercises don't record session duration~~ **RESOLVED** (#23)
-10. **Duolingo-style level map**: Planned future feature — see `agent_docs/feature-level-map.md`
-11. **Lessons 2-6**: Content JSON exists but needs end-to-end testing after Lesson 1 is fully validated
+10. ~~**Duolingo-style level map**: Planned future feature~~ **RESOLVED** (LevelMapScreen implemented in Phase 2)
+11. ~~**Lessons 2-6**: Content JSON needs end-to-end testing~~ **RESOLVED** (#28 — all 30 exercises validated)
+12. **Native MIDI module**: `react-native-midi` not installed yet (needs RN 0.77+). VMPK + IAC Driver ready. See `agent_docs/midi-integration.md`
+13. ~~**Gamification transitions**: No mascot, no transition screens~~ **RESOLVED** (#32 — Keysie + ExerciseCard + LessonCompleteScreen + AchievementToast)
+
+---
+
+### 27. Audio Engine Rewrite: Round-Robin Voice Pools
+
+**Problem:** `ExpoAudioEngine` dropped notes when playing multiple keys together. Root causes:
+- `pooled.ready = false` blocked concurrent notes during async `setStatusAsync()` calls
+- `stopAsync()` fire-and-forget raced with next `setStatusAsync()` on same Audio.Sound
+- Single sound object per note couldn't handle rapid re-triggers
+
+**`src/audio/ExpoAudioEngine.ts` (rewritten):**
+- **Round-robin pools**: `VOICES_PER_NOTE = 2` sound objects per note, cycling via `nextVoice` index
+- **Atomic replay**: `replayAsync()` replaces `setStatusAsync()` — single bridge call that resets position and plays
+- **No blocking flag**: Removed `ready` flag entirely; round-robin ensures a fresh voice is always available
+- **Expanded range**: Pre-loads C3-C5 (25 notes × 2 voices = 50 sound objects)
+- **Fallback**: If replay fails on voice A, automatically tries voice B
+- Kept `createAndPlaySound()` fallback for notes outside the pre-loaded range
+
+### 28. Content E2E Validation
+
+**All 30 exercises across 6 lessons validated:**
+- MIDI ranges (21-108): 30/30 PASS
+- startBeat sequencing: 30/30 PASS
+- durationBeats > 0: 30/30 PASS
+- Scoring config: 30/30 PASS
+- Unlock chain: 6/6 PASS
+- Navigation chain: 30/30 PASS
+
+**Content bug fixed:**
+- `lesson-03-ex-02` (Left Hand Scale Descending): removed MIDI 56 (G#/Ab3) — not a C major scale note. Corrected to 8-note C major descent: C-B-A-G-F-E-D-C with standard fingering 5-4-3-2-1-3-2-1
+
+**Cleanup:** Removed 3 orphan files:
+- `content/exercises/lesson-01/exercise-02-cde.json` (replaced by keyboard-geography)
+- `content/exercises/lesson-1/exercise-1.json` (legacy format)
+- `content/lessons/lesson-1.json` (legacy format)
+
+### 29. Bug Fixes (4 HIGH, 5 MEDIUM)
+
+**HIGH: MIDI noteOff double-counting (#18)**
+- `useExercisePlayback.ts`: Only `noteOn` events are now recorded to `playedNotes` for scoring
+- Previously, every MIDI event (noteOn + noteOff) was recorded, causing double-counting
+
+**HIGH: Pause resets exercise (#19)**
+- Added `resumePlayback()` function that restores `startTimeRef` using saved elapsed time
+- `pausePlayback()` now saves `pauseElapsedRef = Date.now() - startTimeRef`
+- `handlePause` in ExercisePlayer uses `resumePlayback()` instead of `startPlayback()` on resume
+
+**HIGH: Stale playedNotes in completion (#15)**
+- Added `playedNotesRef` (useRef) that's updated synchronously on every note
+- `handleCompletion` reads from ref instead of React state closure (avoids batching lag)
+
+**HIGH: MIDI timestamp normalization (#17)**
+- MIDI events now get `timestamp: Date.now()` override to ensure consistent time domain
+- Native MIDI modules may use a different clock (monotonic vs wall clock)
+
+**MEDIUM: Streak logic bypass (#3/#4)**
+- Replaced manual streak calculation in ExercisePlayer with `XpSystem.recordPracticeSession()`
+- Properly handles streak freezes, multi-day gaps, and sliding-window weekly tracking
+
+**MEDIUM: updateExerciseProgress silent drop (#5)**
+- Auto-initializes lesson progress entry if it doesn't exist (was silently returning unchanged state)
+
+### 30. Dev Build + Physical Device Testing
+
+- Installed `expo-dev-client` for Development Build
+- Built and installed on iPhone 13 Pro (device ID: 00008110-0019341C1AA2801E)
+- `react-native-audio-api` attempted but incompatible with RN 0.76 codegen (deferred to RN 0.77)
+- Metro dev server serves JS bundle on port 8081 to physical device
+
+### 31. MIDI Testing Documentation
+
+- Created `agent_docs/midi-integration.md` — complete MIDI testing guide
+- VMPK already installed (`brew install --cask vmpk`)
+- IAC Driver setup instructions for macOS
+- Architecture diagram: Physical keyboard → IAC → react-native-midi → NativeMidiInput → scoring
+- Simulation API documented for unit/integration testing without hardware
+
+### 32. Gamification: Mascot, Transitions & ExerciseCard Wiring
+
+**Keysie Mascot (`src/components/Mascot/`):**
+- `MascotBubble.tsx` — animated speech bubble with mood-tinted avatar (happy, encouraging, excited, teaching, celebrating)
+- `mascotTips.ts` — 55 tips/facts across 5 categories (encouragement, music-fact, technique-tip, fun-fact, practice-tip)
+- `getTipForScore()` selects tip category based on score (95%+ encouragement, 80%+ mix, 60%+ technique, <60% practice)
+- Integrated into CompletionModal (shows after exercise completion with AI coaching)
+
+**Transition Screens (3-tier system):**
+- `ExerciseCard.tsx` — quick bottom-sheet card between exercises within a lesson
+  - Slides up from bottom (350ms, cubic ease-out)
+  - Shows: score circle, stars, XP badge, tip from Keysie, Next/Retry buttons
+  - Auto-dismisses in 5s with countdown progress bar
+  - Used when: exercise passed AND next exercise exists AND lesson not just completed
+- `LessonCompleteScreen.tsx` — full-screen celebration for lesson milestones
+  - Trophy icon, lesson stats (exercises, best score, XP, stars)
+  - ConfettiEffect animation
+  - Used when: all exercises in a lesson have `completedAt`
+- `AchievementToast.tsx` — small non-blocking toast for XP, level-up, streaks
+  - Auto-dismisses in 3s
+  - Shows on every exercise completion with XP earned
+
+**ExercisePlayer integration (`handleExerciseCompletion`):**
+- Context-aware transition selection:
+  - `score.isPassed && nextExerciseId && !isLessonComplete` → ExerciseCard (quick)
+  - Otherwise → CompletionModal (full, with AI coaching)
+- LessonCompleteScreen shown after CompletionModal closes (if lesson just completed)
+- AchievementToast overlays regardless of which modal is shown
+
+#### Verification
+- TypeScript: 0 errors
+- Tests: 506/506 passed, 19 suites

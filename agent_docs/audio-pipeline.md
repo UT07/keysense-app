@@ -60,7 +60,18 @@ This document details the implementation, optimization strategies, and debugging
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## AudioEngine Implementation
+## Current Audio Implementation
+
+**Active engine:** `ExpoAudioEngine` (expo-av) with round-robin voice pools
+**Planned upgrade:** `react-native-audio-api` (Web Audio API, requires RN 0.77+ for codegen)
+
+The ExpoAudioEngine uses pre-loaded `Audio.Sound` objects with `replayAsync()` for atomic stop+play:
+- `VOICES_PER_NOTE = 2` — two sound objects per note, cycling via round-robin index
+- Pre-loads C3-C5 (25 notes × 2 voices = 50 sound objects) during `initialize()`
+- Notes outside pre-loaded range fall back to dynamic `createAndPlaySound()`
+- No blocking flags — round-robin ensures a fresh voice is always available
+
+## AudioEngine Interface
 
 ### Interface
 

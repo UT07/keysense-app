@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Keyboard } from '../components/Keyboard/Keyboard';
-import { getAudioEngine } from '../audio/ExpoAudioEngine';
+import { createAudioEngine } from '../audio/createAudioEngine';
 import type { MidiNoteEvent } from '../core/exercises/types';
 
 export function PlayScreen() {
@@ -21,7 +21,7 @@ export function PlayScreen() {
   const [highlightedNotes, setHighlightedNotes] = useState<Set<number>>(new Set());
   const [isAudioReady, setIsAudioReady] = useState(false);
 
-  const audioEngine = getAudioEngine();
+  const audioEngine = createAudioEngine();
 
   // Initialize audio engine
   useEffect(() => {

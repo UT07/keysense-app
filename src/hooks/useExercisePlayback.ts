@@ -32,6 +32,7 @@ export interface UseExercisePlaybackReturn {
 
   // Actions
   startPlayback: () => void;
+  resumePlayback: () => void;
   pausePlayback: () => void;
   stopPlayback: () => void;
   resetPlayback: () => void;
@@ -66,10 +67,12 @@ export function useExercisePlayback({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const startTimeRef = useRef(0);
+  const pauseElapsedRef = useRef(0); // Tracks elapsed ms at time of pause
   const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const activeNotesRef = useRef<Map<number, any>>(new Map());
   const mountedRef = useRef(true);
   const handleCompletionRef = useRef<() => void>(() => {});
+  const playedNotesRef = useRef<MidiNoteEvent[]>([]); // Ref for scoring (avoids stale closure)
 
   // Track component mount lifecycle
   useEffect(() => {
@@ -124,6 +127,12 @@ export function useExercisePlayback({
 
   /**
    * Initialize audio engine
+   *
+   * IMPORTANT: We do NOT dispose the audio engine on unmount because it's a
+   * singleton shared across screen navigations. Disposing it on unmount causes
+   * a race condition when navigating between exercises (old cleanup destroys
+   * the engine after the new screen has already initialized it). Instead, we
+   * only release active notes on unmount. The engine persists for the app's lifetime.
    */
   useEffect(() => {
     if (!enableAudio) {
@@ -135,6 +144,14 @@ export function useExercisePlayback({
 
     const initAudio = async () => {
       try {
+        // If already initialized (singleton was kept alive), skip re-init
+        if (audioEngine.isReady()) {
+          if (mounted) {
+            setIsAudioReady(true);
+            console.log('[useExercisePlayback] Audio engine already initialized');
+          }
+          return;
+        }
         await audioEngine.initialize();
         if (mounted) {
           setIsAudioReady(true);
@@ -154,8 +171,9 @@ export function useExercisePlayback({
 
     return () => {
       mounted = false;
+      // Only release active notes — do NOT dispose the singleton engine
       if (enableAudio) {
-        audioEngine.dispose();
+        audioEngine.releaseAllNotes();
       }
     };
   }, [enableAudio, audioEngine]);
@@ -169,11 +187,14 @@ export function useExercisePlayback({
     const unsubscribe = midiInput.onNoteEvent((midiEvent) => {
       if (!mountedRef.current || !isPlaying) return;
 
-      // Add note to played notes
-      setPlayedNotes((prev) => [...prev, midiEvent]);
-
-      // Update exercise store
-      exerciseStore.addPlayedNote(midiEvent);
+      // Only record noteOn events for scoring (noteOff would double-count notes)
+      if (midiEvent.type === 'noteOn') {
+        // Normalize timestamp to Date.now() domain (native MIDI may use a different clock)
+        const normalizedEvent = { ...midiEvent, timestamp: Date.now() };
+        playedNotesRef.current = [...playedNotesRef.current, normalizedEvent];
+        setPlayedNotes(playedNotesRef.current);
+        exerciseStore.addPlayedNote(normalizedEvent);
+      }
 
       // Play audio if enabled
       if (enableAudio && isAudioReady && midiEvent.type === 'noteOn') {
@@ -257,10 +278,12 @@ export function useExercisePlayback({
   }, [isPlaying, exercise, exerciseStore]);
 
   /**
-   * Start playback
+   * Start playback (fresh start — resets all state)
    */
   const startPlayback = useCallback(() => {
     startTimeRef.current = Date.now();
+    pauseElapsedRef.current = 0;
+    playedNotesRef.current = [];
     setIsPlaying(true);
     setCurrentBeat(-exercise.settings.countIn);
     setPlayedNotes([]);
@@ -271,9 +294,25 @@ export function useExercisePlayback({
   }, [exercise.settings.countIn, exerciseStore]);
 
   /**
-   * Pause playback
+   * Resume playback after pause (continues from where it left off)
+   */
+  const resumePlayback = useCallback(() => {
+    // Adjust startTimeRef so elapsed time calculation continues correctly
+    // pauseElapsedRef tracks how much time had passed at the moment of pause
+    startTimeRef.current = Date.now() - pauseElapsedRef.current;
+    setIsPlaying(true);
+    exerciseStore.setIsPlaying(true);
+
+    console.log('[useExercisePlayback] Playback resumed');
+  }, [exerciseStore]);
+
+  /**
+   * Pause playback (preserves played notes and position)
    */
   const pausePlayback = useCallback(() => {
+    // Save elapsed time so we can resume from the same position
+    pauseElapsedRef.current = Date.now() - startTimeRef.current;
+
     // Clear interval synchronously to prevent further state updates
     if (playbackIntervalRef.current) {
       clearInterval(playbackIntervalRef.current);
@@ -320,6 +359,7 @@ export function useExercisePlayback({
    */
   const resetPlayback = useCallback(() => {
     stopPlayback();
+    playedNotesRef.current = [];
     setPlayedNotes([]);
     exerciseStore.clearSession();
 
@@ -344,11 +384,12 @@ export function useExercisePlayback({
     // Convert played note timestamps from epoch (Date.now()) to relative
     // (ms since beat 0). The scoring engine expects timestamps in the same
     // frame as expectedTimeMs = startBeat * msPerBeat.
+    // Use playedNotesRef (not state) to avoid stale closure from React batching.
     const msPerBeat = 60000 / exercise.settings.tempo;
     const countInMs = exercise.settings.countIn * msPerBeat;
     const beat0EpochMs = startTimeRef.current + countInMs;
 
-    const adjustedNotes = playedNotes.map((n) => ({
+    const adjustedNotes = playedNotesRef.current.map((n) => ({
       ...n,
       timestamp: n.timestamp - beat0EpochMs,
     }));
@@ -358,7 +399,7 @@ export function useExercisePlayback({
 
     console.log('[useExercisePlayback] Exercise completed:', score);
     onComplete?.(score);
-  }, [exercise, playedNotes, exerciseStore, onComplete]);
+  }, [exercise, exerciseStore, onComplete]);
 
   // Keep ref in sync so the interval always calls the latest handleCompletion
   useEffect(() => {
@@ -392,7 +433,8 @@ export function useExercisePlayback({
         channel: 0,
       };
 
-      setPlayedNotes((prev) => [...prev, midiEvent]);
+      playedNotesRef.current = [...playedNotesRef.current, midiEvent];
+      setPlayedNotes(playedNotesRef.current);
       exerciseStore.addPlayedNote(midiEvent);
     },
     [isPlaying, enableAudio, isAudioReady, audioEngine, exerciseStore]
@@ -422,6 +464,7 @@ export function useExercisePlayback({
 
     // Actions
     startPlayback,
+    resumePlayback,
     pausePlayback,
     stopPlayback,
     resetPlayback,

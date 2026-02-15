@@ -29,6 +29,7 @@ import { useExerciseStore } from '../../stores/exerciseStore';
 import { useProgressStore } from '../../stores/progressStore';
 import { useExercisePlayback } from '../../hooks/useExercisePlayback';
 import { getExercise, getNextExerciseId, getLessonIdForExercise, getLesson } from '../../content/ContentLoader';
+import { recordPracticeSession as calculateStreakUpdate } from '../../core/progression/XpSystem';
 import type { RootStackParamList } from '../../navigation/AppNavigator';
 import type { Exercise, ExerciseScore, MidiNoteEvent } from '../../core/exercises/types';
 import { ScoreDisplay } from './ScoreDisplay';
@@ -39,6 +40,9 @@ import { CountInAnimation } from './CountInAnimation';
 import { ErrorDisplay } from './ErrorDisplay';
 import { AchievementToast } from '../../components/transitions/AchievementToast';
 import type { AchievementType } from '../../components/transitions/AchievementToast';
+import { LessonCompleteScreen } from '../../components/transitions/LessonCompleteScreen';
+import { ExerciseCard } from '../../components/transitions/ExerciseCard';
+import { getTipForScore } from '../../components/Mascot/mascotTips';
 
 export interface ExercisePlayerProps {
   exercise?: Exercise;
@@ -173,8 +177,25 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   const [showCompletion, setShowCompletion] = useState(false);
   const [finalScore, setFinalScore] = useState<ExerciseScore | null>(null);
 
+  // Quick exercise card (between exercises in a lesson)
+  const [showExerciseCard, setShowExerciseCard] = useState(false);
+
   // Achievement toast state
   const [toastData, setToastData] = useState<{ type: AchievementType; value: number | string } | null>(null);
+
+  // Lesson completion celebration state
+  const [showLessonComplete, setShowLessonComplete] = useState(false);
+  const [lessonCompleteData, setLessonCompleteData] = useState<{
+    lessonTitle: string;
+    lessonNumber: number;
+    exercisesCompleted: number;
+    totalExercises: number;
+    bestScore: number;
+    xpEarned: number;
+    starsEarned: number;
+    maxStars: number;
+    nextLessonTitle?: string;
+  } | null>(null);
 
   /**
    * Handle exercise completion (called by useExercisePlayback hook)
@@ -183,8 +204,10 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   const handleExerciseCompletion = useCallback((score: ExerciseScore) => {
     if (!mountedRef.current) return;
     setFinalScore(score);
-    setShowCompletion(true);
     onExerciseComplete?.(score);
+
+    // Track whether this exercise completes the entire lesson
+    let isLessonComplete = false;
 
     // Persist XP and daily goal progress
     const progressStore = useProgressStore.getState();
@@ -241,6 +264,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         );
 
         if (allComplete && updatedLP?.status !== 'completed') {
+          isLessonComplete = true;
           progressStore.updateLessonProgress(exLessonId, {
             ...updatedLP!,
             status: 'completed',
@@ -248,35 +272,31 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
           });
           // Award lesson completion XP bonus
           progressStore.addXp(lesson.xpReward);
+
+          // Trigger lesson completion celebration
+          const totalStars = allExerciseIds.reduce((sum, eid) =>
+            sum + (updatedLP?.exerciseScores[eid]?.stars ?? 0), 0);
+          const bestScoreInLesson = Math.max(
+            ...allExerciseIds.map((eid) => updatedLP?.exerciseScores[eid]?.highScore ?? 0)
+          );
+          const lessonIndex = ['lesson-01','lesson-02','lesson-03','lesson-04','lesson-05','lesson-06'].indexOf(exLessonId);
+          setLessonCompleteData({
+            lessonTitle: lesson.metadata.title,
+            lessonNumber: lessonIndex + 1,
+            exercisesCompleted: allExerciseIds.length,
+            totalExercises: allExerciseIds.length,
+            bestScore: bestScoreInLesson,
+            xpEarned: lesson.xpReward,
+            starsEarned: totalStars,
+            maxStars: allExerciseIds.length * 3,
+          });
         }
       }
     }
 
-    // Update streak — mark today as practiced
-    const today = new Date().toISOString().split('T')[0];
-    const dayOfWeek = new Date().getDay(); // 0=Sun, 6=Sat
-    const { streakData } = progressStore;
-    const lastDate = streakData.lastPracticeDate;
-    const isNewDay = lastDate !== today;
-
-    if (isNewDay) {
-      const weeklyPractice = [...streakData.weeklyPractice];
-      weeklyPractice[dayOfWeek] = true;
-
-      // Calculate new streak
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
-      const isContinuation = lastDate === yesterdayStr;
-      const newStreak = isContinuation ? streakData.currentStreak + 1 : 1;
-
-      progressStore.updateStreakData({
-        currentStreak: newStreak,
-        longestStreak: Math.max(streakData.longestStreak, newStreak),
-        lastPracticeDate: today,
-        weeklyPractice,
-      });
-    }
+    // Update streak using XpSystem's proper streak logic (handles freezes, weekly tracking)
+    const updatedStreak = calculateStreakUpdate(progressStore.streakData);
+    progressStore.updateStreakData(updatedStreak);
 
     // Show achievement toast for XP earned
     if (score.xpEarned > 0) {
@@ -288,6 +308,19 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       } else {
         setToastData({ type: 'xp', value: score.xpEarned });
       }
+    }
+
+    // Decide which transition screen to show:
+    // - Quick ExerciseCard for mid-lesson passes (fast, auto-dismisses)
+    // - Full CompletionModal for failures, end-of-lesson, or lesson completion
+    const exNextId = getLessonIdForExercise(exercise.id)
+      ? getNextExerciseId(getLessonIdForExercise(exercise.id)!, exercise.id)
+      : null;
+
+    if (score.isPassed && exNextId && !isLessonComplete) {
+      setShowExerciseCard(true);
+    } else {
+      setShowCompletion(true);
     }
 
     if (Platform.OS === 'web') {
@@ -330,6 +363,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     isPlaying,
     currentBeat,
     startPlayback,
+    resumePlayback,
     pausePlayback,
     stopPlayback,
     resetPlayback,
@@ -427,7 +461,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
    */
   const handlePause = useCallback(() => {
     if (isPaused) {
-      startPlayback();
+      resumePlayback();
       setIsPaused(false);
     } else {
       pausePlayback();
@@ -438,7 +472,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       const message = !isPaused ? 'Paused' : 'Resumed';
       AccessibilityInfo.announceForAccessibility(message);
     }
-  }, [isPaused, startPlayback, pausePlayback]);
+  }, [isPaused, resumePlayback, pausePlayback]);
 
   /**
    * Restart exercise
@@ -614,13 +648,22 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
    */
   const handleCompletionClose = useCallback(() => {
     setShowCompletion(false);
-    // Brief delay so the Modal can unmount before we navigate away
-    setTimeout(() => {
-      if (mountedRef.current) {
-        handleExit();
-      }
-    }, 100);
-  }, [handleExit]);
+    // If lesson was just completed, show the celebration screen before navigating away
+    if (lessonCompleteData) {
+      setTimeout(() => {
+        if (mountedRef.current) {
+          setShowLessonComplete(true);
+        }
+      }, 200);
+    } else {
+      // Brief delay so the Modal can unmount before we navigate away
+      setTimeout(() => {
+        if (mountedRef.current) {
+          handleExit();
+        }
+      }, 100);
+    }
+  }, [handleExit, lessonCompleteData]);
 
   /**
    * Retry the current exercise after failing
@@ -767,6 +810,30 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         </View>
       </View>
 
+      {/* Quick exercise card (between exercises in a lesson) */}
+      {showExerciseCard && finalScore && (
+        <ExerciseCard
+          score={finalScore.overall}
+          stars={finalScore.stars}
+          xpEarned={finalScore.xpEarned}
+          isPassed={finalScore.isPassed}
+          exerciseTitle={exercise.metadata.title}
+          nextExerciseTitle={
+            nextExerciseId ? getExercise(nextExerciseId)?.metadata.title : undefined
+          }
+          tip={getTipForScore(finalScore.overall).text}
+          onNext={() => {
+            setShowExerciseCard(false);
+            handleNextExercise();
+          }}
+          onRetry={() => {
+            setShowExerciseCard(false);
+            handleRetry();
+          }}
+          autoDismissMs={5000}
+        />
+      )}
+
       {/* Achievement toast (XP, level-up) */}
       {toastData && (
         <AchievementToast
@@ -774,6 +841,17 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
           value={toastData.value}
           onDismiss={() => setToastData(null)}
           autoDismissMs={3000}
+        />
+      )}
+
+      {/* Lesson completion celebration (full-screen) */}
+      {showLessonComplete && lessonCompleteData && (
+        <LessonCompleteScreen
+          {...lessonCompleteData}
+          onContinue={() => {
+            setShowLessonComplete(false);
+            handleExit();
+          }}
         />
       )}
 

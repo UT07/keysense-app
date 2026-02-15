@@ -68,6 +68,8 @@ src/
 ├── components/           # Reusable UI components
 │   ├── Keyboard/         # Piano keyboard (dynamic range from exercise)
 │   ├── PianoRoll/        # Scrolling note display (dynamic MIDI range)
+│   ├── Mascot/           # Keysie mascot (MascotBubble + 55 tips)
+│   ├── transitions/      # ExerciseCard, LessonCompleteScreen, AchievementToast, ConfettiEffect
 │   └── common/           # Buttons, cards, etc.
 ├── hooks/                # Custom React hooks
 │   └── useExercisePlayback.ts  # Playback timing, completion, MIDI events
@@ -84,7 +86,7 @@ src/
 | File | Purpose |
 |------|---------|
 | `src/content/ContentLoader.ts` | Exercise/lesson loading from JSON (static require registry) |
-| `src/audio/ExpoAudioEngine.ts` | Audio playback with sound pooling (14 pre-loaded sounds) |
+| `src/audio/ExpoAudioEngine.ts` | Audio playback with round-robin voice pools (50 pre-loaded sounds) |
 | `src/core/exercises/ExerciseValidator.ts` | Core scoring logic - pure TS, heavily tested |
 | `src/core/exercises/types.ts` | Exercise and score type definitions |
 | `src/input/MidiInput.ts` | MIDI device connection and event handling |
@@ -95,7 +97,7 @@ src/
 | `src/components/PianoRoll/PianoRoll.tsx` | Transform-based scrolling note display |
 | `src/services/ai/GeminiCoach.ts` | AI coaching via Gemini 2.0 Flash with fallback |
 | `src/hooks/useExercisePlayback.ts` | Playback timing, MIDI events, completion handler |
-| `content/exercises/` | JSON exercise definitions (31 exercises, 6 lessons) |
+| `content/exercises/` | JSON exercise definitions (30 exercises, 6 lessons) |
 
 ## Code Style
 

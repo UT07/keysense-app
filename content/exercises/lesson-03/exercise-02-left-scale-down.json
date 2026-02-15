@@ -40,46 +40,39 @@
       "finger": 3
     },
     {
-      "note": 56,
+      "note": 55,
       "startBeat": 1.5,
       "durationBeats": 0.5,
       "hand": "left",
       "finger": 2
     },
     {
-      "note": 55,
+      "note": 53,
       "startBeat": 2,
       "durationBeats": 0.5,
       "hand": "left",
       "finger": 1
     },
     {
-      "note": 53,
-      "startBeat": 2.5,
-      "durationBeats": 0.5,
-      "hand": "left",
-      "finger": 2
-    },
-    {
       "note": 52,
-      "startBeat": 3,
+      "startBeat": 2.5,
       "durationBeats": 0.5,
       "hand": "left",
       "finger": 3
     },
     {
       "note": 50,
-      "startBeat": 3.5,
+      "startBeat": 3,
       "durationBeats": 0.5,
       "hand": "left",
-      "finger": 4
+      "finger": 2
     },
     {
       "note": 48,
-      "startBeat": 4,
+      "startBeat": 3.5,
       "durationBeats": 1,
       "hand": "left",
-      "finger": 5
+      "finger": 1
     }
   ],
   "scoring": {
@@ -90,11 +83,11 @@
     "starThresholds": [70, 85, 95]
   },
   "hints": {
-    "beforeStart": "Start from Middle C (pinky, 5) and descend: C-B-A-G-F-E-D-C. Use fingers 5-4-3-2-1-2-3-4-5. This is the mirror image of the right hand scale pattern.",
+    "beforeStart": "Start from Middle C (pinky, 5) and descend: C-B-A-G-F-E-D-C. Use fingers 5-4-3-2-1-3-2-1, with thumb crossing under at F.",
     "commonMistakes": [
       {
         "pattern": "direction-confusion",
-        "advice": "Left hand going DOWN from C means the MIDI numbers get lower: 60→59→57→56→55... Right hand goes UP and numbers get higher. It's opposite direction but same keyboard pattern.",
+        "advice": "Left hand going DOWN from C means moving left on the keyboard: C-B-A-G-F-E-D-C. Play every white key going down without skipping any.",
         "triggerCondition": {
           "type": "pitch",
           "threshold": 3

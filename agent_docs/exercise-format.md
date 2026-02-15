@@ -9,18 +9,19 @@ Exercises are defined as JSON files in `content/exercises/`. Each exercise is a 
 ```
 content/
 ├── exercises/
-│   ├── lesson-01/
-│   │   ├── exercise-01-find-middle-c.json
-│   │   ├── exercise-02-cde.json
-│   │   └── exercise-03-cdefg.json
-│   ├── lesson-02/
-│   │   └── ...
-│   └── lesson-03/
-│       └── ...
+│   ├── lesson-01/         # 5 exercises (find-middle-c, keyboard-geography, ...)
+│   ├── lesson-02/         # 5 exercises (right hand melodies)
+│   ├── lesson-03/         # 5 exercises (left hand basics)
+│   ├── lesson-04/         # 5 exercises (both hands together)
+│   ├── lesson-05/         # 5 exercises (scales & technique)
+│   └── lesson-06/         # 5 exercises (popular songs)
 └── lessons/
-    ├── lesson-01.json    # Lesson metadata, exercise order
+    ├── lesson-01.json     # Lesson metadata, exercise order, unlock requirements
     ├── lesson-02.json
-    └── lesson-03.json
+    ├── lesson-03.json
+    ├── lesson-04.json
+    ├── lesson-05.json
+    └── lesson-06.json
 ```
 
 ## Exercise Schema

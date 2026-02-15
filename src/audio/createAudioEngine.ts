@@ -3,14 +3,18 @@
  *
  * Creates the best available IAudioEngine implementation.
  *
- * Currently uses ExpoAudioEngine (expo-av) with sound pooling.
- * When react-native-audio-api is installed (Dev Build), update this factory
- * to prefer WebAudioEngine for oscillator synthesis and true polyphony.
+ * Selection order:
+ * 1. WebAudioEngine (react-native-audio-api oscillator synthesis) — preferred
+ *    Uses JSI for low-latency audio (<10ms). Available in Dev Builds where
+ *    react-native-audio-api's native module is loaded.
  *
- * NOTE: Do NOT use require('react-native-audio-api') here or in any bundled
- * file unless the package is in node_modules. Metro resolves require() at
- * bundle time — a missing package gets replaced with an undefined module ID,
- * causing a fatal error that corrupts subsequent requires even inside try/catch.
+ * 2. ExpoAudioEngine (expo-av) — fallback
+ *    Uses async bridge with round-robin voice pools. Higher latency (~20-30ms)
+ *    but works everywhere including Expo Go.
+ *
+ * Detection: We try to instantiate WebAudioEngine. If the native module isn't
+ * available (e.g., Expo Go), the import or constructor will throw, and we
+ * fall back to ExpoAudioEngine.
  */
 
 import type { IAudioEngine } from './types';
@@ -22,11 +26,27 @@ import { ExpoAudioEngine } from './ExpoAudioEngine';
 let factoryInstance: IAudioEngine | null = null;
 
 /**
+ * Try to create a WebAudioEngine. Returns null if react-native-audio-api
+ * is not available (e.g., running in Expo Go without the native module).
+ */
+function tryCreateWebAudioEngine(): IAudioEngine | null {
+  try {
+    // Dynamic require so Metro includes the module only if it's in node_modules,
+    // and the import doesn't crash at bundle time if the native module is missing.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { WebAudioEngine } = require('./WebAudioEngine');
+    return new WebAudioEngine();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Create the best available audio engine.
  *
- * Currently returns ExpoAudioEngine (expo-av based).
- * When react-native-audio-api is installed via Dev Build,
- * this factory should be updated to try WebAudioEngine first.
+ * Prefers WebAudioEngine (low-latency oscillator synthesis via JSI)
+ * when react-native-audio-api is available. Falls back to ExpoAudioEngine
+ * (expo-av with round-robin voice pools) for Expo Go.
  *
  * Subsequent calls return the same instance (singleton pattern).
  */
@@ -35,8 +55,15 @@ export function createAudioEngine(): IAudioEngine {
     return factoryInstance;
   }
 
-  factoryInstance = new ExpoAudioEngine();
-  console.log('[createAudioEngine] Using ExpoAudioEngine (expo-av)');
+  const webEngine = tryCreateWebAudioEngine();
+  if (webEngine) {
+    factoryInstance = webEngine;
+    console.log('[createAudioEngine] Using WebAudioEngine (react-native-audio-api, low-latency)');
+  } else {
+    factoryInstance = new ExpoAudioEngine();
+    console.log('[createAudioEngine] Using ExpoAudioEngine (expo-av fallback)');
+  }
+
   return factoryInstance;
 }
 

@@ -10,7 +10,7 @@
 | Phase | Status | Progress |
 |-------|--------|----------|
 | Phase 1: Core Loop | **COMPLETE** | 100% |
-| Phase 2: Gamification & Polish | **IN PROGRESS** | ~60% |
+| Phase 2: Gamification & Polish | **NEAR COMPLETE** | ~90% |
 | Phase 3: Music Library | **DESIGNED** | 0% |
 | Phase 4: Firebase Sync & Auth | **PLANNED** | 0% |
 | Phase 5: App Store Launch | **PLANNED** | 0% |
@@ -50,55 +50,48 @@ Everything needed for a single lesson to be fully playable end-to-end.
 - LevelMapScreen (Duolingo-style vertical map, replaces LearnScreen)
 - Concert Hall dark theme across all 20+ screens/components
 - Profile editing (daily goal picker, volume control)
-- MIDI testing documentation
+- MIDI testing documentation (`agent_docs/midi-integration.md`)
 - Keyboard auto-scroll + dark theme
+- Lessons 2-6 E2E validated — all 30 exercises across 6 lessons (MIDI ranges, scoring, unlock chain)
+- Content bug fix: lesson-03-ex-02 had wrong note (G#/Ab3 in C major scale) — corrected
+- Orphan file cleanup: removed 3 legacy/duplicate files
+- Onboarding persistence fix — `settingsStore` hydrated on startup (was not loading `hasCompletedOnboarding`)
+- Audio engine rewrite — round-robin voice pools with `replayAsync()` for reliable polyphony
+- 4 HIGH-severity bug fixes: MIDI noteOff double-counting, pause/resume reset, stale playedNotes closure, MIDI timestamp normalization
+- 5 MEDIUM-severity bug fixes: streak bypass, exercise progress silent drop, practice time tracking, dead code removal, etc.
+- Mascot ("Keysie") — MascotBubble component with 55 tips/facts, mood-based avatar, integrated into CompletionModal
+- Transition screens — LessonCompleteScreen (full celebration), ExerciseCard (quick mid-lesson card), AchievementToast (XP/level-up), ConfettiEffect
+- Dev Build created for physical device testing (iPhone 13 Pro)
+- Documentation updates (stabilization-report.md, CLAUDE.md, MEMORY.md)
 
-### Remaining Items (~3-5 days estimated)
+### Remaining Items (~2-3 days estimated)
 
-#### 2A. Lessons 2-6 E2E Validation (Priority: HIGH)
-**Why:** Content JSON exists for all 6 lessons but only Lesson 1 is tested E2E.
+#### 2A. Onboarding Flow Activation (Priority: HIGH)
+**Why:** Onboarding persistence fixed, but flow may still need functional wiring.
 
-- Add content integrity tests for lessons 2-6 (IDs, MIDI ranges, star thresholds)
-- Run scoring pipeline test: perfect play should score 100%, no play scores 0
-- Fix any content issues found in exercise JSON
-- Verify lesson unlock chain works (lesson-01 → lesson-02 → ... → lesson-06)
-- **Effort:** 1 day
-- **Files:** `src/content/__tests__/ContentLoader.test.ts`, exercise JSONs
-
-#### 2B. Onboarding Flow Activation (Priority: HIGH)
-**Why:** Currently hardcoded to `true` (skips onboarding). New users need the flow.
-
-- OnboardingScreen UI already exists (4 steps: Welcome, Experience, Equipment, Goal)
-- Wire to `settingsStore.hasCompletedOnboarding` persistence
-- Persist experience level and learning goal on completion
-- Navigate to first exercise after onboarding
+- OnboardingScreen UI exists (4 steps: Welcome, Experience, Equipment, Goal)
+- `settingsStore.hasCompletedOnboarding` now persists correctly
+- Need to verify full flow: new user → onboarding → first exercise
 - **Effort:** 0.5 day
-- **Files:** `src/stores/settingsStore.ts`, `src/navigation/AppNavigator.tsx`, `src/screens/OnboardingScreen.tsx`
 
-#### 2C. UI Polish Pass (Priority: MEDIUM)
+#### 2B. UI Polish Pass (Priority: MEDIUM)
 **Why:** Production readiness requires visual refinement.
 
 - HomeScreen: level progress bar, gradient header, card shadow consistency
 - ProfileScreen: weekly practice chart, gradient stats header
-- CompletionModal: confetti for 3-star scores, gradient score ring
+- CompletionModal: gradient score ring refinement
 - LevelMapScreen: path fill animation on lesson completion
-- **Effort:** 2-3 days
-- **Files:** HomeScreen, ProfileScreen, CompletionModal, LevelMapScreen
+- **Effort:** 2 days
 
-#### 2D. AI Adaptive Learning System (Priority: HIGH — Phase 2 End)
+#### 2C. AI Adaptive Learning System (Priority: HIGH — Phase 2 End)
 **Full design:** `docs/plans/2026-02-13-adaptive-learning-design.md`
 
 Three increments:
-- **2D-1:** Challenge infrastructure — AI generates exercise JSON, validation pipeline, fallback templates (3-4 days)
-- **2D-2:** Student skill model — per-skill mastery tracking, adaptive difficulty tuning (2-3 days)
-- **2D-3:** Dynamic curriculum — goal-based paths, exercise reordering, LessonFlowController (3-4 days)
+- **2C-1:** Challenge infrastructure — AI generates exercise JSON, validation pipeline, fallback templates (3-4 days)
+- **2C-2:** Student skill model — per-skill mastery tracking, adaptive difficulty tuning (2-3 days)
+- **2C-3:** Dynamic curriculum — goal-based paths, exercise reordering, LessonFlowController (3-4 days)
 
 Key decisions: play-based challenges (not text quizzes), Gemini generates full exercise JSON, challenges sprinkled every 2 exercises, full personalization (adaptive difficulty + goal paths + AI ordering).
-
-#### 2E. Documentation Sync (Priority: LOW)
-- Update TECHNICAL_SPECIFICATION.md (AsyncStorage not MMKV, Zustand v5 patterns)
-- Update PRD.md with phase status
-- **Effort:** 0.5 day
 
 ---
 
@@ -284,11 +277,10 @@ Song
 ```
 NOW ──────────────────────────────────────────────────────────→ LAUNCH
 
-Phase 2 Remaining (3-5 days)
-├─ 2A: Lessons 2-6 E2E .............. [████████░░] HIGH
-├─ 2B: Onboarding activation ........ [██████████] HIGH
-├─ 2C: UI polish pass ............... [████░░░░░░] MEDIUM
-└─ 2D: Doc sync ..................... [██░░░░░░░░] LOW
+Phase 2 Remaining (2-3 days)
+├─ 2A: Onboarding verification ...... [████████░░] HIGH
+├─ 2B: UI polish pass ............... [████░░░░░░] MEDIUM
+└─ 2C: Adaptive Learning System ..... [██░░░░░░░░] HIGH (design done)
 
 Phase 4: Firebase Auth + Sync (3 days)
 ├─ 4A: Authentication ............... [██████████] HIGH

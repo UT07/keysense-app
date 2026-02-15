@@ -1,6 +1,6 @@
 # Feature: Duolingo-Style Level Map
 
-## Status: Planned (Future)
+## Status: IMPLEMENTED (Phase 2)
 
 ## Overview
 
@@ -84,6 +84,6 @@ All data already exists in the stores:
 - `react-native-svg` (may already be installed via Expo)
 - No new backend/API changes needed
 
-## Priority
+## Implementation Status
 
-This is a **polish/UX feature** — implement after all lesson content and core gameplay are solid. The current flat list is functional and sufficient for Lesson 1 testing.
+The LevelMapScreen has been implemented and replaced LearnScreen in the main tab navigation. It renders lesson nodes with correct states (completed/current/locked), auto-scrolls to current lesson, and navigates to the first uncompleted exercise on tap. See `src/screens/LevelMapScreen.tsx`.

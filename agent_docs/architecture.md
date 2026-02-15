@@ -201,48 +201,48 @@ interface SettingsState {
 ## Component Hierarchy
 
 ```
-App
+App (state hydration: progressStore + settingsStore from MMKV)
 ├── NavigationContainer
-│   ├── AuthStack (unauthenticated)
-│   │   ├── WelcomeScreen
-│   │   ├── OnboardingFlow
-│   │   └── SignInScreen
-│   │
-│   └── MainStack (authenticated)
-│       ├── TabNavigator
-│       │   ├── HomeTab
-│       │   │   └── HomeScreen
-│       │   │       ├── TodayProgress
-│       │   │       ├── ContinueLearning
-│       │   │       └── QuickActions
-│       │   │
-│       │   ├── LearnTab
-│       │   │   └── LessonsScreen
-│       │   │       └── LessonCard[]
-│       │   │
-│       │   ├── PlayTab
-│       │   │   └── FreePlayScreen
-│       │   │       └── Keyboard
-│       │   │
-│       │   └── ProfileTab
-│       │       └── ProfileScreen
-│       │           ├── StatsCard
-│       │           ├── AchievementsList
-│       │           └── SettingsList
-│       │
-│       └── ModalStack
-│           ├── ExerciseScreen
-│           │   ├── ExerciseHeader
-│           │   ├── PianoRoll
-│           │   ├── Keyboard
-│           │   └── ExerciseControls
-│           │
-│           ├── ResultsScreen
-│           │   ├── ScoreDisplay
-│           │   ├── BreakdownChart
-│           │   └── AICoachFeedback
-│           │
-│           └── SettingsScreen
+│   ├── RootStack (NativeStack)
+│   │   ├── Onboarding (if !hasCompletedOnboarding)
+│   │   │   └── OnboardingScreen (4 steps: Welcome, Experience, Equipment, Goal)
+│   │   │
+│   │   ├── MainTabs (BottomTab)
+│   │   │   ├── Home
+│   │   │   │   └── HomeScreen
+│   │   │   │       ├── Time-aware greeting
+│   │   │   │       ├── ContinueLearning (dynamic next exercise)
+│   │   │   │       └── QuickActions (Learn, Practice, Songs, Settings)
+│   │   │   │
+│   │   │   ├── Learn
+│   │   │   │   └── LevelMapScreen (Duolingo-style vertical map)
+│   │   │   │       ├── LessonNode[] (completed/current/locked)
+│   │   │   │       └── SVG PathConnectors
+│   │   │   │
+│   │   │   ├── Play
+│   │   │   │   └── PlayScreen (free play keyboard)
+│   │   │   │
+│   │   │   └── Profile
+│   │   │       └── ProfileScreen
+│   │   │           ├── StatsGrid (XP, level, streak, exercises)
+│   │   │           ├── Daily goal picker
+│   │   │           ├── Volume control
+│   │   │           └── SettingsList
+│   │   │
+│   │   ├── Exercise (fade animation, landscape lock)
+│   │   │   └── ExercisePlayer
+│   │   │       ├── TopBar (ScoreDisplay + HintDisplay + ExerciseControls)
+│   │   │       ├── PianoRoll (transform-based scroll, dynamic MIDI range)
+│   │   │       ├── FeedbackOverlay (PERFECT/GOOD/EARLY/LATE/MISS + combo)
+│   │   │       ├── Keyboard (dynamic range, auto-scroll to focus note)
+│   │   │       ├── CountInAnimation
+│   │   │       ├── ExerciseCard (quick mid-lesson transition, auto-dismiss)
+│   │   │       ├── CompletionModal (full score + AI coaching + Keysie)
+│   │   │       ├── LessonCompleteScreen (full celebration)
+│   │   │       └── AchievementToast (XP, level-up)
+│   │   │
+│   │   └── MidiSetup (modal)
+│   │       └── MidiSetupScreen (5-step wizard)
 ```
 
 ## Error Handling Strategy

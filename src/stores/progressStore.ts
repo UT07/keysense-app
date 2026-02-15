@@ -89,10 +89,14 @@ export const useProgressStore = create<ProgressStoreState>((set, get) => ({
 
   updateExerciseProgress: (lessonId: string, exerciseId: string, progress: ExerciseProgress) => {
     set((state) => {
-      const lesson = state.lessonProgress[lessonId];
-      if (!lesson) {
-        return state;
-      }
+      const lesson = state.lessonProgress[lessonId] ?? {
+        lessonId,
+        status: 'in_progress' as const,
+        exerciseScores: {},
+        bestScore: 0,
+        totalAttempts: 0,
+        totalTimeSpentSeconds: 0,
+      };
 
       return {
         lessonProgress: {
