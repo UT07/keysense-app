@@ -18,7 +18,11 @@ export type AchievementConditionType =
   | 'total_xp'
   | 'level'
   | 'total_notes_played'
-  | 'cats_unlocked';
+  | 'cats_unlocked'
+  | 'session_exercises'
+  | 'exercises_with_same_cat'
+  | 'early_practice'
+  | 'late_practice';
 
 export interface AchievementCondition {
   type: AchievementConditionType;
@@ -51,13 +55,17 @@ export interface AchievementContext {
   totalNotesPlayed: number;
   catsUnlocked: number;
   highScoreExercises: number; // exercises scored 90%+
+  sessionExercises: number; // exercises in current session
+  exercisesWithSameCat: number; // exercises with one cat companion
+  isEarlyPractice: boolean; // practiced before 8am today
+  isLatePractice: boolean; // practiced after 10pm today
 }
 
 /**
- * All achievements in the app
+ * All achievements in the app (32 total)
  */
 export const ACHIEVEMENTS: Achievement[] = [
-  // === Milestones ===
+  // === Milestones (6) ===
   {
     id: 'first-exercise',
     title: 'First Note',
@@ -77,6 +85,33 @@ export const ACHIEVEMENTS: Achievement[] = [
     xpReward: 25,
   },
   {
+    id: 'ten-exercises',
+    title: 'Practice Makes Purrrfect',
+    description: 'Complete 10 exercises',
+    icon: 'repeat',
+    category: 'milestone',
+    condition: { type: 'exercises_completed', threshold: 10 },
+    xpReward: 50,
+  },
+  {
+    id: 'twenty-exercises',
+    title: 'Dedicated Learner',
+    description: 'Complete 20 exercises',
+    icon: 'arm-flex',
+    category: 'milestone',
+    condition: { type: 'exercises_completed', threshold: 20 },
+    xpReward: 75,
+  },
+  {
+    id: 'fifty-exercises',
+    title: 'Half Century',
+    description: 'Complete 50 exercises',
+    icon: 'medal',
+    category: 'milestone',
+    condition: { type: 'exercises_completed', threshold: 50 },
+    xpReward: 150,
+  },
+  {
     id: 'five-lessons',
     title: 'Getting Serious',
     description: 'Complete 5 lessons',
@@ -86,16 +121,16 @@ export const ACHIEVEMENTS: Achievement[] = [
     xpReward: 100,
   },
   {
-    id: 'ten-exercises',
-    title: 'Practice Makes Purrrfect',
-    description: 'Complete 10 exercises',
-    icon: 'repeat',
+    id: 'all-lessons',
+    title: 'Curriculum Complete',
+    description: 'Complete all 6 lessons',
+    icon: 'certificate',
     category: 'milestone',
-    condition: { type: 'exercises_completed', threshold: 10 },
-    xpReward: 50,
+    condition: { type: 'lessons_completed', threshold: 6 },
+    xpReward: 250,
   },
 
-  // === Streaks ===
+  // === Streaks (5) ===
   {
     id: 'streak-3',
     title: '3-Day Streak',
@@ -132,8 +167,17 @@ export const ACHIEVEMENTS: Achievement[] = [
     condition: { type: 'current_streak', threshold: 30 },
     xpReward: 300,
   },
+  {
+    id: 'streak-100',
+    title: 'Century',
+    description: 'Practice for 100 days in a row',
+    icon: 'trophy-award',
+    category: 'streak',
+    condition: { type: 'current_streak', threshold: 100 },
+    xpReward: 500,
+  },
 
-  // === Scores ===
+  // === Scores (5) ===
   {
     id: 'first-perfect',
     title: 'Purrrfection',
@@ -153,6 +197,15 @@ export const ACHIEVEMENTS: Achievement[] = [
     xpReward: 100,
   },
   {
+    id: 'ten-perfects',
+    title: 'Flawless',
+    description: 'Get 10 perfect scores',
+    icon: 'diamond-stone',
+    category: 'score',
+    condition: { type: 'perfect_scores', threshold: 10 },
+    xpReward: 200,
+  },
+  {
     id: 'high-score-10',
     title: 'Consistent Player',
     description: 'Score 90%+ on 10 exercises',
@@ -161,8 +214,17 @@ export const ACHIEVEMENTS: Achievement[] = [
     condition: { type: 'high_score_count', threshold: 10 },
     xpReward: 75,
   },
+  {
+    id: 'high-score-20',
+    title: 'High Achiever',
+    description: 'Score 90%+ on 20 exercises',
+    icon: 'chart-areaspline',
+    category: 'score',
+    condition: { type: 'high_score_count', threshold: 20 },
+    xpReward: 150,
+  },
 
-  // === XP & Levels ===
+  // === XP & Levels (5) ===
   {
     id: 'level-5',
     title: 'Rising Star',
@@ -182,6 +244,15 @@ export const ACHIEVEMENTS: Achievement[] = [
     xpReward: 100,
   },
   {
+    id: 'level-20',
+    title: 'Grand Master',
+    description: 'Reach Level 20',
+    icon: 'crown',
+    category: 'xp',
+    condition: { type: 'level', threshold: 20 },
+    xpReward: 200,
+  },
+  {
     id: 'xp-1000',
     title: 'XP Collector',
     description: 'Earn 1,000 total XP',
@@ -190,8 +261,17 @@ export const ACHIEVEMENTS: Achievement[] = [
     condition: { type: 'total_xp', threshold: 1000 },
     xpReward: 50,
   },
+  {
+    id: 'xp-5000',
+    title: 'XP Hoarder',
+    description: 'Earn 5,000 total XP',
+    icon: 'lightning-bolt-circle',
+    category: 'xp',
+    condition: { type: 'total_xp', threshold: 5000 },
+    xpReward: 100,
+  },
 
-  // === Practice ===
+  // === Practice (7) ===
   {
     id: 'notes-100',
     title: 'Busy Paws',
@@ -210,8 +290,53 @@ export const ACHIEVEMENTS: Achievement[] = [
     condition: { type: 'total_notes_played', threshold: 500 },
     xpReward: 75,
   },
+  {
+    id: 'notes-1000',
+    title: 'Thousand Keys',
+    description: 'Play 1,000 notes total',
+    icon: 'music-note-eighth',
+    category: 'practice',
+    condition: { type: 'total_notes_played', threshold: 1000 },
+    xpReward: 100,
+  },
+  {
+    id: 'notes-5000',
+    title: 'Key Crusher',
+    description: 'Play 5,000 notes total',
+    icon: 'music-note-whole',
+    category: 'practice',
+    condition: { type: 'total_notes_played', threshold: 5000 },
+    xpReward: 200,
+  },
+  {
+    id: 'session-marathon',
+    title: 'Marathon',
+    description: 'Play 10 exercises in one session',
+    icon: 'run-fast',
+    category: 'practice',
+    condition: { type: 'session_exercises', threshold: 10 },
+    xpReward: 75,
+  },
+  {
+    id: 'early-bird',
+    title: 'Early Bird',
+    description: 'Practice before 8am',
+    icon: 'weather-sunset-up',
+    category: 'practice',
+    condition: { type: 'early_practice', threshold: 1 },
+    xpReward: 30,
+  },
+  {
+    id: 'night-owl',
+    title: 'Night Owl',
+    description: 'Practice after 10pm',
+    icon: 'weather-night',
+    category: 'practice',
+    condition: { type: 'late_practice', threshold: 1 },
+    xpReward: 30,
+  },
 
-  // === Collection ===
+  // === Collection (4) ===
   {
     id: 'cats-3',
     title: 'Cat Collector',
@@ -229,6 +354,24 @@ export const ACHIEVEMENTS: Achievement[] = [
     category: 'collection',
     condition: { type: 'cats_unlocked', threshold: 8 },
     xpReward: 200,
+  },
+  {
+    id: 'best-friends',
+    title: 'Best Friends',
+    description: 'Play 100 exercises with the same cat companion',
+    icon: 'heart',
+    category: 'collection',
+    condition: { type: 'exercises_with_same_cat', threshold: 100 },
+    xpReward: 100,
+  },
+  {
+    id: 'cat-duo',
+    title: 'Purrrfect Duo',
+    description: 'Play 50 exercises with the same cat companion',
+    icon: 'handshake',
+    category: 'collection',
+    condition: { type: 'exercises_with_same_cat', threshold: 50 },
+    xpReward: 50,
   },
 ];
 
@@ -269,6 +412,14 @@ export function isConditionMet(condition: AchievementCondition, context: Achieve
       return context.totalNotesPlayed >= condition.threshold;
     case 'cats_unlocked':
       return context.catsUnlocked >= condition.threshold;
+    case 'session_exercises':
+      return context.sessionExercises >= condition.threshold;
+    case 'exercises_with_same_cat':
+      return context.exercisesWithSameCat >= condition.threshold;
+    case 'early_practice':
+      return context.isEarlyPractice ? 1 >= condition.threshold : false;
+    case 'late_practice':
+      return context.isLatePractice ? 1 >= condition.threshold : false;
     default:
       return false;
   }

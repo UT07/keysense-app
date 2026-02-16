@@ -1,6 +1,7 @@
 /**
  * HomeScreen Component
- * Main home screen with daily practice goal, XP/streak display, and quick actions
+ * Duolingo-style home dashboard with hero section, cat companion,
+ * daily goal arc, streak flame, stats pills, and continue learning card
  */
 
 import React, { useMemo, useEffect, useRef } from 'react';
@@ -12,21 +13,32 @@ import {
   ScrollView,
   TouchableOpacity,
   Animated,
+  Dimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { XPBar } from '../components/Progress/XPBar';
-import { StreakDisplay } from '../components/Progress/StreakDisplay';
+import Svg, { Circle } from 'react-native-svg';
+import { DailyChallengeCard } from '../components/DailyChallengeCard';
 import { KeysieAvatar } from '../components/Mascot/KeysieAvatar';
-import { getTipForScore } from '../components/Mascot/mascotTips';
+import { MascotBubble } from '../components/Mascot/MascotBubble';
+import { StreakFlame } from '../components/StreakFlame';
+import { getRandomCatMessage } from '../content/catDialogue';
+import { calculateCatMood } from '../core/catMood';
 import { useProgressStore } from '../stores/progressStore';
 import { useSettingsStore } from '../stores/settingsStore';
-import { getLessons, getLessonExercises } from '../content/ContentLoader';
+import { getLessons, getLessonExercises, isPostCurriculum } from '../content/ContentLoader';
+import { COLORS, GRADIENTS, SPACING, BORDER_RADIUS } from '../theme/tokens';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type HomeNavProp = NativeStackNavigationProp<RootStackParamList>;
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const GOAL_ARC_SIZE = 140;
+const GOAL_ARC_STROKE = 8;
+const GOAL_ARC_RADIUS = (GOAL_ARC_SIZE - GOAL_ARC_STROKE) / 2;
+const GOAL_ARC_CIRCUMFERENCE = 2 * Math.PI * GOAL_ARC_RADIUS;
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -43,23 +55,6 @@ export interface HomeScreenProps {
   onNavigateToSettings?: () => void;
 }
 
-interface HomeScreenState {
-  currentXP: number;
-  currentLevel: number;
-  currentStreak: number;
-  longestStreak: number;
-  freezesAvailable: number;
-  lastPracticeDate?: string;
-  dailyGoalMinutes: number;
-  minutesPracticedToday: number;
-  nextExerciseTitle?: string;
-  exerciseProgress?: number; // 0-100, percentage of lesson complete
-}
-
-/**
- * HomeScreen - Main dashboard with progress and quick actions
- * Shows daily goal, streak, XP, and navigation to learning content
- */
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigateToExercise,
   onNavigateToLesson,
@@ -68,12 +63,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
   const navigation = useNavigation<HomeNavProp>();
 
-  // Connect to Zustand stores for real data
+  // Store connections
   const { totalXp, level, streakData, dailyGoalData, lessonProgress } = useProgressStore();
-  const { dailyGoalMinutes, displayName, hasCompletedOnboarding } = useSettingsStore();
+  const { dailyGoalMinutes, displayName, hasCompletedOnboarding, selectedCatId } = useSettingsStore();
 
-  // First-time user → show Onboarding modal once per app session.
-  // Guard prevents re-navigating after the user completes onboarding and the modal dismisses.
+  // Onboarding guard
   const hasShownOnboarding = useRef(false);
   useEffect(() => {
     if (!hasCompletedOnboarding && !hasShownOnboarding.current) {
@@ -82,28 +76,36 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   }, [hasCompletedOnboarding, navigation]);
 
-  // Get today's practice data from dailyGoalData
+  // Daily goal progress
   const today = new Date().toISOString().split('T')[0];
   const todayGoal = dailyGoalData[today];
   const minutesPracticedToday = todayGoal?.minutesPracticed ?? 0;
-  const dailyGoalProgress = dailyGoalMinutes > 0 ? minutesPracticedToday / dailyGoalMinutes : 0;
+  const dailyGoalProgress = dailyGoalMinutes > 0 ? Math.min(1, minutesPracticedToday / dailyGoalMinutes) : 0;
 
-  // Calculate current lesson and exercise progress from real data
-  const { nextExerciseTitle, nextExerciseId, currentLessonLabel, exerciseProgress } = useMemo(() => {
+  // Next exercise computation
+  const { nextExerciseTitle, nextExerciseId, currentLessonLabel, exerciseProgress, totalCompleted } = useMemo(() => {
     const lessons = getLessons();
+    let totalDone = 0;
+    let totalEx = 0;
+    for (const lesson of lessons) {
+      const exercises = getLessonExercises(lesson.id);
+      totalEx += exercises.length;
+      const lp = lessonProgress[lesson.id];
+      const completedCount = lp
+        ? Object.values(lp.exerciseScores).filter((s) => s.completedAt != null).length
+        : 0;
+      totalDone += completedCount;
+    }
+
     for (const lesson of lessons) {
       const exercises = getLessonExercises(lesson.id);
       if (exercises.length === 0) continue;
-
-      // Count completed exercises in this lesson
       const lp = lessonProgress[lesson.id];
       const completedCount = lp
         ? Object.values(lp.exerciseScores).filter((s) => s.completedAt != null).length
         : 0;
       const progress = Math.round((completedCount / exercises.length) * 100);
-
       if (completedCount < exercises.length) {
-        // This lesson is in progress — find the next uncompleted exercise
         const nextEx = exercises.find((ex) => {
           const score = lp?.exerciseScores[ex.id];
           return !score || score.completedAt == null;
@@ -113,32 +115,73 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           nextExerciseId: nextEx?.id ?? exercises[0].id,
           currentLessonLabel: lesson.metadata.title,
           exerciseProgress: progress,
+          totalCompleted: totalDone,
+          totalExercises: totalEx,
         };
       }
     }
-    // All lessons complete — show last lesson
-    const lastLesson = lessons[lessons.length - 1];
+    const allComplete = isPostCurriculum(lessonProgress);
     return {
-      nextExerciseTitle: 'All Complete!',
+      nextExerciseTitle: allComplete ? 'AI Practice' : 'All Complete!',
       nextExerciseId: null as string | null,
-      currentLessonLabel: lastLesson?.metadata.title ?? 'Lessons',
+      currentLessonLabel: allComplete ? 'Adaptive Practice' : (lessons[lessons.length - 1]?.metadata.title ?? 'Lessons'),
       exerciseProgress: 100,
+      totalCompleted: totalDone,
+      totalExercises: totalEx,
     };
   }, [lessonProgress]);
 
-  // Use real store data with safe defaults
-  const state: HomeScreenState = {
-    currentXP: totalXp ?? 0,
-    currentLevel: level ?? 1,
+  // Cat mood & dialogue
+  const catMood = useMemo(() => calculateCatMood({
+    lastPracticeDate: streakData?.lastPracticeDate ?? '',
+    recentScore: 0.7,
     currentStreak: streakData?.currentStreak ?? 0,
-    longestStreak: streakData?.longestStreak ?? 0,
-    freezesAvailable: streakData?.freezesAvailable ?? 0,
-    lastPracticeDate: streakData?.lastPracticeDate,
-    dailyGoalMinutes: dailyGoalMinutes ?? 10,
-    minutesPracticedToday,
-    nextExerciseTitle,
-    exerciseProgress,
-  };
+  }), [streakData]);
+
+  const catMessage = useMemo(() => {
+    const catId = selectedCatId ?? 'mini-meowww';
+    return getRandomCatMessage(catId, 'daily_login');
+  }, [selectedCatId]);
+
+  const mascotMood = catMood === 'happy' ? 'happy' : catMood === 'sleepy' ? 'encouraging' : 'teaching';
+
+  // Stagger animation
+  const fadeAnims = useRef(
+    Array.from({ length: 6 }, () => new Animated.Value(0))
+  ).current;
+  const slideAnims = useRef(
+    Array.from({ length: 6 }, () => new Animated.Value(30))
+  ).current;
+
+  useEffect(() => {
+    const animations = fadeAnims.map((anim, i) =>
+      Animated.parallel([
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 400,
+          delay: i * 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnims[i], {
+          toValue: 0,
+          duration: 400,
+          delay: i * 100,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    Animated.stagger(80, animations).start();
+  }, [fadeAnims, slideAnims]);
+
+  const staggerStyle = (index: number) => ({
+    opacity: fadeAnims[Math.min(index, 5)],
+    transform: [{ translateY: slideAnims[Math.min(index, 5)] }],
+  });
+
+  // Goal arc offset
+  const goalArcOffset = GOAL_ARC_CIRCUMFERENCE * (1 - dailyGoalProgress);
+
+  const streak = streakData?.currentStreak ?? 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -146,186 +189,199 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Gradient Header */}
-        <LinearGradient
-          colors={['#1A1A2E', '#1A1A1A', '#0D0D0D']}
-          style={styles.header}
-        >
-          <View style={styles.headerLeft}>
-            <KeysieAvatar mood="happy" size="small" animated />
-            <View>
-              <Text style={styles.greeting}>{getGreeting()}</Text>
-              <Text style={styles.greetingName}>{displayName}</Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            style={styles.settingsButton}
-            onPress={onNavigateToSettings ?? (() => navigation.navigate('MidiSetup'))}
+        {/* Hero Section with gradient */}
+        <Animated.View style={staggerStyle(0)}>
+          <LinearGradient
+            colors={[GRADIENTS.header[0], GRADIENTS.header[1], COLORS.background]}
+            style={styles.hero}
           >
-            <MaterialCommunityIcons name="cog" size={24} color="#B0B0B0" />
-          </TouchableOpacity>
-        </LinearGradient>
+            {/* Top bar: greeting + settings */}
+            <View style={styles.topBar}>
+              <View>
+                <Text style={styles.greeting}>{getGreeting()}</Text>
+                <Text style={styles.greetingName}>{displayName}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.settingsBtn}
+                onPress={onNavigateToSettings ?? (() => navigation.navigate('MidiSetup'))}
+              >
+                <MaterialCommunityIcons name="cog-outline" size={24} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            </View>
 
-        {/* XP Bar */}
-        <XPBar
-          currentXP={state.currentXP}
-          currentLevel={state.currentLevel}
-          animatedXPGain={0}
-        />
+            {/* Center: Cat avatar with goal arc + streak */}
+            <View style={styles.heroCenter}>
+              {/* Daily goal arc ring */}
+              <View style={styles.goalArcContainer}>
+                <Svg width={GOAL_ARC_SIZE} height={GOAL_ARC_SIZE}>
+                  {/* Background ring */}
+                  <Circle
+                    cx={GOAL_ARC_SIZE / 2}
+                    cy={GOAL_ARC_SIZE / 2}
+                    r={GOAL_ARC_RADIUS}
+                    stroke={COLORS.cardBorder}
+                    strokeWidth={GOAL_ARC_STROKE}
+                    fill="transparent"
+                  />
+                  {/* Progress ring */}
+                  <Circle
+                    cx={GOAL_ARC_SIZE / 2}
+                    cy={GOAL_ARC_SIZE / 2}
+                    r={GOAL_ARC_RADIUS}
+                    stroke={dailyGoalProgress >= 1 ? COLORS.success : COLORS.primary}
+                    strokeWidth={GOAL_ARC_STROKE}
+                    fill="transparent"
+                    strokeDasharray={`${GOAL_ARC_CIRCUMFERENCE}`}
+                    strokeDashoffset={goalArcOffset}
+                    strokeLinecap="round"
+                    rotation="-90"
+                    origin={`${GOAL_ARC_SIZE / 2}, ${GOAL_ARC_SIZE / 2}`}
+                  />
+                </Svg>
+                {/* Cat avatar in center */}
+                <View style={styles.avatarInRing}>
+                  <KeysieAvatar mood={mascotMood} size="large" animated showParticles={dailyGoalProgress >= 1} />
+                </View>
+              </View>
 
-        {/* Streak Display */}
-        <StreakDisplay
-          currentStreak={state.currentStreak}
-          longestStreak={state.longestStreak}
-          freezesAvailable={state.freezesAvailable}
-          lastPracticeDate={state.lastPracticeDate}
-        />
+              {/* Streak flame + level badge row */}
+              <View style={styles.heroStats}>
+                <StreakFlame streak={streak} size="small" />
+                <View style={styles.levelBadge}>
+                  <MaterialCommunityIcons name="shield-star" size={18} color={COLORS.starGold} />
+                  <Text style={styles.levelText}>Lv. {level}</Text>
+                </View>
+                <View style={styles.xpPill}>
+                  <MaterialCommunityIcons name="lightning-bolt" size={16} color={COLORS.starGold} />
+                  <Text style={styles.xpText}>{totalXp} XP</Text>
+                </View>
+              </View>
+            </View>
 
-        {/* Daily Goal */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Today's Practice</Text>
-          <View style={styles.dailyGoalCard}>
-            <View style={styles.goalHeader}>
-              <Text style={styles.goalLabel}>Practice Goal</Text>
-              <Text style={styles.goalTime}>
-                {state.minutesPracticedToday} / {state.dailyGoalMinutes} min
+            {/* Goal progress text */}
+            <View style={styles.goalTextRow}>
+              <Text style={styles.goalLabel}>Daily Goal</Text>
+              <Text style={[styles.goalValue, dailyGoalProgress >= 1 && { color: COLORS.success }]}>
+                {minutesPracticedToday}/{dailyGoalMinutes} min
               </Text>
             </View>
-            <View style={styles.progressBarContainer}>
-              <Animated.View
-                style={[
-                  styles.progressBar,
-                  { width: `${Math.min(100, dailyGoalProgress * 100)}%` },
-                ]}
-              />
-            </View>
             {dailyGoalProgress >= 1 && (
-              <View style={styles.goalCompleteContainer}>
-                <MaterialCommunityIcons
-                  name="check-circle"
-                  size={16}
-                  color="#4CAF50"
-                />
-                <Text style={styles.goalCompleteText}>Daily goal complete!</Text>
+              <View style={styles.goalCompleteChip}>
+                <MaterialCommunityIcons name="check-circle" size={14} color={COLORS.success} />
+                <Text style={styles.goalCompleteText}>Goal complete!</Text>
               </View>
             )}
-          </View>
-        </View>
+          </LinearGradient>
+        </Animated.View>
 
-        {/* Continue Learning */}
-        <View style={styles.section}>
+        {/* Cat speech bubble */}
+        <Animated.View style={[styles.section, staggerStyle(1)]}>
+          <MascotBubble
+            mood={mascotMood}
+            message={catMessage}
+            size="small"
+          />
+        </Animated.View>
+
+        {/* Daily Challenge Card */}
+        <Animated.View style={[styles.section, staggerStyle(2)]}>
+          <DailyChallengeCard onPress={() => {
+            if (nextExerciseId) {
+              navigation.navigate('Exercise', { exerciseId: nextExerciseId });
+            }
+          }} />
+        </Animated.View>
+
+        {/* Continue Learning Card */}
+        <Animated.View style={[styles.section, staggerStyle(3)]}>
           <Text style={styles.sectionTitle}>Continue Learning</Text>
           <TouchableOpacity
             style={styles.continueCard}
             onPress={onNavigateToExercise ?? (() => {
               if (nextExerciseId) {
                 navigation.navigate('Exercise', { exerciseId: nextExerciseId });
+              } else if (isPostCurriculum(lessonProgress)) {
+                navigation.navigate('Exercise', { exerciseId: 'ai-mode', aiMode: true });
               } else {
                 navigation.navigate('MainTabs', { screen: 'Learn' } as any);
               }
             })}
             activeOpacity={0.7}
           >
-            <View style={styles.continueHeader}>
-              <MaterialCommunityIcons
-                name="play-circle-outline"
-                size={24}
-                color="#DC143C"
-              />
-              <View style={styles.continueInfo}>
-                <Text style={styles.continueLabel}>{currentLessonLabel}</Text>
-                <Text style={styles.continueTitle}>
-                  {state.nextExerciseTitle}
-                </Text>
+            <LinearGradient
+              colors={[COLORS.cardHighlight, COLORS.cardSurface]}
+              style={styles.continueCardInner}
+            >
+              <View style={styles.continueTop}>
+                <View style={styles.continuePlayIcon}>
+                  <MaterialCommunityIcons name="play" size={24} color="#FFFFFF" />
+                </View>
+                <View style={styles.continueInfo}>
+                  <Text style={styles.continueLabel}>{currentLessonLabel}</Text>
+                  <Text style={styles.continueTitle}>{nextExerciseTitle}</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={24} color={COLORS.textMuted} />
               </View>
-            </View>
-            <View style={styles.continueProgress}>
-              <View style={styles.continueProgressBar}>
-                <Animated.View
-                  style={[
-                    styles.continueProgressFill,
-                    {
-                      width: `${state.exerciseProgress ?? 0}%`,
-                    },
-                  ]}
-                />
+              <View style={styles.continueProgressRow}>
+                <View style={styles.continueProgressTrack}>
+                  <View style={[styles.continueProgressFill, { width: `${exerciseProgress}%` }]} />
+                </View>
+                <Text style={styles.continueProgressText}>{exerciseProgress}%</Text>
               </View>
-              <Text style={styles.continueProgressText}>
-                {state.exerciseProgress}% complete
-              </Text>
-            </View>
+            </LinearGradient>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
 
-        {/* Quick Actions */}
-        <View style={styles.section}>
+        {/* Quick Stats Row */}
+        <Animated.View style={[styles.section, staggerStyle(4)]}>
+          <View style={styles.statsPillRow}>
+            <StatPill icon="music-note" label="Exercises" value={totalCompleted} color={COLORS.primary} />
+            <StatPill icon="book-open-variant" label="Lessons" value={Object.values(lessonProgress).filter(l => l.status === 'completed').length} color={COLORS.info} />
+            <StatPill icon="fire" label="Streak" value={streak} color="#FF6B00" />
+            <StatPill icon="star" label="Stars" value={Object.values(lessonProgress).reduce((sum, l) => sum + Object.values(l.exerciseScores).reduce((s, e) => s + (e.stars ?? 0), 0), 0)} color={COLORS.starGold} />
+          </View>
+        </Animated.View>
+
+        {/* Quick Actions Grid */}
+        <Animated.View style={[styles.section, staggerStyle(5)]}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.actionsGrid}>
-            <TouchableOpacity
-              style={styles.actionCard}
+            <ActionCard
+              icon="book-open-outline"
+              label="Learn"
+              gradient={['#1A0A2E', '#2D1B4E']}
               onPress={onNavigateToLesson ?? (() => navigation.navigate('MainTabs', { screen: 'Learn' } as any))}
-            >
-              <MaterialCommunityIcons
-                name="book-open-outline"
-                size={28}
-                color="#DC143C"
-              />
-              <Text style={styles.actionLabel}>Learn</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionCard}
+            />
+            <ActionCard
+              icon="music-box-multiple"
+              label="Practice"
+              gradient={['#0A1A2E', '#1B2D4E']}
               onPress={onNavigateToExercise ?? (() => {
                 if (nextExerciseId) {
                   navigation.navigate('Exercise', { exerciseId: nextExerciseId });
+                } else if (isPostCurriculum(lessonProgress)) {
+                  navigation.navigate('Exercise', { exerciseId: 'ai-mode', aiMode: true });
                 } else {
                   navigation.navigate('MainTabs', { screen: 'Learn' } as any);
                 }
               })}
-            >
-              <MaterialCommunityIcons
-                name="music-box-multiple"
-                size={28}
-                color="#DC143C"
-              />
-              <Text style={styles.actionLabel}>Practice</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionCard}
+            />
+            <ActionCard
+              icon="piano"
+              label="Free Play"
+              gradient={['#1A2E0A', '#2D4E1B']}
               onPress={onNavigateToSongs ?? (() => navigation.navigate('MainTabs', { screen: 'Play' } as any))}
-            >
-              <MaterialCommunityIcons
-                name="music"
-                size={28}
-                color="#DC143C"
-              />
-              <Text style={styles.actionLabel}>Songs</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionCard}
+            />
+            <ActionCard
+              icon="tune-variant"
+              label="Settings"
+              gradient={['#2E1A0A', '#4E2D1B']}
               onPress={onNavigateToSettings ?? (() => navigation.navigate('MidiSetup'))}
-            >
-              <MaterialCommunityIcons
-                name="tune"
-                size={28}
-                color="#DC143C"
-              />
-              <Text style={styles.actionLabel}>Settings</Text>
-            </TouchableOpacity>
+            />
           </View>
-        </View>
+        </Animated.View>
 
-        {/* Motivational tip */}
-        <View style={styles.section}>
-          <View style={styles.tipContainer}>
-            <KeysieAvatar mood="teaching" size="tiny" />
-            <Text style={styles.tipText}>
-              {getTipForScore(85).text}
-            </Text>
-          </View>
-        </View>
+        <View style={{ height: SPACING.xl }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -333,187 +389,271 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
 HomeScreen.displayName = 'HomeScreen';
 
+/** Stat pill component for the quick stats row */
+function StatPill({ icon, label, value, color }: { icon: string; label: string; value: number; color: string }) {
+  return (
+    <View style={styles.statPill}>
+      <MaterialCommunityIcons name={icon as any} size={18} color={color} />
+      <Text style={[styles.statPillValue, { color }]}>{value}</Text>
+      <Text style={styles.statPillLabel}>{label}</Text>
+    </View>
+  );
+}
+
+/** Action card with gradient background */
+function ActionCard({ icon, label, gradient, onPress }: { icon: string; label: string; gradient: readonly [string, string] | string[]; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={styles.actionCard} onPress={onPress} activeOpacity={0.7}>
+      <LinearGradient colors={gradient as [string, string]} style={styles.actionCardGradient}>
+        <MaterialCommunityIcons name={icon as any} size={28} color={COLORS.textPrimary} />
+        <Text style={styles.actionLabel}>{label}</Text>
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D0D0D',
+    backgroundColor: COLORS.background,
   },
   scrollContent: {
-    paddingBottom: 24,
+    paddingBottom: SPACING.lg,
   },
-  header: {
+  // Hero
+  hero: {
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.lg,
+  },
+  topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    paddingBottom: 20,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    alignItems: 'flex-start',
+    marginBottom: SPACING.md,
   },
   greeting: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#B0B0B0',
+    color: COLORS.textSecondary,
   },
   greetingName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
     marginTop: 2,
   },
-  settingsButton: {
-    padding: 8,
+  settingsBtn: {
+    padding: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  section: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  heroCenter: {
+    alignItems: 'center',
+    marginBottom: SPACING.md,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 12,
+  goalArcContainer: {
+    width: GOAL_ARC_SIZE,
+    height: GOAL_ARC_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  dailyGoalCard: {
-    backgroundColor: '#1A1A1A',
-    borderRadius: 8,
-    padding: 16,
+  avatarInRing: {
+    position: 'absolute',
+  },
+  heroStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    marginTop: SPACING.sm,
+  },
+  levelBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.full,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: 'rgba(255, 215, 0, 0.2)',
   },
-  goalHeader: {
+  levelText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.starGold,
+  },
+  xpPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.2)',
+  },
+  xpText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.starGold,
+  },
+  goalTextRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    paddingHorizontal: SPACING.sm,
   },
   goalLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#B0B0B0',
+    color: COLORS.textSecondary,
   },
-  goalTime: {
+  goalValue: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#DC143C',
+    fontWeight: '700',
+    color: COLORS.primary,
   },
-  progressBarContainer: {
-    height: 8,
-    backgroundColor: '#333333',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: '#DC143C',
-    borderRadius: 4,
-  },
-  goalCompleteContainer: {
+  goalCompleteChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    alignSelf: 'center',
+    gap: 4,
+    marginTop: SPACING.xs,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
     backgroundColor: 'rgba(76, 175, 80, 0.15)',
-    borderRadius: 4,
+    borderRadius: BORDER_RADIUS.full,
   },
   goalCompleteText: {
-    marginLeft: 6,
     fontSize: 12,
-    fontWeight: '500',
-    color: '#4CAF50',
+    fontWeight: '600',
+    color: COLORS.success,
   },
+  // Sections
+  section: {
+    paddingHorizontal: SPACING.md,
+    marginTop: SPACING.md,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.sm,
+  },
+  // Continue Card
   continueCard: {
-    backgroundColor: '#1A1A1A',
-    borderRadius: 8,
-    padding: 16,
+    borderRadius: BORDER_RADIUS.lg,
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#2A2A2A',
-    borderLeftWidth: 4,
-    borderLeftColor: '#DC143C',
+    borderColor: COLORS.cardBorder,
   },
-  continueHeader: {
+  continueCardInner: {
+    padding: SPACING.md,
+  },
+  continueTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
+  continuePlayIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   continueInfo: {
-    marginLeft: 12,
     flex: 1,
   },
   continueLabel: {
     fontSize: 12,
-    color: '#666666',
+    color: COLORS.textMuted,
     fontWeight: '500',
   },
   continueTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
     marginTop: 2,
   },
-  continueProgress: {
-    alignItems: 'flex-start',
+  continueProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
   },
-  continueProgressBar: {
-    width: '100%',
+  continueProgressTrack: {
+    flex: 1,
     height: 6,
-    backgroundColor: '#333333',
+    backgroundColor: COLORS.cardBorder,
     borderRadius: 3,
     overflow: 'hidden',
-    marginBottom: 6,
   },
   continueProgressFill: {
     height: '100%',
-    backgroundColor: '#DC143C',
+    backgroundColor: COLORS.primary,
     borderRadius: 3,
   },
   continueProgressText: {
-    fontSize: 11,
-    color: '#666666',
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+    minWidth: 32,
+    textAlign: 'right',
   },
+  // Stats pills
+  statsPillRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  statPill: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    gap: 2,
+  },
+  statPillValue: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  statPillLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+    textTransform: 'uppercase',
+  },
+  // Actions grid
   actionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: SPACING.sm,
   },
   actionCard: {
-    flex: 1,
-    minWidth: '48%',
-    backgroundColor: '#1A1A1A',
-    borderRadius: 12,
-    paddingVertical: 20,
-    alignItems: 'center',
+    width: (SCREEN_WIDTH - SPACING.md * 2 - SPACING.sm) / 2,
+    borderRadius: BORDER_RADIUS.lg,
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: COLORS.cardBorder,
+  },
+  actionCardGradient: {
+    paddingVertical: SPACING.lg,
+    alignItems: 'center',
+    gap: SPACING.sm,
   },
   actionLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#B0B0B0',
-    marginTop: 8,
-  },
-  tipContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(220, 20, 60, 0.1)',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(220, 20, 60, 0.3)',
-    alignItems: 'center',
-  },
-  tipText: {
-    marginLeft: 12,
-    flex: 1,
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#DC143C',
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
   },
 });

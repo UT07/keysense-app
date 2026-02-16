@@ -24,13 +24,17 @@ function defaultContext(overrides: Partial<AchievementContext> = {}): Achievemen
     totalNotesPlayed: 0,
     catsUnlocked: 0,
     highScoreExercises: 0,
+    sessionExercises: 0,
+    exercisesWithSameCat: 0,
+    isEarlyPractice: false,
+    isLatePractice: false,
     ...overrides,
   };
 }
 
 describe('Achievement Definitions', () => {
-  it('should have at least 15 achievements', () => {
-    expect(ACHIEVEMENTS.length).toBeGreaterThanOrEqual(15);
+  it('should have at least 30 achievements', () => {
+    expect(ACHIEVEMENTS.length).toBeGreaterThanOrEqual(30);
   });
 
   it('should have unique IDs', () => {
@@ -145,6 +149,30 @@ describe('isConditionMet', () => {
     expect(isConditionMet(condition, defaultContext({ catsUnlocked: 2 }))).toBe(false);
     expect(isConditionMet(condition, defaultContext({ catsUnlocked: 3 }))).toBe(true);
   });
+
+  it('should check session_exercises condition', () => {
+    const condition: AchievementCondition = { type: 'session_exercises', threshold: 10 };
+    expect(isConditionMet(condition, defaultContext({ sessionExercises: 9 }))).toBe(false);
+    expect(isConditionMet(condition, defaultContext({ sessionExercises: 10 }))).toBe(true);
+  });
+
+  it('should check exercises_with_same_cat condition', () => {
+    const condition: AchievementCondition = { type: 'exercises_with_same_cat', threshold: 50 };
+    expect(isConditionMet(condition, defaultContext({ exercisesWithSameCat: 49 }))).toBe(false);
+    expect(isConditionMet(condition, defaultContext({ exercisesWithSameCat: 50 }))).toBe(true);
+  });
+
+  it('should check early_practice condition', () => {
+    const condition: AchievementCondition = { type: 'early_practice', threshold: 1 };
+    expect(isConditionMet(condition, defaultContext({ isEarlyPractice: false }))).toBe(false);
+    expect(isConditionMet(condition, defaultContext({ isEarlyPractice: true }))).toBe(true);
+  });
+
+  it('should check late_practice condition', () => {
+    const condition: AchievementCondition = { type: 'late_practice', threshold: 1 };
+    expect(isConditionMet(condition, defaultContext({ isLatePractice: false }))).toBe(false);
+    expect(isConditionMet(condition, defaultContext({ isLatePractice: true }))).toBe(true);
+  });
 });
 
 describe('checkAchievements', () => {
@@ -220,5 +248,42 @@ describe('checkAchievements', () => {
     const result = checkAchievements(context, new Set());
     expect(result).toContain('cats-3');
     expect(result).toContain('cats-all');
+  });
+
+  it('should unlock session marathon when 10+ exercises in one session', () => {
+    const context = defaultContext({ sessionExercises: 10 });
+    const result = checkAchievements(context, new Set());
+    expect(result).toContain('session-marathon');
+  });
+
+  it('should unlock early bird when practicing before 8am', () => {
+    const context = defaultContext({ isEarlyPractice: true });
+    const result = checkAchievements(context, new Set());
+    expect(result).toContain('early-bird');
+    expect(result).not.toContain('night-owl');
+  });
+
+  it('should unlock night owl when practicing after 10pm', () => {
+    const context = defaultContext({ isLatePractice: true });
+    const result = checkAchievements(context, new Set());
+    expect(result).toContain('night-owl');
+    expect(result).not.toContain('early-bird');
+  });
+
+  it('should unlock cat companion achievements', () => {
+    const context = defaultContext({ exercisesWithSameCat: 100 });
+    const result = checkAchievements(context, new Set());
+    expect(result).toContain('cat-duo');
+    expect(result).toContain('best-friends');
+  });
+
+  it('should unlock century streak', () => {
+    const context = defaultContext({ currentStreak: 100 });
+    const result = checkAchievements(context, new Set());
+    expect(result).toContain('streak-3');
+    expect(result).toContain('streak-7');
+    expect(result).toContain('streak-14');
+    expect(result).toContain('streak-30');
+    expect(result).toContain('streak-100');
   });
 });

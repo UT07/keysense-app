@@ -19,6 +19,10 @@ function defaultContext(overrides: Partial<AchievementContext> = {}): Achievemen
     totalNotesPlayed: 0,
     catsUnlocked: 0,
     highScoreExercises: 0,
+    sessionExercises: 0,
+    exercisesWithSameCat: 0,
+    isEarlyPractice: false,
+    isLatePractice: false,
     ...overrides,
   };
 }

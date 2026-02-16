@@ -1,7 +1,7 @@
 /**
  * Completion Modal Component
- * Results screen shown after exercise completion
- * Displays score, stars, breakdown, and celebration
+ * Celebration screen with animated score counter, star stagger with haptics,
+ * confetti burst, cat dialogue, and AI coach feedback
  */
 
 import React, { useEffect, useRef, useState, useMemo } from 'react';
@@ -20,11 +20,14 @@ import { Button } from '../../components/common/Button';
 import { MascotBubble } from '../../components/Mascot/MascotBubble';
 import { FunFactCard } from '../../components/FunFact/FunFactCard';
 import { getFactForExerciseType } from '../../content/funFactSelector';
-import { getTipForScore } from '../../components/Mascot/mascotTips';
 import type { MascotMood } from '../../components/Mascot/mascotTips';
 import { ConfettiEffect } from '../../components/transitions/ConfettiEffect';
+import { XpPopup } from '../../components/XpPopup';
+import { getRandomCatMessage } from '../../content/catDialogue';
 import { coachingService } from '../../services/ai/CoachingService';
 import { useProgressStore } from '../../stores/progressStore';
+import { useSettingsStore } from '../../stores/settingsStore';
+import { COLORS, SPACING, BORDER_RADIUS } from '../../theme/tokens';
 import type { Exercise, ExerciseScore } from '../../core/exercises/types';
 
 export interface CompletionModalProps {
@@ -38,10 +41,6 @@ export interface CompletionModalProps {
   testID?: string;
 }
 
-/**
- * CompletionModal - Results celebration screen
- * Shows final score, star rating, and detailed breakdown
- */
 export const CompletionModal: React.FC<CompletionModalProps> = ({
   score,
   exercise,
@@ -55,11 +54,29 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
   // Animation values
   const scaleAnim = useRef(new Animated.Value(0.5)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
-  const starsAnimValue = useRef(new Animated.Value(0)).current;
+  const scoreCountAnim = useRef(new Animated.Value(0)).current;
+
+  // Per-star animation values
+  const starAnims = useRef(
+    Array.from({ length: 3 }, () => new Animated.Value(0))
+  ).current;
+
+  // Animated score display
+  const [displayScore, setDisplayScore] = useState(0);
+  const [showXpPopup, setShowXpPopup] = useState(false);
 
   // AI Coach feedback
   const [coachFeedback, setCoachFeedback] = useState<string | null>(null);
   const [coachLoading, setCoachLoading] = useState(true);
+
+  // Cat dialogue
+  const selectedCatId = useSettingsStore((s) => s.selectedCatId);
+  const catDialogue = useMemo(() => {
+    const catId = selectedCatId ?? 'mini-meowww';
+    const trigger = score.isPassed ? 'exercise_complete_pass' : 'exercise_complete_fail';
+    const condition = score.stars === 3 ? 'score_high' : score.overall < 50 ? 'score_low' : undefined;
+    return getRandomCatMessage(catId, trigger, condition);
+  }, [selectedCatId, score]);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,29 +93,21 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
           attemptNumber: 1,
           recentScores: [],
         });
-        if (!cancelled) {
-          setCoachFeedback(result.feedback);
-        }
+        if (!cancelled) setCoachFeedback(result.feedback);
       } catch {
-        if (!cancelled) {
-          setCoachFeedback('Keep practicing! You are making great progress.');
-        }
+        if (!cancelled) setCoachFeedback('Keep practicing! You are making great progress.');
       } finally {
-        if (!cancelled) {
-          setCoachLoading(false);
-        }
+        if (!cancelled) setCoachLoading(false);
       }
     };
 
     fetchFeedback();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [exercise.id, exercise.metadata.title, exercise.metadata.difficulty, score]);
 
-  // Trigger animations on mount
+  // Main animation sequence
   useEffect(() => {
-    // Scale and fade animation
+    // 1. Modal scale + fade in
     Animated.parallel([
       Animated.timing(scaleAnim, {
         toValue: 1,
@@ -113,106 +122,93 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
       }),
     ]).start();
 
-    // Stars animation (delayed)
+    // 2. Animated score counter: 0 → final (1s)
+    const scoreListener = scoreCountAnim.addListener(({ value }) => {
+      setDisplayScore(Math.round(value));
+    });
+    Animated.timing(scoreCountAnim, {
+      toValue: score.overall,
+      duration: 1000,
+      easing: Easing.out(Easing.cubic),
+      delay: 300,
+      useNativeDriver: false,
+    }).start();
+
+    // 3. Stars light up one by one (300ms stagger) with haptic per star
     if (score.stars > 0) {
-      Animated.sequence([
-        Animated.delay(200),
-        Animated.timing(starsAnimValue, {
-          toValue: 1,
-          duration: 500,
-          easing: Easing.out(Easing.back(1.5)),
-          useNativeDriver: true,
-        }),
-      ]).start();
+      for (let i = 0; i < score.stars; i++) {
+        const delay = 800 + i * 300;
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.spring(starAnims[i], {
+            toValue: 1,
+            damping: 8,
+            stiffness: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
 
-      // Haptic feedback for each star
-      setTimeout(() => {
-        for (let i = 0; i < score.stars; i++) {
-          setTimeout(() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(
-              () => {}
-            );
-          }, i * 200);
-        }
-      }, 200);
+        // Haptic per star
+        setTimeout(() => {
+          Haptics.impactAsync(
+            i === score.stars - 1
+              ? Haptics.ImpactFeedbackStyle.Heavy
+              : Haptics.ImpactFeedbackStyle.Medium
+          ).catch(() => {});
+        }, delay);
+      }
     }
-  }, [score.stars, scaleAnim, opacityAnim, starsAnimValue]);
 
-  const scaleStyle = {
-    transform: [
-      { scale: scaleAnim },
-    ],
-  };
+    // 4. XP popup flies up
+    setTimeout(() => setShowXpPopup(true), 1200 + score.stars * 300);
 
-  const starsStyle = {
-    transform: [{ scale: starsAnimValue }],
-  };
-
-  // Determine result text and color
-  const getResultDisplay = () => {
-    if (score.stars === 3) {
-      return {
-        text: 'Outstanding!',
-        color: '#FFD700',
-        icon: 'star',
-      };
-    }
-    if (score.stars === 2) {
-      return {
-        text: 'Great Job!',
-        color: '#C0C0C0',
-        icon: 'star',
-      };
-    }
-    if (score.stars === 1) {
-      return {
-        text: 'Good Effort!',
-        color: '#CD7F32',
-        icon: 'star',
-      };
-    }
-    if (score.isPassed) {
-      return {
-        text: 'Keep Practicing',
-        color: '#4CAF50',
-        icon: 'check-circle',
-      };
-    }
-    return {
-      text: 'Try Again',
-      color: '#F44336',
-      icon: 'alert-circle',
+    return () => {
+      scoreCountAnim.removeListener(scoreListener);
     };
-  };
+  }, [score.stars, score.overall, scaleAnim, opacityAnim, scoreCountAnim, starAnims]);
 
-  const resultDisplay = getResultDisplay();
+  // Result display
+  const resultDisplay = useMemo(() => {
+    if (score.stars === 3) return { text: 'Outstanding!', color: COLORS.starGold, icon: 'crown' as const };
+    if (score.stars === 2) return { text: 'Great Job!', color: '#C0C0C0', icon: 'star' as const };
+    if (score.stars === 1) return { text: 'Good Effort!', color: '#CD7F32', icon: 'star-half-full' as const };
+    if (score.isPassed) return { text: 'Keep Going!', color: COLORS.success, icon: 'check-circle' as const };
+    return { text: 'Try Again!', color: COLORS.error, icon: 'refresh' as const };
+  }, [score.stars, score.isPassed]);
 
-  // Mascot mood and tip based on score
-  const mascotData = useMemo(() => {
-    let mood: MascotMood;
-    if (score.overall >= 95) {
-      mood = 'celebrating';
-    } else if (score.overall >= 80) {
-      mood = 'happy';
-    } else if (score.overall >= 60) {
-      mood = 'encouraging';
-    } else {
-      mood = 'encouraging';
-    }
-    const tip = getTipForScore(score.overall);
-    return { mood, message: tip.text };
+  // Mascot mood
+  const mascotMood: MascotMood = useMemo(() => {
+    if (score.overall >= 95) return 'celebrating';
+    if (score.overall >= 80) return 'happy';
+    return 'encouraging';
   }, [score.overall]);
 
-  // Fun fact for passed exercises
+  // Fun fact
   const completionFunFact = useMemo(
     () => (score.isPassed ? getFactForExerciseType(exercise.metadata.skills) : null),
     [score.isPassed, exercise.metadata.skills]
   );
 
+  // Score color based on value
+  const scoreColor = displayScore >= 95 ? COLORS.starGold
+    : displayScore >= 80 ? COLORS.success
+    : displayScore >= 60 ? COLORS.warning
+    : COLORS.error;
+
   return (
     <View style={styles.overlay} testID={testID}>
       {/* Confetti for 3-star scores */}
       {score.stars === 3 && <ConfettiEffect testID="completion-confetti" />}
+
+      {/* XP Popup */}
+      {showXpPopup && score.xpEarned > 0 && (
+        <View style={styles.xpPopupContainer}>
+          <XpPopup
+            amount={score.xpEarned}
+            onComplete={() => setShowXpPopup(false)}
+          />
+        </View>
+      )}
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -221,57 +217,58 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
         <Animated.View
           style={[
             styles.container,
-            scaleStyle,
-            { opacity: opacityAnim },
+            { transform: [{ scale: scaleAnim }], opacity: opacityAnim },
           ]}
         >
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>{exercise.metadata.title}</Text>
-            <Text style={styles.subtitle}>{isTestMode ? 'Mastery Test Complete!' : 'Exercise Complete!'}</Text>
+            <Text style={styles.subtitle}>
+              {isTestMode ? 'Mastery Test Complete!' : 'Exercise Complete!'}
+            </Text>
           </View>
 
-          {/* Score + Stars in a compact row for landscape */}
+          {/* Score + Stars */}
           <View style={styles.scoreStarsRow}>
-            {/* Score Display */}
+            {/* Animated Score Circle */}
             <View style={styles.scoreSection}>
-              <View style={[
-                styles.scoreCircle,
-                {
-                  borderColor: resultDisplay.color,
-                  backgroundColor: '#252525',
-                },
-              ]}>
+              <View style={[styles.scoreCircle, { borderColor: scoreColor }]}>
                 <View style={styles.scoreRow}>
-                  <Text style={[styles.scoreNumber, { color: resultDisplay.color }]}>{Math.round(score.overall)}</Text>
-                  <Text style={[styles.scoreLabel, { color: resultDisplay.color }]}>%</Text>
+                  <Text style={[styles.scoreNumber, { color: scoreColor }]}>{displayScore}</Text>
+                  <Text style={[styles.scorePercent, { color: scoreColor }]}>%</Text>
                 </View>
               </View>
             </View>
 
             {/* Stars + Result */}
             <View style={styles.starsResultColumn}>
-              <Animated.View
-                style={[
-                  styles.starsContainer,
-                  starsStyle,
-                ]}
-              >
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <MaterialCommunityIcons
-                    key={i}
-                    name={i < score.stars ? 'star' : 'star-outline'}
-                    size={36}
-                    color={i < score.stars ? '#FFD700' : '#444444'}
-                  />
-                ))}
-              </Animated.View>
+              <View style={styles.starsContainer}>
+                {Array.from({ length: 3 }).map((_, i) => {
+                  const starScale = starAnims[i].interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 1],
+                  });
+                  const isEarned = i < score.stars;
+                  return (
+                    <Animated.View
+                      key={i}
+                      style={{ transform: [{ scale: isEarned ? starScale : 1 }] }}
+                    >
+                      <MaterialCommunityIcons
+                        name={isEarned ? 'star' : 'star-outline'}
+                        size={38}
+                        color={isEarned ? COLORS.starGold : COLORS.starEmpty}
+                      />
+                    </Animated.View>
+                  );
+                })}
+              </View>
 
               {/* Result message */}
               <View style={styles.resultSection}>
                 <MaterialCommunityIcons
                   name={resultDisplay.icon as any}
-                  size={24}
+                  size={22}
                   color={resultDisplay.color}
                 />
                 <Text style={[styles.resultText, { color: resultDisplay.color }]}>
@@ -284,78 +281,32 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
           {/* Score Breakdown */}
           <View style={styles.breakdownSection}>
             <Text style={styles.breakdownTitle}>Breakdown</Text>
-
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Accuracy</Text>
-              <View style={styles.breakdownBar}>
-                <View
-                  style={[
-                    styles.breakdownFill,
-                    {
-                      width: `${Math.round(score.breakdown.accuracy)}%`,
-                      backgroundColor: '#4CAF50',
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={styles.breakdownValue}>{Math.round(score.breakdown.accuracy)}%</Text>
-            </View>
-
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Timing</Text>
-              <View style={styles.breakdownBar}>
-                <View
-                  style={[
-                    styles.breakdownFill,
-                    {
-                      width: `${Math.round(score.breakdown.timing)}%`,
-                      backgroundColor: '#2196F3',
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={styles.breakdownValue}>{Math.round(score.breakdown.timing)}%</Text>
-            </View>
-
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Completeness</Text>
-              <View style={styles.breakdownBar}>
-                <View
-                  style={[
-                    styles.breakdownFill,
-                    {
-                      width: `${Math.round(score.breakdown.completeness)}%`,
-                      backgroundColor: '#FF9800',
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={styles.breakdownValue}>{Math.round(score.breakdown.completeness)}%</Text>
-            </View>
+            <BreakdownBar label="Accuracy" value={score.breakdown.accuracy} color={COLORS.success} />
+            <BreakdownBar label="Timing" value={score.breakdown.timing} color={COLORS.info} />
+            <BreakdownBar label="Completeness" value={score.breakdown.completeness} color={COLORS.warning} />
           </View>
 
           {/* XP and Stats */}
           <View style={styles.statsSection}>
             <View style={styles.statItem}>
-              <MaterialCommunityIcons name="lightning-bolt" size={20} color="#FFD700" />
+              <MaterialCommunityIcons name="lightning-bolt" size={20} color={COLORS.starGold} />
               <Text style={styles.statLabel}>XP Earned</Text>
               <Text style={styles.statValue}>+{score.xpEarned}</Text>
             </View>
-
             {score.isNewHighScore && (
               <View style={styles.statItem}>
-                <MaterialCommunityIcons name="trophy" size={20} color="#FFD700" />
+                <MaterialCommunityIcons name="trophy" size={20} color={COLORS.starGold} />
                 <Text style={styles.statLabel}>New Record!</Text>
                 <Text style={styles.statValue}>{Math.round(score.overall)}%</Text>
               </View>
             )}
           </View>
 
-          {/* Keysie Mascot */}
-          <View style={styles.mascotSection}>
+          {/* Cat Dialogue (replaces generic tips) */}
+          <View style={styles.catDialogueSection}>
             <MascotBubble
-              mood={mascotData.mood}
-              message={mascotData.message}
+              mood={mascotMood}
+              message={catDialogue}
               size="small"
             />
           </View>
@@ -373,7 +324,7 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
             )}
           </View>
 
-          {/* Fun Fact (passed exercises only) */}
+          {/* Fun Fact */}
           {completionFunFact && (
             <FunFactCard
               fact={completionFunFact}
@@ -385,7 +336,6 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
 
           {/* Action Buttons */}
           <View style={styles.actions}>
-            {/* Mastery test gate: all regular exercises done → take the test */}
             {onStartTest && score.isPassed && (
               <Button
                 title="Take Mastery Test"
@@ -396,7 +346,6 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
                 testID="completion-start-test"
               />
             )}
-            {/* Normal next exercise (when no mastery test is pending) */}
             {onNextExercise && score.isPassed && !onStartTest && (
               <Button
                 title="Next Exercise"
@@ -417,7 +366,6 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
                 testID="completion-retry"
               />
             )}
-            {/* In test mode failures, only show retry — no "back to lessons" escape */}
             {!(isTestMode && !score.isPassed) && (
               <Button
                 title={score.isPassed && (onNextExercise || onStartTest) ? 'Back to Lessons' : (score.isPassed ? 'Continue' : 'Back to Lessons')}
@@ -435,35 +383,77 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
   );
 };
 
+/** Animated breakdown bar */
+function BreakdownBar({ label, value, color }: { label: string; value: number; color: string }) {
+  const widthAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(widthAnim, {
+      toValue: Math.round(value),
+      duration: 800,
+      delay: 500,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [value, widthAnim]);
+
+  return (
+    <View style={styles.breakdownRow}>
+      <Text style={styles.breakdownLabel}>{label}</Text>
+      <View style={styles.breakdownBar}>
+        <Animated.View
+          style={[
+            styles.breakdownFill,
+            {
+              width: widthAnim.interpolate({
+                inputRange: [0, 100],
+                outputRange: ['0%', '100%'],
+              }),
+              backgroundColor: color,
+            },
+          ]}
+        />
+      </View>
+      <Text style={styles.breakdownValue}>{Math.round(value)}%</Text>
+    </View>
+  );
+}
+
 CompletionModal.displayName = 'CompletionModal';
 
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     zIndex: 1000,
+  },
+  xpPopupContainer: {
+    position: 'absolute',
+    top: '30%',
+    alignSelf: 'center',
+    zIndex: 1001,
   },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: SPACING.md,
   },
   container: {
     width: '100%',
     maxWidth: 500,
-    backgroundColor: '#1A1A1A',
-    borderRadius: 16,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.xl,
     paddingHorizontal: 20,
     paddingVertical: 16,
     gap: 12,
-    shadowColor: '#DC143C',
+    shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.2,
     shadowRadius: 20,
     elevation: 12,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: COLORS.cardBorder,
   },
   header: {
     alignItems: 'center',
@@ -472,11 +462,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: COLORS.textPrimary,
   },
   subtitle: {
     fontSize: 14,
-    color: '#B0B0B0',
+    color: COLORS.textSecondary,
   },
   scoreStarsRow: {
     flexDirection: 'row',
@@ -491,11 +481,10 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#252525',
+    backgroundColor: COLORS.cardSurface,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#DC143C',
+    borderWidth: 4,
   },
   scoreRow: {
     flexDirection: 'row',
@@ -503,13 +492,11 @@ const styles = StyleSheet.create({
   },
   scoreNumber: {
     fontSize: 36,
-    fontWeight: '700',
-    color: '#DC143C',
+    fontWeight: '800',
   },
-  scoreLabel: {
+  scorePercent: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#DC143C',
+    fontWeight: '700',
     marginLeft: 1,
   },
   starsResultColumn: {
@@ -519,12 +506,12 @@ const styles = StyleSheet.create({
   starsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
   },
   resultSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   resultText: {
     fontSize: 18,
@@ -532,28 +519,32 @@ const styles = StyleSheet.create({
   },
   breakdownSection: {
     gap: 8,
-    backgroundColor: '#252525',
+    backgroundColor: COLORS.cardSurface,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.sm,
   },
   breakdownTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: COLORS.textPrimary,
     marginBottom: 4,
   },
   breakdownRow: {
-    gap: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   breakdownLabel: {
-    fontSize: 11,
-    color: '#B0B0B0',
+    fontSize: 12,
+    color: COLORS.textSecondary,
     fontWeight: '600',
+    width: 90,
   },
   breakdownBar: {
+    flex: 1,
     height: 6,
-    backgroundColor: '#333333',
+    backgroundColor: COLORS.cardBorder,
     borderRadius: 3,
     overflow: 'hidden',
   },
@@ -562,8 +553,10 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   breakdownValue: {
-    fontSize: 11,
-    color: '#B0B0B0',
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: '700',
+    width: 36,
     textAlign: 'right',
   },
   statsSection: {
@@ -576,32 +569,32 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: 'rgba(220, 20, 60, 0.1)',
-    borderRadius: 8,
+    backgroundColor: 'rgba(220, 20, 60, 0.08)',
+    borderRadius: BORDER_RADIUS.sm,
     flex: 1,
   },
   statLabel: {
     fontSize: 11,
-    color: '#B0B0B0',
+    color: COLORS.textSecondary,
     fontWeight: '600',
   },
   statValue: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFD700',
+    color: COLORS.starGold,
   },
-  mascotSection: {
+  catDialogueSection: {
     paddingHorizontal: 4,
     paddingVertical: 4,
   },
   coachSection: {
-    backgroundColor: 'rgba(124, 77, 255, 0.1)',
+    backgroundColor: 'rgba(124, 77, 255, 0.08)',
     paddingHorizontal: 14,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.sm,
     gap: 6,
     borderWidth: 1,
-    borderColor: 'rgba(124, 77, 255, 0.2)',
+    borderColor: 'rgba(124, 77, 255, 0.15)',
   },
   coachHeader: {
     flexDirection: 'row',

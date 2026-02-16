@@ -207,7 +207,10 @@ export function buildAchievementContext(progress: {
   streakData: { currentStreak: number };
   lessonProgress: Record<string, { status: string }>;
   dailyGoalData: Record<string, { exercisesCompleted: number }>;
-}, catsUnlocked: number): AchievementContext {
+}, catsUnlocked: number, extras?: {
+  sessionExercises?: number;
+  exercisesWithSameCat?: number;
+}): AchievementContext {
   const achievementState = useAchievementStore.getState();
 
   // Count completed lessons
@@ -221,6 +224,9 @@ export function buildAchievementContext(progress: {
     0
   );
 
+  // Time-of-day checks
+  const hour = new Date().getHours();
+
   return {
     totalXp: progress.totalXp,
     level: progress.level,
@@ -231,5 +237,9 @@ export function buildAchievementContext(progress: {
     totalNotesPlayed: achievementState.totalNotesPlayed,
     catsUnlocked,
     highScoreExercises: achievementState.highScoreCount,
+    sessionExercises: extras?.sessionExercises ?? 0,
+    exercisesWithSameCat: extras?.exercisesWithSameCat ?? 0,
+    isEarlyPractice: hour < 8,
+    isLatePractice: hour >= 22,
   };
 }

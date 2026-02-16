@@ -1,9 +1,10 @@
 /**
  * ProfileScreen - User profile, stats, and settings
  * Features cat character avatar system with backstories and unlock levels
+ * Duolingo-style gamification polish: progress ring, gradient stats, horizontal achievements
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,11 +16,13 @@ import {
   TextInput,
   Modal,
   FlatList,
+  Animated as RNAnimated,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import Svg, { Circle } from 'react-native-svg';
 import { useProgressStore } from '../stores/progressStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useAchievementStore } from '../stores/achievementStore';
@@ -28,15 +31,12 @@ import type { Achievement } from '../core/achievements/achievements';
 import { CatAvatar } from '../components/Mascot/CatAvatar';
 import { CAT_CHARACTERS, getCatById, isCatUnlocked } from '../components/Mascot/catCharacters';
 import type { CatCharacter } from '../components/Mascot/catCharacters';
+import { StreakFlame } from '../components/StreakFlame';
+import { getLevelProgress } from '../core/progression/XpSystem';
+import { COLORS, SPACING, BORDER_RADIUS } from '../theme/tokens';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
-
-interface StatItem {
-  icon: IconName;
-  label: string;
-  value: number;
-}
 
 type ProfileNavProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -47,6 +47,73 @@ const VOLUME_OPTIONS = [
   { label: '75%', value: 0.75 },
   { label: '100%', value: 1.0 },
 ];
+
+/** Stat card accent colors for gradient overlays */
+const STAT_ACCENTS = {
+  level: 'rgba(220, 20, 60, 0.15)',    // crimson
+  xp: 'rgba(255, 215, 0, 0.15)',       // gold
+  streak: 'rgba(255, 152, 0, 0.15)',    // orange
+  lessons: 'rgba(76, 175, 80, 0.15)',   // green
+} as const;
+
+const STAT_ACCENT_BORDERS = {
+  level: 'rgba(220, 20, 60, 0.3)',
+  xp: 'rgba(255, 215, 0, 0.3)',
+  streak: 'rgba(255, 152, 0, 0.3)',
+  lessons: 'rgba(76, 175, 80, 0.3)',
+} as const;
+
+const STAT_ICON_COLORS = {
+  level: '#DC143C',
+  xp: '#FFD700',
+  streak: '#FF9800',
+  lessons: '#4CAF50',
+} as const;
+
+type StatAccentKey = keyof typeof STAT_ACCENTS;
+
+interface StatItem {
+  icon: IconName;
+  label: string;
+  value: number;
+  accentKey: StatAccentKey;
+  useFlame?: boolean;
+}
+
+/** Hook for animated count-up from 0 to target value */
+function useCountUp(target: number, duration: number = 800): RNAnimated.Value {
+  const animValue = useRef(new RNAnimated.Value(0)).current;
+
+  useEffect(() => {
+    animValue.setValue(0);
+    RNAnimated.timing(animValue, {
+      toValue: target,
+      duration,
+      useNativeDriver: false,
+    }).start();
+  }, [animValue, target, duration]);
+
+  return animValue;
+}
+
+/** Animated stat value text that counts up from 0 */
+function AnimatedStatValue({ value, color }: { value: number; color: string }): React.ReactElement {
+  const animValue = useCountUp(value);
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    const listenerId = animValue.addListener(({ value: v }) => {
+      setDisplayValue(Math.round(v));
+    });
+    return () => {
+      animValue.removeListener(listenerId);
+    };
+  }, [animValue]);
+
+  return (
+    <Text style={[styles.statValue, { color }]}>{displayValue}</Text>
+  );
+}
 
 /** Get the last 7 days of practice data for the chart */
 function useWeeklyPractice(): { day: string; minutes: number }[] {
@@ -86,7 +153,7 @@ function CatPickerCard({
     <TouchableOpacity
       style={[
         catPickerStyles.card,
-        isSelected && { borderColor: '#DC143C', borderWidth: 2 },
+        isSelected && { borderColor: COLORS.primary, borderWidth: 2 },
         !isUnlocked && catPickerStyles.cardLocked,
       ]}
       onPress={() => {
@@ -152,19 +219,31 @@ function CatPickerCard({
       {/* Selected check */}
       {isSelected && (
         <View style={catPickerStyles.selectedCheck}>
-          <MaterialCommunityIcons name="check-circle" size={20} color="#DC143C" />
+          <MaterialCommunityIcons name="check-circle" size={20} color={COLORS.primary} />
         </View>
       )}
     </TouchableOpacity>
   );
 }
 
-/** Achievements section with unlocked/locked badges */
+/** Achievements section as horizontal scroll with circular badges */
 function AchievementsSection(): React.ReactElement {
   const { unlockedIds } = useAchievementStore();
   const unlockedSet = useMemo(() => new Set(Object.keys(unlockedIds)), [unlockedIds]);
   const unlockedCount = unlockedSet.size;
   const totalCount = ACHIEVEMENTS.length;
+
+  // Determine recently unlocked (within last 24 hours)
+  const recentlyUnlockedSet = useMemo(() => {
+    const recent = new Set<string>();
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    for (const [id, timestamp] of Object.entries(unlockedIds)) {
+      if (new Date(timestamp).getTime() > oneDayAgo) {
+        recent.add(id);
+      }
+    }
+    return recent;
+  }, [unlockedIds]);
 
   // Sort: unlocked first (newest first), then locked
   const sortedAchievements = useMemo(() => {
@@ -186,6 +265,20 @@ function AchievementsSection(): React.ReactElement {
     return [...unlocked, ...locked];
   }, [unlockedSet, unlockedIds]);
 
+  const handleBadgePress = useCallback((achievement: Achievement, isUnlocked: boolean) => {
+    if (isUnlocked) {
+      Alert.alert(
+        achievement.title,
+        `${achievement.description}\n\n+${achievement.xpReward} XP`,
+      );
+    } else {
+      Alert.alert(
+        achievement.title,
+        achievement.description,
+      );
+    }
+  }, []);
+
   return (
     <View style={styles.section}>
       <View style={styles.achievementHeader}>
@@ -194,56 +287,111 @@ function AchievementsSection(): React.ReactElement {
           {unlockedCount}/{totalCount}
         </Text>
       </View>
-      {sortedAchievements.map((achievement) => {
-        const isUnlocked = unlockedSet.has(achievement.id);
-        return (
-          <View
-            key={achievement.id}
-            style={[
-              styles.achievementCard,
-              !isUnlocked && styles.achievementCardLocked,
-            ]}
-          >
-            <View
-              style={[
-                styles.achievementIconContainer,
-                isUnlocked
-                  ? styles.achievementIconUnlocked
-                  : styles.achievementIconLocked,
-              ]}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.achievementScrollContent}
+      >
+        {sortedAchievements.map((achievement) => {
+          const isUnlocked = unlockedSet.has(achievement.id);
+          const isRecent = recentlyUnlockedSet.has(achievement.id);
+          return (
+            <TouchableOpacity
+              key={achievement.id}
+              style={styles.achievementBadgeContainer}
+              onPress={() => handleBadgePress(achievement, isUnlocked)}
+              activeOpacity={0.7}
             >
-              <MaterialCommunityIcons
-                name={achievement.icon as IconName}
-                size={28}
-                color={isUnlocked ? '#FFD700' : '#555555'}
-              />
-            </View>
-            <View style={styles.achievementContent}>
+              <View
+                style={[
+                  styles.achievementBadge,
+                  isUnlocked
+                    ? styles.achievementBadgeUnlocked
+                    : styles.achievementBadgeLocked,
+                  isRecent && styles.achievementBadgeRecent,
+                ]}
+              >
+                {isUnlocked ? (
+                  <MaterialCommunityIcons
+                    name={achievement.icon as IconName}
+                    size={32}
+                    color="#FFD700"
+                  />
+                ) : (
+                  <MaterialCommunityIcons
+                    name="lock"
+                    size={24}
+                    color="#555555"
+                  />
+                )}
+              </View>
               <Text
                 style={[
-                  styles.achievementTitle,
-                  !isUnlocked && styles.achievementTitleLocked,
+                  styles.achievementBadgeLabel,
+                  !isUnlocked && styles.achievementBadgeLabelLocked,
                 ]}
+                numberOfLines={2}
               >
                 {achievement.title}
               </Text>
-              <Text
-                style={[
-                  styles.achievementDescription,
-                  !isUnlocked && styles.achievementDescriptionLocked,
-                ]}
-              >
-                {achievement.description}
-              </Text>
-            </View>
-            {isUnlocked && (
-              <View style={styles.achievementXpBadge}>
-                <Text style={styles.achievementXpText}>+{achievement.xpReward}</Text>
-              </View>
-            )}
-          </View>
-        );
-      })}
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
+/** SVG progress ring for level display */
+function LevelProgressRing({
+  percent,
+  level,
+  size,
+  catColor,
+}: {
+  percent: number;
+  level: number;
+  size: number;
+  catColor: string;
+}): React.ReactElement {
+  const strokeWidth = 5;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = (1 - percent / 100) * circumference;
+  const center = size / 2;
+
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
+        {/* Background track */}
+        <Circle
+          cx={center}
+          cy={center}
+          r={radius}
+          stroke="#333333"
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
+        {/* Foreground progress */}
+        <Circle
+          cx={center}
+          cy={center}
+          r={radius}
+          stroke={catColor}
+          strokeWidth={strokeWidth}
+          fill="none"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+        />
+      </Svg>
+      {/* Center content */}
+      <View style={StyleSheet.absoluteFill}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={styles.levelRingLabel}>Level</Text>
+          <Text style={[styles.levelRingValue, { color: catColor }]}>{level}</Text>
+        </View>
+      </View>
     </View>
   );
 }
@@ -267,6 +415,10 @@ export function ProfileScreen(): React.ReactElement {
   const [editingName, setEditingName] = useState(displayName);
 
   const selectedCat = getCatById(selectedCatId) ?? CAT_CHARACTERS[0];
+  const catColor = selectedCat.color;
+
+  // Level progress
+  const levelProgress = getLevelProgress(totalXp);
 
   // Calculate total lessons completed
   const completedLessons = Object.values(lessonProgress).filter(
@@ -274,11 +426,16 @@ export function ProfileScreen(): React.ReactElement {
   ).length;
 
   const stats: StatItem[] = [
-    { icon: 'trophy', label: 'Level', value: level },
-    { icon: 'star', label: 'Total XP', value: totalXp },
-    { icon: 'fire', label: 'Day Streak', value: streakData.currentStreak },
-    { icon: 'book-open', label: 'Lessons Done', value: completedLessons },
+    { icon: 'trophy', label: 'Level', value: level, accentKey: 'level' },
+    { icon: 'star', label: 'Total XP', value: totalXp, accentKey: 'xp' },
+    { icon: 'fire', label: 'Day Streak', value: streakData.currentStreak, accentKey: 'streak', useFlame: true },
+    { icon: 'book-open', label: 'Lessons Done', value: completedLessons, accentKey: 'lessons' },
   ];
+
+  // Goal line height for the chart
+  const goalLineHeight = dailyGoalMinutes > 0
+    ? Math.max(8, (dailyGoalMinutes / Math.max(maxDayMinutes, dailyGoalMinutes)) * 80)
+    : 0;
 
   const handleSaveName = useCallback(() => {
     const trimmed = editingName.trim();
@@ -292,7 +449,6 @@ export function ProfileScreen(): React.ReactElement {
     setSelectedCatId(catId);
     const cat = getCatById(catId);
     if (cat) {
-      // Also update the avatarEmoji to the cat's emoji for backwards compatibility
       useSettingsStore.getState().setAvatarEmoji(cat.emoji);
     }
   }, [setSelectedCatId]);
@@ -322,9 +478,9 @@ export function ProfileScreen(): React.ReactElement {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Gradient Header with cat avatar */}
+        {/* Gradient Header with cat avatar and level progress ring */}
         <LinearGradient
-          colors={['#1A1A2E', '#1A1A1A', '#0D0D0D']}
+          colors={[catColor + '22', '#1A1A2E', COLORS.background]}
           style={styles.header}
         >
           <TouchableOpacity
@@ -338,6 +494,17 @@ export function ProfileScreen(): React.ReactElement {
             </View>
           </TouchableOpacity>
 
+          {/* Level progress ring */}
+          <LevelProgressRing
+            percent={levelProgress.percentToNextLevel}
+            level={levelProgress.level}
+            size={80}
+            catColor={catColor}
+          />
+          <Text style={styles.xpToNextText}>
+            {levelProgress.xpToNextLevel} XP to next
+          </Text>
+
           <TouchableOpacity onPress={() => { setEditingName(displayName); setShowNameEditor(true); }}>
             <View style={styles.nameRow}>
               <Text style={styles.username}>{displayName}</Text>
@@ -349,14 +516,30 @@ export function ProfileScreen(): React.ReactElement {
           </Text>
         </LinearGradient>
 
-        {/* Stats Grid */}
+        {/* Stats Grid with gradient backgrounds */}
         <View style={styles.statsGrid}>
-          {stats.map((stat, index) => (
-            <View key={index} style={styles.statCard}>
-              <MaterialCommunityIcons name={stat.icon} size={32} color="#DC143C" />
-              <Text style={styles.statValue}>{stat.value}</Text>
+          {stats.map((stat) => (
+            <LinearGradient
+              key={stat.label}
+              colors={['#1E1E32', '#1A1A2E']}
+              style={[
+                styles.statCard,
+                { borderColor: STAT_ACCENT_BORDERS[stat.accentKey] },
+              ]}
+            >
+              <View style={[styles.statAccentOverlay, { backgroundColor: STAT_ACCENTS[stat.accentKey] }]} />
+              {stat.useFlame ? (
+                <StreakFlame streak={stat.value} showCount={false} size="small" />
+              ) : (
+                <MaterialCommunityIcons
+                  name={stat.icon}
+                  size={32}
+                  color={STAT_ICON_COLORS[stat.accentKey]}
+                />
+              )}
+              <AnimatedStatValue value={stat.value} color={COLORS.textPrimary} />
               <Text style={styles.statLabel}>{stat.label}</Text>
-            </View>
+            </LinearGradient>
           ))}
         </View>
 
@@ -367,9 +550,22 @@ export function ProfileScreen(): React.ReactElement {
             <Text style={styles.chartTotal}>{totalWeekMinutes} min total</Text>
           </View>
           <View style={styles.chartContainer}>
+            {/* Goal line (dashed) */}
+            {goalLineHeight > 0 && (
+              <View
+                style={[
+                  styles.goalLine,
+                  { bottom: goalLineHeight + 28 },
+                ]}
+              >
+                <View style={styles.goalLineDash} />
+                <Text style={styles.goalLineLabel}>{dailyGoalMinutes}m</Text>
+              </View>
+            )}
             {weeklyPractice.map((day, index) => {
+              const effectiveMax = Math.max(maxDayMinutes, dailyGoalMinutes);
               const barHeight = day.minutes > 0
-                ? Math.max(8, (day.minutes / maxDayMinutes) * 80)
+                ? Math.max(8, (day.minutes / effectiveMax) * 80)
                 : 4;
               const isToday = index === 6;
               return (
@@ -383,8 +579,13 @@ export function ProfileScreen(): React.ReactElement {
                         styles.chartBar,
                         {
                           height: barHeight,
+                          width: isToday ? 22 : 16,
+                          borderTopLeftRadius: 4,
+                          borderTopRightRadius: 4,
+                          borderBottomLeftRadius: 2,
+                          borderBottomRightRadius: 2,
                           backgroundColor: day.minutes > 0
-                            ? (isToday ? '#DC143C' : '#DC143C99')
+                            ? (isToday ? COLORS.primary : COLORS.primary + '88')
                             : '#333333',
                         },
                       ]}
@@ -398,6 +599,9 @@ export function ProfileScreen(): React.ReactElement {
             })}
           </View>
         </View>
+
+        {/* Achievements as horizontal scroll */}
+        <AchievementsSection />
 
         {/* Settings Section */}
         <View style={styles.section}>
@@ -482,9 +686,6 @@ export function ProfileScreen(): React.ReactElement {
             <MaterialCommunityIcons name="chevron-right" size={24} color="#666" />
           </TouchableOpacity>
         </View>
-
-        {/* Achievements */}
-        <AchievementsSection />
       </ScrollView>
 
       {/* Name Editor Modal */}
@@ -589,41 +790,41 @@ const catPickerStyles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   container: {
-    backgroundColor: '#0D0D0D',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: COLORS.background,
+    borderTopLeftRadius: BORDER_RADIUS.xl,
+    borderTopRightRadius: BORDER_RADIUS.xl,
     paddingTop: 20,
-    paddingHorizontal: 16,
-    paddingBottom: 32,
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.xl,
     maxHeight: '85%',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: SPACING.xs,
   },
   title: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#FFFFFF',
+    color: COLORS.textPrimary,
   },
   subtitle: {
     fontSize: 13,
     color: '#888',
-    marginBottom: 16,
+    marginBottom: SPACING.md,
   },
   listContent: {
-    paddingBottom: 8,
+    paddingBottom: SPACING.sm,
   },
   row: {
-    gap: 12,
-    marginBottom: 12,
+    gap: SPACING.md - 4,
+    marginBottom: SPACING.md - 4,
   },
   card: {
     flex: 1,
     backgroundColor: '#1A1A1A',
-    borderRadius: 16,
+    borderRadius: BORDER_RADIUS.lg,
     padding: 14,
     alignItems: 'center',
     borderWidth: 1,
@@ -636,8 +837,8 @@ const catPickerStyles = StyleSheet.create({
   },
   lockOverlay: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: SPACING.sm,
+    right: SPACING.sm,
     alignItems: 'center',
     zIndex: 2,
   },
@@ -653,7 +854,7 @@ const catPickerStyles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: SPACING.sm,
   },
   emojiText: {
     fontSize: 28,
@@ -661,7 +862,7 @@ const catPickerStyles = StyleSheet.create({
   catName: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: '#FFFFFF',
+    color: COLORS.textPrimary,
     marginBottom: 2,
   },
   catSkill: {
@@ -681,22 +882,22 @@ const catPickerStyles = StyleSheet.create({
   },
   selectedCheck: {
     position: 'absolute',
-    top: 8,
-    left: 8,
+    top: SPACING.sm,
+    left: SPACING.sm,
   },
   backstoryPanel: {
     backgroundColor: '#1A1A1A',
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 8,
-    marginBottom: 8,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.sm,
     borderWidth: 1,
   },
   backstoryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
-    gap: 12,
+    gap: SPACING.md - 4,
   },
   backstoryEmoji: {
     fontSize: 36,
@@ -707,7 +908,7 @@ const catPickerStyles = StyleSheet.create({
   backstoryName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#FFFFFF',
+    color: COLORS.textPrimary,
   },
   backstorySkill: {
     fontSize: 13,
@@ -721,9 +922,9 @@ const catPickerStyles = StyleSheet.create({
   },
   backstoryClose: {
     alignSelf: 'flex-end',
-    marginTop: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    marginTop: SPACING.sm,
+    paddingHorizontal: SPACING.md - 4,
+    paddingVertical: SPACING.xs,
   },
   backstoryCloseText: {
     fontSize: 13,
@@ -731,14 +932,14 @@ const catPickerStyles = StyleSheet.create({
     fontWeight: '600',
   },
   doneButton: {
-    backgroundColor: '#DC143C',
-    borderRadius: 12,
+    backgroundColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.md,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: SPACING.sm,
   },
   doneButtonText: {
-    color: '#FFFFFF',
+    color: COLORS.textPrimary,
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -747,18 +948,18 @@ const catPickerStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D0D0D',
+    backgroundColor: COLORS.background,
   },
   scrollContent: {
     paddingBottom: 40,
   },
   header: {
     alignItems: 'center',
-    paddingVertical: 32,
-    paddingBottom: 28,
+    paddingVertical: SPACING.xl,
+    paddingBottom: SPACING.lg,
   },
   avatarContainer: {
-    marginBottom: 16,
+    marginBottom: SPACING.md,
     position: 'relative',
   },
   editBadge: {
@@ -768,83 +969,105 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#DC143C',
+    backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#1A1A1A',
+    borderColor: '#1A1A2E',
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    marginTop: SPACING.sm,
   },
   username: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.xs,
   },
   subtitle: {
     fontSize: 16,
     color: '#B0B0B0',
   },
+  // Level progress ring
+  levelRingLabel: {
+    fontSize: 11,
+    color: '#B0B0B0',
+    fontWeight: '600',
+  },
+  levelRingValue: {
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  xpToNextText: {
+    fontSize: 12,
+    color: '#888',
+    fontWeight: '600',
+    marginTop: SPACING.xs,
+  },
+  // Stats grid
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 16,
-    gap: 12,
+    padding: SPACING.md,
+    gap: SPACING.md - 4,
   },
   statCard: {
     flex: 1,
     minWidth: '45%',
-    backgroundColor: '#1A1A1A',
     padding: 20,
-    borderRadius: 12,
+    borderRadius: BORDER_RADIUS.md,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    overflow: 'hidden',
+  },
+  statAccentOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: BORDER_RADIUS.md,
   },
   statValue: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginTop: 8,
+    marginTop: SPACING.sm,
   },
   statLabel: {
     fontSize: 14,
     color: '#B0B0B0',
-    marginTop: 4,
+    marginTop: SPACING.xs,
   },
+  // Sections
   section: {
-    marginTop: 24,
-    paddingHorizontal: 16,
+    marginTop: SPACING.lg,
+    paddingHorizontal: SPACING.md,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 16,
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.md,
   },
+  // Settings
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#1A1A1A',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
+    backgroundColor: COLORS.surface,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.sm,
     borderWidth: 1,
     borderColor: '#2A2A2A',
   },
   settingLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: SPACING.md - 4,
   },
   settingLabel: {
     fontSize: 16,
-    color: '#FFFFFF',
+    color: COLORS.textPrimary,
   },
   settingValue: {
     fontSize: 16,
@@ -853,26 +1076,26 @@ const styles = StyleSheet.create({
   settingRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: SPACING.xs,
   },
   pickerRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
-    paddingHorizontal: 4,
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+    paddingHorizontal: SPACING.xs,
   },
   pickerChip: {
     flex: 1,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.sm,
     backgroundColor: '#252525',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#333333',
   },
   pickerChipActive: {
-    backgroundColor: '#DC143C',
-    borderColor: '#DC143C',
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   pickerChipText: {
     fontSize: 14,
@@ -880,8 +1103,9 @@ const styles = StyleSheet.create({
     color: '#B0B0B0',
   },
   pickerChipTextActive: {
-    color: '#FFFFFF',
+    color: COLORS.textPrimary,
   },
+  // Chart
   chartHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -891,41 +1115,41 @@ const styles = StyleSheet.create({
   chartTotal: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#DC143C',
-    marginBottom: 16,
+    color: COLORS.primary,
+    marginBottom: SPACING.md,
   },
   chartContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    backgroundColor: '#1A1A1A',
-    borderRadius: 12,
-    padding: 16,
-    paddingBottom: 12,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    paddingBottom: SPACING.md - 4,
     borderWidth: 1,
     borderColor: '#2A2A2A',
     height: 140,
+    position: 'relative',
   },
   chartColumn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-end',
+    zIndex: 1,
   },
   chartMinutes: {
     fontSize: 10,
     color: '#B0B0B0',
-    marginBottom: 4,
+    marginBottom: SPACING.xs,
     fontWeight: '600',
   },
   chartBarTrack: {
-    width: 20,
+    width: 24,
     height: 80,
     justifyContent: 'flex-end',
     alignItems: 'center',
   },
   chartBar: {
-    width: 16,
-    borderRadius: 4,
     minHeight: 4,
   },
   chartDay: {
@@ -935,9 +1159,32 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   chartDayActive: {
-    color: '#DC143C',
+    color: COLORS.primary,
     fontWeight: '700',
   },
+  // Goal line
+  goalLine: {
+    position: 'absolute',
+    left: SPACING.md,
+    right: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 0,
+  },
+  goalLineDash: {
+    flex: 1,
+    height: 1,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  goalLineLabel: {
+    fontSize: 9,
+    color: 'rgba(255, 255, 255, 0.3)',
+    fontWeight: '600',
+    marginLeft: SPACING.xs,
+  },
+  // Achievement badges (horizontal scroll)
   achievementHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -946,65 +1193,50 @@ const styles = StyleSheet.create({
   achievementCounter: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#DC143C',
-    marginBottom: 16,
+    color: COLORS.primary,
+    marginBottom: SPACING.md,
   },
-  achievementCard: {
-    flexDirection: 'row',
-    backgroundColor: '#1A1A1A',
-    padding: 14,
-    borderRadius: 12,
+  achievementScrollContent: {
+    paddingRight: SPACING.md,
+    gap: SPACING.md,
+  },
+  achievementBadgeContainer: {
     alignItems: 'center',
-    gap: 12,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-    marginBottom: 8,
+    width: 80,
   },
-  achievementCardLocked: {
-    opacity: 0.5,
-  },
-  achievementIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  achievementBadge: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: SPACING.xs,
   },
-  achievementIconUnlocked: {
+  achievementBadgeUnlocked: {
     backgroundColor: 'rgba(255, 215, 0, 0.15)',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 215, 0, 0.3)',
   },
-  achievementIconLocked: {
-    backgroundColor: '#252525',
+  achievementBadgeLocked: {
+    backgroundColor: '#1A1A1A',
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
   },
-  achievementContent: {
-    flex: 1,
+  achievementBadgeRecent: {
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  achievementTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 2,
+  achievementBadgeLabel: {
+    fontSize: 11,
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+    fontWeight: '500',
   },
-  achievementTitleLocked: {
-    color: '#888888',
-  },
-  achievementDescription: {
-    fontSize: 13,
-    color: '#B0B0B0',
-  },
-  achievementDescriptionLocked: {
+  achievementBadgeLabelLocked: {
     color: '#555555',
-  },
-  achievementXpBadge: {
-    backgroundColor: 'rgba(255, 215, 0, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  achievementXpText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFD700',
   },
   // Modal styles
   modalOverlay: {
@@ -1012,12 +1244,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: SPACING.xl,
   },
   modalCard: {
-    backgroundColor: '#1A1A1A',
-    borderRadius: 16,
-    padding: 24,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
     width: '100%',
     maxWidth: 340,
     borderWidth: 1,
@@ -1026,28 +1258,28 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 16,
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.md,
     textAlign: 'center',
   },
   nameInput: {
     borderWidth: 1,
     borderColor: '#333333',
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: BORDER_RADIUS.sm,
+    padding: SPACING.md - 4,
     fontSize: 16,
-    color: '#FFFFFF',
+    color: COLORS.textPrimary,
     backgroundColor: '#252525',
-    marginBottom: 16,
+    marginBottom: SPACING.md,
   },
   modalActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: SPACING.md - 4,
   },
   modalCancel: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: SPACING.md - 4,
+    borderRadius: BORDER_RADIUS.sm,
     backgroundColor: '#252525',
     alignItems: 'center',
   },
@@ -1058,14 +1290,14 @@ const styles = StyleSheet.create({
   },
   modalSave: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: '#DC143C',
+    paddingVertical: SPACING.md - 4,
+    borderRadius: BORDER_RADIUS.sm,
+    backgroundColor: COLORS.primary,
     alignItems: 'center',
   },
   modalSaveText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: COLORS.textPrimary,
   },
 });
