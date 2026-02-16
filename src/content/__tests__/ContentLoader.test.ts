@@ -146,11 +146,12 @@ describe('ContentLoader', () => {
   });
 
   describe('Lesson 1 content integrity', () => {
-    it('should have 3 exercises that match lesson manifest', () => {
+    it('should have 3 regular exercises plus a mastery test', () => {
       const lesson = getLesson('lesson-01');
       const exercises = getLessonExercises('lesson-01');
 
-      expect(lesson!.exercises.length).toBe(3);
+      // Manifest includes test exercise; getLessonExercises filters it out
+      expect(lesson!.exercises.length).toBe(4);
       expect(exercises.length).toBe(3);
 
       // Every manifest entry should resolve to an actual exercise
@@ -195,7 +196,9 @@ describe('ContentLoader', () => {
           const lesson = getLesson(lessonId);
           expect(lesson).not.toBeNull();
           const exercises = getLessonExercises(lessonId);
-          expect(exercises.length).toBe(lesson!.exercises.length);
+          // getLessonExercises filters out test exercises
+          const nonTestEntries = lesson!.exercises.filter((e: { test?: boolean }) => !e.test);
+          expect(exercises.length).toBe(nonTestEntries.length);
 
           exercises.forEach((ex) => {
             expect(ex.id).toBeTruthy();

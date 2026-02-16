@@ -1,17 +1,17 @@
 /**
  * PianoKey Component
- * Renders a single piano key with touch feedback and animations
- * Performance: Optimized for <16ms touch-to-visual latency
+ * Renders a single piano key as a purely visual element.
+ * Touch handling is managed by the parent Keyboard's multi-touch responder.
+ * Performance: Optimized for <16ms visual feedback via isPressed prop
  */
 
-import React, { useCallback, useMemo } from 'react';
-import { StyleSheet, Pressable } from 'react-native';
+import React, { useMemo, useEffect } from 'react';
+import { StyleSheet } from 'react-native';
 import Animated, {
-  useSharedValue,
   useAnimatedStyle,
   withSpring,
+  useSharedValue,
 } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
 
 export interface PianoKeyProps {
   midiNote: number;
@@ -19,9 +19,7 @@ export interface PianoKeyProps {
   label?: string;
   isHighlighted?: boolean;
   isExpected?: boolean;
-  onKeyDown?: (note: number) => void;
-  onKeyUp?: (note: number) => void;
-  hapticEnabled?: boolean;
+  isPressed?: boolean;
   showLabels?: boolean;
 }
 
@@ -43,19 +41,16 @@ function isBlackKeyNote(midiNote: number): boolean {
 }
 
 /**
- * PianoKey - A single piano key component
- * Supports touch feedback, highlighting, and performance optimizations
+ * PianoKey - A single piano key component (visual only)
+ * Touch input is handled at the Keyboard container level for multi-touch support.
  */
 export const PianoKey = React.memo(
   ({
     midiNote,
     isBlackKey: isBlackKeyProp,
-    label: _label,
     isHighlighted = false,
     isExpected = false,
-    onKeyDown,
-    onKeyUp,
-    hapticEnabled = false,
+    isPressed = false,
     showLabels = false,
   }: PianoKeyProps) => {
     const isBlackKey = useMemo(
@@ -63,9 +58,20 @@ export const PianoKey = React.memo(
       [isBlackKeyProp, midiNote]
     );
 
-    // Shared value for key press animation
+    // Shared values for key press animation
     const scale = useSharedValue(1);
     const yOffset = useSharedValue(0);
+
+    // Drive animation from isPressed prop
+    useEffect(() => {
+      if (isPressed) {
+        scale.value = withSpring(0.95, { damping: 8, mass: 1, overshootClamping: false });
+        yOffset.value = withSpring(isBlackKey ? -2 : -3, { damping: 8, mass: 1 });
+      } else {
+        scale.value = withSpring(1, { damping: 8, mass: 1 });
+        yOffset.value = withSpring(0, { damping: 8, mass: 1 });
+      }
+    }, [isPressed, isBlackKey, scale, yOffset]);
 
     // Animated style for key depression
     const animatedStyle = useAnimatedStyle(() => ({
@@ -74,44 +80,6 @@ export const PianoKey = React.memo(
         { translateY: yOffset.value },
       ],
     }));
-
-    const handlePressIn = useCallback(() => {
-      // Trigger haptic feedback
-      if (hapticEnabled) {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-
-      // Animate key press with spring effect
-      scale.value = withSpring(0.95, {
-        damping: 8,
-        mass: 1,
-        overshootClamping: false,
-      });
-
-      yOffset.value = withSpring(isBlackKey ? -2 : -3, {
-        damping: 8,
-        mass: 1,
-      });
-
-      // Notify parent component
-      onKeyDown?.(midiNote);
-    }, [midiNote, isBlackKey, onKeyDown, hapticEnabled, scale, yOffset]);
-
-    const handlePressOut = useCallback(() => {
-      // Animate key release with spring effect
-      scale.value = withSpring(1, {
-        damping: 8,
-        mass: 1,
-      });
-
-      yOffset.value = withSpring(0, {
-        damping: 8,
-        mass: 1,
-      });
-
-      // Notify parent component
-      onKeyUp?.(midiNote);
-    }, [midiNote, onKeyUp, scale, yOffset]);
 
     const noteLabel = getNoteLabel(midiNote, showLabels);
 
@@ -123,13 +91,12 @@ export const PianoKey = React.memo(
             animatedStyle,
           ]}
         >
-          <Pressable
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-            style={({ pressed: _pressed }) => [
+          <Animated.View
+            style={[
               styles.blackKey,
               isExpected && styles.expectedBlackKey,
               isHighlighted && styles.highlightedBlackKey,
+              isPressed && styles.pressedBlackKey,
             ]}
           >
             {showLabels && (
@@ -137,7 +104,7 @@ export const PianoKey = React.memo(
                 {noteLabel}
               </Animated.Text>
             )}
-          </Pressable>
+          </Animated.View>
         </Animated.View>
       );
     }
@@ -149,13 +116,12 @@ export const PianoKey = React.memo(
           animatedStyle,
         ]}
       >
-        <Pressable
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          style={({ pressed: _pressed }) => [
+        <Animated.View
+          style={[
             styles.whiteKey,
             isExpected && styles.expectedWhiteKey,
             isHighlighted && styles.highlightedWhiteKey,
+            isPressed && styles.pressedWhiteKey,
           ]}
         >
           {showLabels && (
@@ -163,7 +129,7 @@ export const PianoKey = React.memo(
               {noteLabel}
             </Animated.Text>
           )}
-        </Pressable>
+        </Animated.View>
       </Animated.View>
     );
   }
@@ -207,6 +173,10 @@ const styles = StyleSheet.create({
     borderColor: '#2E7D32',
     borderWidth: 2,
   },
+  pressedWhiteKey: {
+    backgroundColor: '#E0E0E0',
+    borderColor: '#999999',
+  },
   blackKeyContainer: {
     position: 'absolute',
     zIndex: 10,
@@ -243,5 +213,9 @@ const styles = StyleSheet.create({
   expectedBlackKey: {
     backgroundColor: '#2E7D32',
     borderColor: '#1B5E20',
+  },
+  pressedBlackKey: {
+    backgroundColor: '#333333',
+    borderColor: '#444444',
   },
 });

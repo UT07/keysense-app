@@ -32,6 +32,13 @@
       "title": "C Major Scale Mastery Review",
       "order": 4,
       "required": false
+    },
+    {
+      "id": "lesson-05-test",
+      "title": "Mastery Test",
+      "order": 99,
+      "required": true,
+      "test": true
     }
   ],
   "unlockRequirement": {

@@ -26,6 +26,13 @@
       "title": "White Keys Pattern",
       "order": 3,
       "required": true
+    },
+    {
+      "id": "lesson-01-test",
+      "title": "Mastery Test",
+      "order": 99,
+      "required": true,
+      "test": true
     }
   ],
   "unlockRequirement": null,

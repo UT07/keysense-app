@@ -3,7 +3,7 @@
  * Main home screen with daily practice goal, XP/streak display, and quick actions
  */
 
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -72,11 +72,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const { totalXp, level, streakData, dailyGoalData, lessonProgress } = useProgressStore();
   const { dailyGoalMinutes, displayName, hasCompletedOnboarding } = useSettingsStore();
 
-  // First-time user → show Onboarding modal once
-  // App.tsx hydrates settings before rendering, so hasCompletedOnboarding is always
-  // the correct persisted value by the time this effect runs.
+  // First-time user → show Onboarding modal once per app session.
+  // Guard prevents re-navigating after the user completes onboarding and the modal dismisses.
+  const hasShownOnboarding = useRef(false);
   useEffect(() => {
-    if (!hasCompletedOnboarding) {
+    if (!hasCompletedOnboarding && !hasShownOnboarding.current) {
+      hasShownOnboarding.current = true;
       navigation.navigate('Onboarding');
     }
   }, [hasCompletedOnboarding, navigation]);

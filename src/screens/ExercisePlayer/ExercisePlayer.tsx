@@ -29,7 +29,7 @@ import { PianoRoll } from '../../components/PianoRoll/PianoRoll';
 import { useExerciseStore } from '../../stores/exerciseStore';
 import { useProgressStore } from '../../stores/progressStore';
 import { useExercisePlayback } from '../../hooks/useExercisePlayback';
-import { getExercise, getNextExerciseId, getLessonIdForExercise, getLesson } from '../../content/ContentLoader';
+import { getExercise, getNextExerciseId, getLessonIdForExercise, getLesson, isTestExercise, getTestExercise, getNonTestExercises } from '../../content/ContentLoader';
 import { recordPracticeSession as calculateStreakUpdate } from '../../core/progression/XpSystem';
 import type { RootStackParamList } from '../../navigation/AppNavigator';
 import type { Exercise, ExerciseScore, MidiNoteEvent } from '../../core/exercises/types';
@@ -149,6 +149,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
 }) => {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'Exercise'>>();
+  const testMode = route.params?.testMode ?? false;
   const mountedRef = useRef(true);
   const skipPortraitResetRef = useRef(false);
   const playbackStartTimeRef = useRef(0);
@@ -253,6 +254,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
 
     // Track whether this exercise completes the entire lesson
     let isLessonComplete = false;
+    let needsMasteryTest = false;
 
     // Persist XP and daily goal progress
     const progressStore = useProgressStore.getState();
@@ -312,41 +314,55 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         ...(score.isPassed ? { completedAt: existingExScore?.completedAt ?? Date.now() } : {}),
       });
 
-      // Check if all exercises in the lesson are now completed
+      // Check lesson completion status
       if (lesson && score.isPassed) {
         const updatedLP = useProgressStore.getState().lessonProgress[exLessonId];
-        const allExerciseIds = lesson.exercises.map((e) => e.id);
-        const allComplete = allExerciseIds.every((eid) =>
-          updatedLP?.exerciseScores[eid]?.completedAt != null
-        );
+        const currentIsTest = isTestExercise(exercise.id);
 
-        if (allComplete && updatedLP?.status !== 'completed') {
-          isLessonComplete = true;
-          progressStore.updateLessonProgress(exLessonId, {
-            ...updatedLP!,
-            status: 'completed',
-            completedAt: Date.now(),
-          });
-          // Award lesson completion XP bonus
-          progressStore.addXp(lesson.xpReward);
+        if (currentIsTest) {
+          // Mastery test passed → mark lesson complete
+          if (updatedLP?.status !== 'completed') {
+            isLessonComplete = true;
+            progressStore.updateLessonProgress(exLessonId, {
+              ...updatedLP!,
+              status: 'completed',
+              completedAt: Date.now(),
+            });
+            progressStore.addXp(lesson.xpReward);
 
-          // Trigger lesson completion celebration
-          const totalStars = allExerciseIds.reduce((sum, eid) =>
-            sum + (updatedLP?.exerciseScores[eid]?.stars ?? 0), 0);
-          const bestScoreInLesson = Math.max(
-            ...allExerciseIds.map((eid) => updatedLP?.exerciseScores[eid]?.highScore ?? 0)
+            const nonTestIds = getNonTestExercises(exLessonId).map((e) => e.id);
+            const totalStars = nonTestIds.reduce((sum, eid) =>
+              sum + (updatedLP?.exerciseScores[eid]?.stars ?? 0), 0) + score.stars;
+            const bestScoreInLesson = Math.max(
+              score.overall,
+              ...nonTestIds.map((eid) => updatedLP?.exerciseScores[eid]?.highScore ?? 0)
+            );
+            const lessonIndex = ['lesson-01','lesson-02','lesson-03','lesson-04','lesson-05','lesson-06'].indexOf(exLessonId);
+            setLessonCompleteData({
+              lessonTitle: lesson.metadata.title,
+              lessonNumber: lessonIndex + 1,
+              exercisesCompleted: nonTestIds.length + 1,
+              totalExercises: nonTestIds.length + 1,
+              bestScore: bestScoreInLesson,
+              xpEarned: lesson.xpReward,
+              starsEarned: totalStars,
+              maxStars: (nonTestIds.length + 1) * 3,
+            });
+          }
+        } else {
+          // Non-test exercise: check if all non-test exercises are completed → trigger mastery test
+          const nonTestExercises = lesson.exercises.filter((e) => !e.test);
+          const allNonTestComplete = nonTestExercises.every((entry) =>
+            updatedLP?.exerciseScores[entry.id]?.completedAt != null
           );
-          const lessonIndex = ['lesson-01','lesson-02','lesson-03','lesson-04','lesson-05','lesson-06'].indexOf(exLessonId);
-          setLessonCompleteData({
-            lessonTitle: lesson.metadata.title,
-            lessonNumber: lessonIndex + 1,
-            exercisesCompleted: allExerciseIds.length,
-            totalExercises: allExerciseIds.length,
-            bestScore: bestScoreInLesson,
-            xpEarned: lesson.xpReward,
-            starsEarned: totalStars,
-            maxStars: allExerciseIds.length * 3,
-          });
+
+          if (allNonTestComplete) {
+            // Check if test exercise exists and hasn't been completed yet
+            const testEx = getTestExercise(exLessonId);
+            if (testEx && !updatedLP?.exerciseScores[testEx.id]?.completedAt) {
+              needsMasteryTest = true;
+            }
+          }
         }
       }
     }
@@ -395,16 +411,17 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
 
     // Decide which transition screen to show:
     // - Quick ExerciseCard for mid-lesson passes (fast, auto-dismisses)
-    // - Full CompletionModal for failures, end-of-lesson, or lesson completion
+    // - Full CompletionModal for failures, end-of-lesson, mastery test gate, or lesson completion
     const exNextId = getLessonIdForExercise(exercise.id)
       ? getNextExerciseId(getLessonIdForExercise(exercise.id)!, exercise.id)
       : null;
 
-    if (score.isPassed && exNextId && !isLessonComplete) {
+    if (score.isPassed && exNextId && !isLessonComplete && !needsMasteryTest) {
       // Always show a contextual fun fact between exercises
       setExerciseCardFunFact(getFactForExerciseType(exercise.metadata.skills));
       setShowExerciseCard(true);
     } else {
+      // Show full CompletionModal (handles mastery test prompt, lesson complete, retry, etc.)
       setShowCompletion(true);
     }
 
@@ -499,19 +516,35 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   // Derived state
   const countInComplete = currentBeat >= 0;
 
-  useEffect(() => {
-    const expectedNotesSet = new Set<number>(
-      exercise.notes
-        .filter(
-          (note) =>
-            note.startBeat >= currentBeat - 0.5 &&
-            note.startBeat < currentBeat + 2.0
-        )
-        .map((note) => note.note)
-    );
+  // Track the MIDI note of the next expected note for keyboard auto-scroll
+  const [nextExpectedNote, setNextExpectedNote] = useState<number | undefined>(undefined);
 
-    setExpectedNotes(expectedNotesSet);
-  }, [currentBeat, exercise.notes]);
+  useEffect(() => {
+    // Find the next unconsumed note(s) at the nearest upcoming beat
+    const upcoming = exercise.notes
+      .map((note, index) => ({ ...note, index }))
+      .filter(
+        (note) =>
+          !consumedNoteIndicesRef.current.has(note.index) &&
+          note.startBeat >= currentBeat - 0.5
+      );
+
+    if (upcoming.length === 0) {
+      setExpectedNotes(new Set());
+      setNextExpectedNote(undefined);
+      return;
+    }
+
+    // Find the minimum startBeat among upcoming notes
+    const minBeat = Math.min(...upcoming.map((n) => n.startBeat));
+
+    // Highlight only notes at that exact beat (handles chords naturally)
+    const notesAtMinBeat = upcoming.filter((n) => n.startBeat === minBeat);
+
+    // In testMode, suppress green highlighting but still track for auto-scroll
+    setExpectedNotes(testMode ? new Set() : new Set(notesAtMinBeat.map((n) => n.note)));
+    setNextExpectedNote(notesAtMinBeat[0].note);
+  }, [currentBeat, exercise.notes, testMode]);
 
   // Playback loop is now handled by useExercisePlayback hook
 
@@ -797,6 +830,47 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     }, 100);
   }, [nextExerciseId, stopPlayback, exerciseStore, navigation]);
 
+  /**
+   * Navigate to the mastery test for the current lesson
+   */
+  const handleStartTest = useCallback(() => {
+    const lid = getLessonIdForExercise(exercise.id);
+    if (!lid) return;
+    const testEx = getTestExercise(lid);
+    if (!testEx) return;
+
+    setShowCompletion(false);
+    stopPlayback();
+    exerciseStore.clearSession();
+    skipPortraitResetRef.current = true;
+    setTimeout(() => {
+      if (mountedRef.current) {
+        (navigation as any).replace('Exercise', { exerciseId: testEx.id, testMode: true });
+      }
+    }, 100);
+  }, [exercise.id, stopPlayback, exerciseStore, navigation]);
+
+  // Determine if we should show "Take Mastery Test" in CompletionModal
+  const showMasteryTestButton = useMemo(() => {
+    if (testMode) return false; // Already in test mode
+    if (isTestExercise(exercise.id)) return false;
+    const lid = getLessonIdForExercise(exercise.id);
+    if (!lid) return false;
+    const lesson = getLesson(lid);
+    if (!lesson) return false;
+
+    const lp = useProgressStore.getState().lessonProgress[lid];
+    const nonTestExercises = lesson.exercises.filter((e) => !e.test);
+    const allNonTestComplete = nonTestExercises.every((entry) =>
+      lp?.exerciseScores[entry.id]?.completedAt != null
+    );
+    if (!allNonTestComplete) return false;
+
+    const testEx = getTestExercise(lid);
+    if (!testEx) return false;
+    return !lp?.exerciseScores[testEx.id]?.completedAt;
+  }, [exercise.id, testMode, finalScore]); // finalScore dep ensures recalc after score persisted
+
   // Show error if initialization failed
   if (hasError && errorMessage && !isMidiReady && !isAudioReady) {
     return (
@@ -846,7 +920,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
           <View style={styles.topBarDivider} />
 
           <HintDisplay
-            hints={exercise.hints}
+            hints={testMode ? { beforeStart: 'Mastery test — play from memory!', commonMistakes: [], successMessage: '' } : exercise.hints}
             isPlaying={isPlaying}
             countInComplete={countInComplete}
             feedback={feedback.type}
@@ -927,7 +1001,9 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
             enabled={true}
             hapticEnabled={true}
             showLabels={true}
-            scrollable={false}
+            scrollable={true}
+            scrollEnabled={false}
+            focusNote={nextExpectedNote}
             keyHeight={100}
             testID="exercise-keyboard"
           />
@@ -988,6 +1064,8 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
           onClose={handleCompletionClose}
           onRetry={handleRetry}
           onNextExercise={nextExerciseId ? handleNextExercise : undefined}
+          onStartTest={showMasteryTestButton ? handleStartTest : undefined}
+          isTestMode={testMode}
           testID="completion-modal"
         />
       )}

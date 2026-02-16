@@ -38,6 +38,13 @@
       "title": "Steady Bass Pattern",
       "order": 5,
       "required": false
+    },
+    {
+      "id": "lesson-03-test",
+      "title": "Mastery Test",
+      "order": 99,
+      "required": true,
+      "test": true
     }
   ],
   "unlockRequirement": {

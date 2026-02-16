@@ -56,6 +56,13 @@
       "title": "C Position Review",
       "order": 8,
       "required": false
+    },
+    {
+      "id": "lesson-02-test",
+      "title": "Mastery Test",
+      "order": 99,
+      "required": true,
+      "test": true
     }
   ],
   "unlockRequirement": {

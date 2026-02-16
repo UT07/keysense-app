@@ -21,6 +21,7 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
+import { useNavigation } from '@react-navigation/native';
 import { Button, Card } from '../components/common';
 import { useSettingsStore } from '../stores/settingsStore';
 
@@ -314,6 +315,7 @@ export function OnboardingScreen(): React.ReactElement {
   const [step, setStep] = useState(1);
   const [state, setState] = useState<OnboardingState>({});
 
+  const navigation = useNavigation();
   const setHasCompletedOnboarding = useSettingsStore((s) => s.setHasCompletedOnboarding);
   const setExperienceLevel = useSettingsStore((s) => s.setExperienceLevel);
   const setLearningGoal = useSettingsStore((s) => s.setLearningGoal);
@@ -330,6 +332,8 @@ export function OnboardingScreen(): React.ReactElement {
       if (state.goal) {
         setLearningGoal(state.goal);
       }
+      // Dismiss the onboarding modal and return to MainTabs
+      navigation.goBack();
     } else {
       setStep((prev) => prev + 1);
     }

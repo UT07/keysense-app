@@ -33,7 +33,7 @@ export type RootStackParamList = {
   EmailAuth: undefined;
   Onboarding: undefined;
   MainTabs: undefined;
-  Exercise: { exerciseId: string };
+  Exercise: { exerciseId: string; testMode?: boolean };
   LessonIntro: { lessonId: string };
   MidiSetup: undefined;
   Account: undefined;
@@ -139,7 +139,10 @@ export function AppNavigator() {
             <RootStack.Screen
               name="Onboarding"
               component={OnboardingScreen}
-              options={{ presentation: 'modal' }}
+              options={{
+                presentation: 'modal',
+                gestureEnabled: false,  // Prevent swipe-to-dismiss — must complete all steps
+              }}
             />
             <RootStack.Screen
               name="Exercise"

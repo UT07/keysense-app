@@ -1,0 +1,54 @@
+{
+  "id": "lesson-02-test",
+  "version": 1,
+  "metadata": {
+    "title": "Lesson 2 Mastery Test",
+    "description": "Show your right hand skills — play a melody from memory!",
+    "difficulty": 1,
+    "estimatedMinutes": 3,
+    "skills": ["right-hand", "c-major", "melodies", "quarter-notes"],
+    "prerequisites": []
+  },
+  "settings": {
+    "tempo": 72,
+    "timeSignature": [4, 4],
+    "keySignature": "C",
+    "countIn": 4,
+    "metronomeEnabled": true,
+    "loopEnabled": false
+  },
+  "notes": [
+    { "note": 64, "startBeat": 0, "durationBeats": 1, "hand": "right", "finger": 3 },
+    { "note": 62, "startBeat": 1, "durationBeats": 1, "hand": "right", "finger": 2 },
+    { "note": 60, "startBeat": 2, "durationBeats": 1, "hand": "right", "finger": 1 },
+    { "note": 62, "startBeat": 3, "durationBeats": 1, "hand": "right", "finger": 2 },
+    { "note": 64, "startBeat": 4, "durationBeats": 1, "hand": "right", "finger": 3 },
+    { "note": 64, "startBeat": 5, "durationBeats": 1, "hand": "right", "finger": 3 },
+    { "note": 64, "startBeat": 6, "durationBeats": 2, "hand": "right", "finger": 3 },
+    { "note": 62, "startBeat": 8, "durationBeats": 1, "hand": "right", "finger": 2 },
+    { "note": 62, "startBeat": 9, "durationBeats": 1, "hand": "right", "finger": 2 },
+    { "note": 62, "startBeat": 10, "durationBeats": 2, "hand": "right", "finger": 2 },
+    { "note": 64, "startBeat": 12, "durationBeats": 1, "hand": "right", "finger": 3 },
+    { "note": 67, "startBeat": 13, "durationBeats": 1, "hand": "right", "finger": 5 },
+    { "note": 67, "startBeat": 14, "durationBeats": 2, "hand": "right", "finger": 5 }
+  ],
+  "scoring": {
+    "timingToleranceMs": 65,
+    "timingGracePeriodMs": 175,
+    "velocitySensitive": false,
+    "passingScore": 70,
+    "starThresholds": [75, 88, 96]
+  },
+  "hints": {
+    "beforeStart": "Mastery test — play from memory! No green hints this time.",
+    "commonMistakes": [],
+    "successMessage": "Excellent! Your right hand basics are solid. Time to learn the left hand!"
+  },
+  "display": {
+    "showFingerNumbers": false,
+    "showNoteNames": false,
+    "highlightHands": false,
+    "showPianoRoll": true,
+    "showStaffNotation": false
+  }
+}

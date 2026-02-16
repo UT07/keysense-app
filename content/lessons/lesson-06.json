@@ -32,6 +32,13 @@
       "title": "Contemporary Melody (Let It Go Style)",
       "order": 4,
       "required": false
+    },
+    {
+      "id": "lesson-06-test",
+      "title": "Mastery Test",
+      "order": 99,
+      "required": true,
+      "test": true
     }
   ],
   "unlockRequirement": {

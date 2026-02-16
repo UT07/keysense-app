@@ -33,6 +33,8 @@ export interface CompletionModalProps {
   onClose: () => void;
   onRetry?: () => void;
   onNextExercise?: () => void;
+  onStartTest?: () => void;
+  isTestMode?: boolean;
   testID?: string;
 }
 
@@ -46,6 +48,8 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
   onClose,
   onRetry,
   onNextExercise,
+  onStartTest,
+  isTestMode = false,
   testID,
 }) => {
   // Animation values
@@ -224,7 +228,7 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>{exercise.metadata.title}</Text>
-            <Text style={styles.subtitle}>Exercise Complete!</Text>
+            <Text style={styles.subtitle}>{isTestMode ? 'Mastery Test Complete!' : 'Exercise Complete!'}</Text>
           </View>
 
           {/* Score + Stars in a compact row for landscape */}
@@ -381,7 +385,19 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
 
           {/* Action Buttons */}
           <View style={styles.actions}>
-            {onNextExercise && score.isPassed && (
+            {/* Mastery test gate: all regular exercises done → take the test */}
+            {onStartTest && score.isPassed && (
+              <Button
+                title="Take Mastery Test"
+                onPress={onStartTest}
+                variant="primary"
+                size="large"
+                icon={<MaterialCommunityIcons name="trophy-outline" size={20} color="#FFF" />}
+                testID="completion-start-test"
+              />
+            )}
+            {/* Normal next exercise (when no mastery test is pending) */}
+            {onNextExercise && score.isPassed && !onStartTest && (
               <Button
                 title="Next Exercise"
                 onPress={onNextExercise}
@@ -393,7 +409,7 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
             )}
             {!score.isPassed && onRetry && (
               <Button
-                title="Try Again"
+                title={isTestMode ? 'Retry Test' : 'Try Again'}
                 onPress={onRetry}
                 variant="primary"
                 size="large"
@@ -401,14 +417,17 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
                 testID="completion-retry"
               />
             )}
-            <Button
-              title={score.isPassed && onNextExercise ? 'Back to Lessons' : (score.isPassed ? 'Continue' : 'Back to Lessons')}
-              onPress={onClose}
-              variant={score.isPassed && onNextExercise ? 'secondary' : (!score.isPassed ? 'secondary' : 'primary')}
-              size="large"
-              icon={<MaterialCommunityIcons name={score.isPassed && !onNextExercise ? 'check' : 'arrow-left'} size={20} color={score.isPassed && !onNextExercise ? '#FFF' : '#666'} />}
-              testID="completion-continue"
-            />
+            {/* In test mode failures, only show retry — no "back to lessons" escape */}
+            {!(isTestMode && !score.isPassed) && (
+              <Button
+                title={score.isPassed && (onNextExercise || onStartTest) ? 'Back to Lessons' : (score.isPassed ? 'Continue' : 'Back to Lessons')}
+                onPress={onClose}
+                variant={score.isPassed && (onNextExercise || onStartTest) ? 'secondary' : (!score.isPassed ? 'secondary' : 'primary')}
+                size="large"
+                icon={<MaterialCommunityIcons name={score.isPassed && !onNextExercise && !onStartTest ? 'check' : 'arrow-left'} size={20} color={score.isPassed && !onNextExercise && !onStartTest ? '#FFF' : '#666'} />}
+                testID="completion-continue"
+              />
+            )}
           </View>
         </Animated.View>
       </ScrollView>

@@ -1,0 +1,57 @@
+{
+  "id": "lesson-05-test",
+  "version": 1,
+  "metadata": {
+    "title": "Lesson 5 Mastery Test",
+    "description": "Play scales with speed and accuracy from memory!",
+    "difficulty": 2,
+    "estimatedMinutes": 3,
+    "skills": ["scales", "finger-crossing", "speed", "technique"],
+    "prerequisites": []
+  },
+  "settings": {
+    "tempo": 80,
+    "timeSignature": [4, 4],
+    "keySignature": "C",
+    "countIn": 4,
+    "metronomeEnabled": true,
+    "loopEnabled": false
+  },
+  "notes": [
+    { "note": 60, "startBeat": 0, "durationBeats": 0.5, "hand": "right", "finger": 1 },
+    { "note": 62, "startBeat": 0.5, "durationBeats": 0.5, "hand": "right", "finger": 2 },
+    { "note": 64, "startBeat": 1, "durationBeats": 0.5, "hand": "right", "finger": 3 },
+    { "note": 65, "startBeat": 1.5, "durationBeats": 0.5, "hand": "right", "finger": 1 },
+    { "note": 67, "startBeat": 2, "durationBeats": 0.5, "hand": "right", "finger": 2 },
+    { "note": 69, "startBeat": 2.5, "durationBeats": 0.5, "hand": "right", "finger": 3 },
+    { "note": 71, "startBeat": 3, "durationBeats": 0.5, "hand": "right", "finger": 4 },
+    { "note": 72, "startBeat": 3.5, "durationBeats": 0.5, "hand": "right", "finger": 5 },
+    { "note": 72, "startBeat": 4, "durationBeats": 0.5, "hand": "right", "finger": 5 },
+    { "note": 71, "startBeat": 4.5, "durationBeats": 0.5, "hand": "right", "finger": 4 },
+    { "note": 69, "startBeat": 5, "durationBeats": 0.5, "hand": "right", "finger": 3 },
+    { "note": 67, "startBeat": 5.5, "durationBeats": 0.5, "hand": "right", "finger": 2 },
+    { "note": 65, "startBeat": 6, "durationBeats": 0.5, "hand": "right", "finger": 1 },
+    { "note": 64, "startBeat": 6.5, "durationBeats": 0.5, "hand": "right", "finger": 3 },
+    { "note": 62, "startBeat": 7, "durationBeats": 0.5, "hand": "right", "finger": 2 },
+    { "note": 60, "startBeat": 7.5, "durationBeats": 1.5, "hand": "right", "finger": 1 }
+  ],
+  "scoring": {
+    "timingToleranceMs": 65,
+    "timingGracePeriodMs": 175,
+    "velocitySensitive": false,
+    "passingScore": 70,
+    "starThresholds": [75, 88, 96]
+  },
+  "hints": {
+    "beforeStart": "Mastery test — play from memory! No green hints this time.",
+    "commonMistakes": [],
+    "successMessage": "Scale mastery achieved! You're ready to play real songs."
+  },
+  "display": {
+    "showFingerNumbers": false,
+    "showNoteNames": false,
+    "highlightHands": false,
+    "showPianoRoll": true,
+    "showStaffNotation": false
+  }
+}

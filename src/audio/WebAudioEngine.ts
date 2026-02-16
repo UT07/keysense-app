@@ -2,12 +2,13 @@
  * Web Audio Engine Implementation
  * Uses react-native-audio-api for low-latency oscillator-based synthesis via JSI
  *
- * Strategy: Fundamental + 1 harmonic (2 oscillators) with natural decay
+ * Strategy: Fundamental + 1 harmonic (2 oscillators) with sustain-while-held
  * - Sine fundamental + one harmonic at half amplitude = warm piano tone
- * - Natural decay (sustain=0): notes die out like a real piano, no stuck notes
+ * - ADSR: quick decay to 20% sustain — notes stay audible while key is held
+ * - On key release: 150ms fade-out to silence
  * - 4 audio nodes per keypress: 2 oscillators + 1 harmonic gain + 1 envelope
  * - MAX_POLYPHONY = 10 with O(1) oldest-note eviction
- * - Hard auto-stop at 2s as safety net
+ * - Hard auto-stop at 10s as safety net against stuck notes
  *
  * MIDI note to frequency: 440 * 2^((note - 69) / 12)
  *
@@ -24,18 +25,19 @@ import type { IAudioEngine, NoteHandle, AudioContextState } from './types';
 const DEFAULT_VOLUME = 0.8;
 const MAX_POLYPHONY = 10;
 const MIN_NOTE_DURATION = 0.05; // 50ms minimum before release
-const MAX_NOTE_DURATION = 2.0;  // Hard ceiling — oscillators auto-stop after 2s
+const MAX_NOTE_DURATION = 10.0; // Safety net — oscillators auto-stop after 10s if release never fires
 
 /**
- * ADSR envelope — natural piano-like decay
- * Low sustain (5%) ensures notes fade naturally but don't ring forever.
- * Hard stop at MAX_NOTE_DURATION is the safety net.
+ * ADSR envelope — sustain while key is held
+ * Sustain at 20% keeps notes clearly audible while pressed.
+ * On key release, the release phase fades to silence in 150ms.
+ * Hard stop at MAX_NOTE_DURATION is a safety net against stuck notes.
  */
 const ADSR = {
   attack: 0.003,  // 3ms — near-instant attack for percussive feel
-  decay: 1.5,     // 1.5s — natural piano decay (longer = warmer)
-  sustain: 0.05,  // 5% — slight sustain so notes don't completely vanish
-  release: 0.1,   // 100ms — quick release to avoid clicks
+  decay: 0.6,     // 600ms — quick decay to sustain level (piano-like attack character)
+  sustain: 0.20,  // 20% — clearly audible while key is held
+  release: 0.15,  // 150ms — smooth release to avoid clicks
 };
 
 /**

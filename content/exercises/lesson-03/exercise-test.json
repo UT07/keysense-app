@@ -1,0 +1,53 @@
+{
+  "id": "lesson-03-test",
+  "version": 1,
+  "metadata": {
+    "title": "Lesson 3 Mastery Test",
+    "description": "Prove your left hand skills — bass notes from memory!",
+    "difficulty": 1,
+    "estimatedMinutes": 3,
+    "skills": ["left-hand", "bass-notes", "accompaniment"],
+    "prerequisites": []
+  },
+  "settings": {
+    "tempo": 60,
+    "timeSignature": [4, 4],
+    "keySignature": "C",
+    "countIn": 4,
+    "metronomeEnabled": true,
+    "loopEnabled": false
+  },
+  "notes": [
+    { "note": 48, "startBeat": 0, "durationBeats": 1, "hand": "left", "finger": 5 },
+    { "note": 50, "startBeat": 1, "durationBeats": 1, "hand": "left", "finger": 4 },
+    { "note": 52, "startBeat": 2, "durationBeats": 1, "hand": "left", "finger": 3 },
+    { "note": 53, "startBeat": 3, "durationBeats": 1, "hand": "left", "finger": 2 },
+    { "note": 55, "startBeat": 4, "durationBeats": 2, "hand": "left", "finger": 1 },
+    { "note": 53, "startBeat": 6, "durationBeats": 1, "hand": "left", "finger": 2 },
+    { "note": 52, "startBeat": 7, "durationBeats": 1, "hand": "left", "finger": 3 },
+    { "note": 50, "startBeat": 8, "durationBeats": 1, "hand": "left", "finger": 4 },
+    { "note": 48, "startBeat": 9, "durationBeats": 1, "hand": "left", "finger": 5 },
+    { "note": 48, "startBeat": 10, "durationBeats": 1, "hand": "left", "finger": 5 },
+    { "note": 55, "startBeat": 11, "durationBeats": 1, "hand": "left", "finger": 1 },
+    { "note": 48, "startBeat": 12, "durationBeats": 2, "hand": "left", "finger": 5 }
+  ],
+  "scoring": {
+    "timingToleranceMs": 65,
+    "timingGracePeriodMs": 175,
+    "velocitySensitive": false,
+    "passingScore": 70,
+    "starThresholds": [75, 88, 96]
+  },
+  "hints": {
+    "beforeStart": "Mastery test — play from memory! No green hints this time.",
+    "commonMistakes": [],
+    "successMessage": "Your left hand is ready! Time to put both hands together."
+  },
+  "display": {
+    "showFingerNumbers": false,
+    "showNoteNames": false,
+    "highlightHands": false,
+    "showPianoRoll": true,
+    "showStaffNotation": false
+  }
+}

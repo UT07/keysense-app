@@ -5,6 +5,7 @@
  * Each note gets VOICES_PER_NOTE sound objects. On each play, we cycle
  * to the next voice using replayAsync() which atomically resets and plays.
  * This eliminates the stop/play race condition that caused dropped notes.
+ * Notes sustain until released (key up stops the sound).
  *
  * Middle C (MIDI 60) = 261.63 Hz is the base note.
  * Other notes use playback rate shifting: rate = 2^((note - 60) / 12)
@@ -17,7 +18,7 @@ import type { IAudioEngine, NoteHandle, AudioContextState } from './types';
 const BASE_MIDI_NOTE = 60;
 const BASE_FREQUENCY = 261.63;
 const SAMPLE_RATE = 44100;
-const DURATION = 1.5; // seconds
+const DURATION = 5.0; // seconds — long enough for sustained key holds
 const VOICES_PER_NOTE = 2; // Round-robin voices per note
 
 /**
@@ -60,7 +61,7 @@ function generatePianoWav(): ArrayBuffer {
   const freq = BASE_FREQUENCY;
   for (let i = 0; i < numSamples; i++) {
     const t = i / SAMPLE_RATE;
-    const envelope = Math.exp(-t * 3.0);
+    const envelope = Math.exp(-t * 1.0);
     const attack = Math.min(1.0, t / 0.01);
     const fundamental = Math.sin(2 * Math.PI * freq * t);
     const harmonic2 = 0.5 * Math.sin(2 * Math.PI * freq * 2 * t);
@@ -103,6 +104,8 @@ export class ExpoAudioEngine implements IAudioEngine {
   private soundSource: AVPlaybackSource | null = null;
   private voicePools: Map<number, NoteVoicePool> = new Map();
   private activeNotes: Set<number> = new Set();
+  /** Track which voice is currently playing for each note, so release can stop it */
+  private activeVoices: Map<number, Audio.Sound> = new Map();
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
@@ -252,6 +255,7 @@ export class ExpoAudioEngine implements IAudioEngine {
     }
     this.voicePools.clear();
     this.activeNotes.clear();
+    this.activeVoices.clear();
     this.soundSource = null;
     this.initialized = false;
     console.log('[ExpoAudioEngine] Disposed');
@@ -285,6 +289,9 @@ export class ExpoAudioEngine implements IAudioEngine {
       const voice = pool.sounds[pool.nextVoice];
       pool.nextVoice = (pool.nextVoice + 1) % pool.sounds.length;
 
+      // Track which voice is playing this note so release can stop it
+      this.activeVoices.set(note, voice);
+
       // Fire-and-forget: replayAsync atomically resets and plays
       voice.replayAsync({
         positionMillis: 0,
@@ -293,6 +300,7 @@ export class ExpoAudioEngine implements IAudioEngine {
       }).catch(() => {
         // If replay fails, try the other voice
         const fallbackVoice = pool.sounds[pool.nextVoice];
+        this.activeVoices.set(note, fallbackVoice);
         fallbackVoice.replayAsync({
           positionMillis: 0,
           volume: vol,
@@ -347,9 +355,14 @@ export class ExpoAudioEngine implements IAudioEngine {
   }
 
   private doRelease(note: number): void {
-    // For pooled sounds, let them decay naturally (WAV has built-in decay)
-    // For rapid re-trigger, round-robin handles it
     this.activeNotes.delete(note);
+
+    // Stop the voice that's playing this note
+    const voice = this.activeVoices.get(note);
+    if (voice) {
+      this.activeVoices.delete(note);
+      voice.stopAsync().catch(() => {});
+    }
   }
 
   releaseNote(handle: NoteHandle): void {
@@ -363,6 +376,7 @@ export class ExpoAudioEngine implements IAudioEngine {
       }
     }
     this.activeNotes.clear();
+    this.activeVoices.clear();
   }
 
   setVolume(volume: number): void {

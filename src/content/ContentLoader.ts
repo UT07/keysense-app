@@ -25,6 +25,7 @@ export interface LessonManifest {
     title: string;
     order: number;
     required: boolean;
+    test?: boolean;
   }>;
   unlockRequirement: {
     type: string;
@@ -43,6 +44,7 @@ const EXERCISE_REGISTRY: Record<string, Exercise> = {
   'lesson-01-ex-01': require('../../content/exercises/lesson-01/exercise-01-find-middle-c.json'),
   'lesson-01-ex-02': require('../../content/exercises/lesson-01/exercise-02-keyboard-geography.json'),
   'lesson-01-ex-03': require('../../content/exercises/lesson-01/exercise-03-white-keys.json'),
+  'lesson-01-test': require('../../content/exercises/lesson-01/exercise-test.json'),
 
   // Lesson 02
   'lesson-02-ex-01': require('../../content/exercises/lesson-02/exercise-01-cde-simple.json'),
@@ -53,6 +55,7 @@ const EXERCISE_REGISTRY: Record<string, Exercise> = {
   'lesson-02-ex-06': require('../../content/exercises/lesson-02/exercise-06-twinkle-twinkle.json'),
   'lesson-02-ex-07': require('../../content/exercises/lesson-02/exercise-07-eighth-note-drill.json'),
   'lesson-02-ex-08': require('../../content/exercises/lesson-02/exercise-08-c-position-review.json'),
+  'lesson-02-test': require('../../content/exercises/lesson-02/exercise-test.json'),
 
   // Lesson 03
   'lesson-03-ex-01': require('../../content/exercises/lesson-03/exercise-01-left-c-position.json'),
@@ -60,6 +63,7 @@ const EXERCISE_REGISTRY: Record<string, Exercise> = {
   'lesson-03-ex-03': require('../../content/exercises/lesson-03/exercise-03-bass-notes.json'),
   'lesson-03-ex-04': require('../../content/exercises/lesson-03/exercise-04-broken-f-chord-left.json'),
   'lesson-03-ex-05': require('../../content/exercises/lesson-03/exercise-05-steady-bass-pattern.json'),
+  'lesson-03-test': require('../../content/exercises/lesson-03/exercise-test.json'),
 
   // Lesson 04
   'lesson-04-ex-01': require('../../content/exercises/lesson-04/exercise-01-hands-melody-bass.json'),
@@ -68,18 +72,21 @@ const EXERCISE_REGISTRY: Record<string, Exercise> = {
   'lesson-04-ex-04': require('../../content/exercises/lesson-04/exercise-04-ode-to-joy-intro.json'),
   'lesson-04-ex-05': require('../../content/exercises/lesson-04/exercise-05-blocked-c-f-chords.json'),
   'lesson-04-ex-06': require('../../content/exercises/lesson-04/exercise-06-both-hands-review.json'),
+  'lesson-04-test': require('../../content/exercises/lesson-04/exercise-test.json'),
 
   // Lesson 05
   'lesson-05-ex-01': require('../../content/exercises/lesson-05/exercise-01-scale-technique.json'),
   'lesson-05-ex-02': require('../../content/exercises/lesson-05/exercise-02-parallel-scales.json'),
   'lesson-05-ex-03': require('../../content/exercises/lesson-05/exercise-03-scale-speed-drill.json'),
   'lesson-05-ex-04': require('../../content/exercises/lesson-05/exercise-04-scale-review.json'),
+  'lesson-05-test': require('../../content/exercises/lesson-05/exercise-test.json'),
 
   // Lesson 06
   'lesson-06-ex-01': require('../../content/exercises/lesson-06/exercise-01-jingle-bells.json'),
   'lesson-06-ex-02': require('../../content/exercises/lesson-06/exercise-02-happy-birthday.json'),
   'lesson-06-ex-03': require('../../content/exercises/lesson-06/exercise-03-amazing-grace.json'),
   'lesson-06-ex-04': require('../../content/exercises/lesson-06/exercise-04-let-it-go-snippet.json'),
+  'lesson-06-test': require('../../content/exercises/lesson-06/exercise-test.json'),
 };
 
 // ============================================================================
@@ -126,11 +133,16 @@ export function getLessonExercises(lessonId: string): Exercise[] {
   if (!lesson) return [];
 
   return lesson.exercises
+    .filter((e) => !e.test)
     .sort((a, b) => a.order - b.order)
     .map((entry) => EXERCISE_REGISTRY[entry.id])
     .filter(Boolean);
 }
 
+/**
+ * Get the next exercise in the lesson, skipping test exercises in normal progression.
+ * Test exercises are only reached via explicit testMode navigation.
+ */
 export function getNextExerciseId(
   lessonId: string,
   currentExerciseId: string
@@ -138,11 +150,15 @@ export function getNextExerciseId(
   const lesson = LESSON_REGISTRY[lessonId];
   if (!lesson) return null;
 
-  const sorted = [...lesson.exercises].sort((a, b) => a.order - b.order);
-  const currentIndex = sorted.findIndex((e) => e.id === currentExerciseId);
-  if (currentIndex === -1 || currentIndex >= sorted.length - 1) return null;
+  // Filter out test exercises from normal progression
+  const nonTestExercises = [...lesson.exercises]
+    .filter((e) => !e.test)
+    .sort((a, b) => a.order - b.order);
 
-  return sorted[currentIndex + 1].id;
+  const currentIndex = nonTestExercises.findIndex((e) => e.id === currentExerciseId);
+  if (currentIndex === -1 || currentIndex >= nonTestExercises.length - 1) return null;
+
+  return nonTestExercises[currentIndex + 1].id;
 }
 
 export function getLessonIdForExercise(exerciseId: string): string | null {
@@ -152,4 +168,42 @@ export function getLessonIdForExercise(exerciseId: string): string | null {
     }
   }
   return null;
+}
+
+/**
+ * Get the test exercise for a lesson, if one exists.
+ */
+export function getTestExercise(lessonId: string): Exercise | null {
+  const lesson = LESSON_REGISTRY[lessonId];
+  if (!lesson) return null;
+
+  const testEntry = lesson.exercises.find((e) => e.test);
+  if (!testEntry) return null;
+
+  return EXERCISE_REGISTRY[testEntry.id] ?? null;
+}
+
+/**
+ * Check if an exercise is a mastery test.
+ */
+export function isTestExercise(exerciseId: string): boolean {
+  for (const lesson of Object.values(LESSON_REGISTRY)) {
+    const entry = lesson.exercises.find((e) => e.id === exerciseId);
+    if (entry) return !!entry.test;
+  }
+  return false;
+}
+
+/**
+ * Get non-test exercises for a lesson (the regular practice exercises).
+ */
+export function getNonTestExercises(lessonId: string): Exercise[] {
+  const lesson = LESSON_REGISTRY[lessonId];
+  if (!lesson) return [];
+
+  return lesson.exercises
+    .filter((e) => !e.test)
+    .sort((a, b) => a.order - b.order)
+    .map((entry) => EXERCISE_REGISTRY[entry.id])
+    .filter(Boolean);
 }
