@@ -39,17 +39,35 @@ jest.mock('expo-haptics', () => ({
   },
 }));
 
-// Mock exercise store
-jest.mock('../../stores/exerciseStore', () => ({
-  useExerciseStore: jest.fn(() => ({
-    currentExercise: null,
-    clearSession: jest.fn(),
-    setScore: jest.fn(),
-    addPlayedNote: jest.fn(),
-    setCurrentBeat: jest.fn(),
-    setIsPlaying: jest.fn(),
-  })),
-}));
+// Mock exercise store — Zustand-compatible (selector + getState)
+// eslint-disable-next-line prefer-const
+let mockExerciseState: Record<string, any> = {
+  currentExercise: null,
+  clearSession: jest.fn(),
+  setScore: jest.fn(),
+  addPlayedNote: jest.fn(),
+  setCurrentBeat: jest.fn(),
+  setIsPlaying: jest.fn(),
+  playedNotes: [],
+  failCount: 0,
+  ghostNotesEnabled: false,
+  ghostNotesSuccessCount: 0,
+  demoWatched: false,
+  incrementFailCount: jest.fn(),
+  resetFailCount: jest.fn(),
+  setGhostNotesEnabled: jest.fn(),
+  incrementGhostNotesSuccessCount: jest.fn(),
+  setDemoWatched: jest.fn(),
+};
+
+jest.mock('../../stores/exerciseStore', () => {
+  const useExerciseStore: any = (selector?: any) => {
+    if (typeof selector === 'function') return selector(mockExerciseState);
+    return mockExerciseState;
+  };
+  useExerciseStore.getState = () => mockExerciseState;
+  return { useExerciseStore };
+});
 
 // Mock progress store
 jest.mock('../../stores/progressStore', () => ({
