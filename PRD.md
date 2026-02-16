@@ -732,6 +732,8 @@ interface SyncProgressResponse {
 **Gate:** NPS >40 in beta testing
 
 > **Phase 4+ (Adaptive Learning + Gamification UI Overhaul) is COMPLETE** — 22/22 tasks delivered. See `docs/plans/2026-02-16-gamification-adaptive-design.md` for details.
+>
+> **Gameplay UX Rework is COMPLETE** — 10/10 tasks. Vertical falling notes, smart keyboard range (1-2 octaves), demo mode with ghost notes, ExerciseBuddy dialogue, speed selector, portrait layout. 46 test suites, 1,109 tests passing.
 
 ### Phase 4: Launch Prep (Weeks 11-12)
 

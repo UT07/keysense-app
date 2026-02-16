@@ -14,14 +14,14 @@
 | Phase 3 | Firebase Auth + Sync | **COMPLETE** | 100% |
 | Phase 4+ | Adaptive Learning + Gamification UI Overhaul | **COMPLETE** | 100% (22/22 tasks) |
 | — | Avatar Redesign + Rive System | **COMPLETE** | 100% |
-| Next | Gameplay UX Rework | **IN PROGRESS** | Design approved — vertical note flow, bigger keys, AI demo, ghost notes |
-| Phase 5 | Game Feel & Polish | **PLANNED** | 0% — fun facts, transitions, micro-interactions |
+| — | Gameplay UX Rework | **COMPLETE** | 10/10 tasks — vertical notes, smart keyboard, demo mode, ghost notes, 1109 tests |
+| Next | Game Feel & Polish | **PLANNED** | 0% — fun facts, transitions, micro-interactions |
 | Phase 6 | Social & Advanced Gamification | **PLANNED** | 0% |
 | Phase 7 | Music Library | **DESIGNED** | 0% |
 | Phase 7.5 | Pre-Launch QA Sprint | **PLANNED** | 0% — AI quality, performance, gamification, content |
 | Phase 8 | App Store Launch | **PLANNED** | 0% |
 
-**Current Codebase Health:** 0 TypeScript errors, 983 tests passing, 42 suites
+**Current Codebase Health:** 0 TypeScript errors, 1,109 tests passing, 46 suites
 
 ---
 
@@ -160,19 +160,25 @@ Implementation: `docs/plans/2026-02-16-gamification-adaptive-implementation.md`
 
 ---
 
-## Next Up: Gameplay UX Rework
+## Gameplay UX Rework (COMPLETE)
 
-User tested on iPhone 13 Pro and identified critical UX issues with the exercise gameplay.
+User tested on iPhone 13 Pro, identified critical UX issues. All 10 tasks delivered across 2 commits.
 
-### Changes Planned
-| Change | Rationale |
-|--------|-----------|
-| Notes flow **top-to-bottom** (not left-to-right) | Industry standard (Synthesia, Simply Piano, Piano Tiles), natural gravity feel |
-| Piano keyboard at **bottom**, zoomed to 1-2 relevant octaves | Bigger, tappable keys instead of full 88-key range |
-| **Smart octave selection** per exercise | Auto-detect needed range, only render those keys |
-| Two-hand play: combined range at bottom with left/right zone divider | Maintains real-piano spatial mapping |
+### What Was Built
+| Feature | Details |
+|---------|---------|
+| **VerticalPianoRoll** | Top-to-bottom falling notes (Synthesia-style), replacing horizontal scroll |
+| **Smart Keyboard** | `computeZoomedRange` — 1-2 octaves auto-selected from exercise notes |
+| **Demo Mode** | Visual-only note demonstration via `DemoPlaybackService` |
+| **Ghost Notes** | Semi-transparent note overlays after 3 failed attempts |
+| **Speed Selector** | 0.5x / 0.75x / 1.0x playback speed control |
+| **ExerciseBuddy Dialogue** | Cat companion triggers contextual tips during demo/ghost |
+| **Portrait Layout** | Full ExercisePlayer rewrite for portrait orientation |
+| **exerciseStore** | New fields: ghostNotes, demoWatched, failCount, playbackSpeed |
+| **44 ExercisePlayer Tests** | Comprehensive test coverage for all new features |
+| **Integration Tests** | Updated ExerciseFlow tests with Zustand-compatible mocks |
 
-### Why NOT left/right edge keys (discussed & rejected)
+### Architecture Decision: Why NOT edge keys (discussed & rejected)
 - Breaks piano spatial mapping (keys run left-to-right on real pianos)
 - Black keys have no natural position on vertical edge strips
 - Two-hand split inverts muscle memory (thumbs wrong direction)

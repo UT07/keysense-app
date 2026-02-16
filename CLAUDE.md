@@ -6,9 +6,12 @@ Built with React Native (Expo) + Firebase + Gemini AI.
 
 **Stack:** Expo SDK 52+, TypeScript 5.x, react-native-audio-api, Zustand, Firebase
 
-## Current Sprint: Gameplay UX Rework (vertical note flow, bigger keys)
+## Current Sprint: Phase 5 — Game Feel & Polish (next up)
 
-Previous sprint (Gamification + Adaptive Learning + UI Overhaul) is COMPLETE — all 22/22 tasks delivered. See `docs/plans/2026-02-16-gamification-adaptive-design.md` for details.
+Previous sprints all COMPLETE:
+- Phase 4+ (Gamification + Adaptive Learning + UI Overhaul): 22/22 tasks
+- Avatar Redesign + Rive System: committed
+- Gameplay UX Rework: 10/10 tasks (vertical falling notes, smart keyboard, demo mode, ghost notes)
 
 ## Quick Commands
 
@@ -75,14 +78,17 @@ src/
 ├── screens/              # Screen components
 │   └── ExercisePlayer/   # Main exercise gameplay screen
 ├── components/           # Reusable UI components
-│   ├── Keyboard/         # Piano keyboard (dynamic range from exercise)
-│   │   └── SplitKeyboard.tsx  # Two-handed split keyboard
-│   ├── PianoRoll/        # Scrolling note display (dynamic MIDI range)
+│   ├── Keyboard/         # Piano keyboard (smart zoomed range per exercise)
+│   │   ├── SplitKeyboard.tsx  # Two-handed split keyboard
+│   │   └── computeZoomedRange.ts  # Smart octave selection from exercise notes
+│   ├── PianoRoll/        # VerticalPianoRoll (falling notes) + legacy PianoRoll
 │   ├── Mascot/           # Cat avatars (CatAvatar, KeysieSvg, RiveCatAvatar, ExerciseBuddy, MascotBubble)
 │   ├── transitions/      # ExerciseCard, LessonCompleteScreen, AchievementToast, ConfettiEffect
 │   └── common/           # ScoreRing, PressableScale, buttons, cards
 ├── hooks/                # Custom React hooks
 │   └── useExercisePlayback.ts  # Playback timing, completion, MIDI events
+├── services/             # External integrations + internal services
+│   └── demoPlayback.ts   # DemoPlaybackService (visual-only note demonstration)
 ├── navigation/           # React Navigation setup
 ├── services/             # External integrations
 │   ├── firebase/         # Auth, Firestore, Functions
@@ -116,6 +122,9 @@ src/
 | `src/components/Mascot/RiveCatAvatar.tsx` | Rive-animated cat avatar (high-fidelity animations) |
 | `src/components/common/ScoreRing.tsx` | Animated SVG circle score indicator |
 | `src/components/Keyboard/keyboardHitTest.ts` | Multi-touch coordinate-to-MIDI mapping |
+| `src/components/Keyboard/computeZoomedRange.ts` | Smart octave selection (1-2 octaves from exercise notes) |
+| `src/components/PianoRoll/VerticalPianoRoll.tsx` | Falling-note display (top-to-bottom, Synthesia-style) |
+| `src/services/demoPlayback.ts` | Demo mode: visual-only note playback with cat dialogue |
 | `src/content/catDialogue.ts` | Cat personality dialogue (8 cats, ~320 messages, trigger-based) |
 | `src/stores/learnerProfileStore.ts` | Adaptive learning: per-note accuracy, skills, tempo range |
 | `docs/plans/2026-02-16-gamification-adaptive-design.md` | Current sprint design doc |
@@ -178,7 +187,7 @@ onAudioBuffer((buffer: Float32Array) => {
 | E2E | Detox | `e2e/` |
 | Audio latency | Custom harness | `scripts/measure-latency.ts` |
 
-**983 tests, 42 suites.** Run tests before committing:
+**1,109 tests, 46 suites.** Run tests before committing:
 ```bash
 npm run typecheck && npm run test
 ```
