@@ -260,26 +260,22 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     const progressStore = useProgressStore.getState();
     progressStore.recordExerciseCompletion(exercise.id, score.overall, score.xpEarned);
 
-    // Sync score to cloud (fire-and-forget, failures retry automatically)
-    syncManager.syncAfterExercise(exercise.id, {
-      overall: score.overall,
-      accuracy: score.breakdown.accuracy,
-      timing: score.breakdown.timing,
-      completeness: score.breakdown.completeness,
-      stars: score.stars,
-      xpEarned: score.xpEarned,
-    }).catch(() => {
-      // Silently caught — SyncManager handles retries internally
-    });
-
     // Record practice time (convert elapsed ms to minutes)
     if (playbackStartTimeRef.current > 0) {
       const elapsedMinutes = (Date.now() - playbackStartTimeRef.current) / 60000;
       progressStore.recordPracticeSession(Math.max(1, Math.round(elapsedMinutes)));
     }
 
-    // Save exercise score to lesson progress
+    // Save exercise score to lesson progress and compute sync data
     const exLessonId = getLessonIdForExercise(exercise.id);
+    let lessonSyncData: {
+      lessonId: string;
+      status: 'in_progress' | 'completed';
+      completedAt?: number;
+      exerciseId: string;
+      exerciseScore: { highScore: number; stars: number; attempts: number; averageScore: number };
+    } | undefined;
+
     if (exLessonId) {
       const lesson = getLesson(exLessonId);
       const existingLP = progressStore.lessonProgress[exLessonId];
@@ -301,18 +297,31 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       const existingExScore = currentLP?.exerciseScores[exercise.id];
       const isNewHighScore = !existingExScore || score.overall > existingExScore.highScore;
 
+      const newHighScore = isNewHighScore ? score.overall : (existingExScore?.highScore ?? score.overall);
+      const newStars = isNewHighScore ? score.stars : (existingExScore?.stars ?? score.stars);
+      const newAttempts = (existingExScore?.attempts ?? 0) + 1;
+      const newAvgScore = existingExScore
+        ? (existingExScore.averageScore * existingExScore.attempts + score.overall) / newAttempts
+        : score.overall;
+
       // Save exercise progress
       progressStore.updateExerciseProgress(exLessonId, exercise.id, {
         exerciseId: exercise.id,
-        highScore: isNewHighScore ? score.overall : (existingExScore?.highScore ?? score.overall),
-        stars: isNewHighScore ? score.stars : (existingExScore?.stars ?? score.stars),
-        attempts: (existingExScore?.attempts ?? 0) + 1,
+        highScore: newHighScore,
+        stars: newStars,
+        attempts: newAttempts,
         lastAttemptAt: Date.now(),
-        averageScore: existingExScore
-          ? (existingExScore.averageScore * existingExScore.attempts + score.overall) / (existingExScore.attempts + 1)
-          : score.overall,
+        averageScore: newAvgScore,
         ...(score.isPassed ? { completedAt: existingExScore?.completedAt ?? Date.now() } : {}),
       });
+
+      // Build lesson sync data (starts as in_progress, may upgrade to completed below)
+      lessonSyncData = {
+        lessonId: exLessonId,
+        status: 'in_progress',
+        exerciseId: exercise.id,
+        exerciseScore: { highScore: newHighScore, stars: newStars, attempts: newAttempts, averageScore: newAvgScore },
+      };
 
       // Check lesson completion status
       if (lesson && score.isPassed) {
@@ -323,12 +332,16 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
           // Mastery test passed → mark lesson complete
           if (updatedLP?.status !== 'completed') {
             isLessonComplete = true;
+            const completedAt = Date.now();
             progressStore.updateLessonProgress(exLessonId, {
               ...updatedLP!,
               status: 'completed',
-              completedAt: Date.now(),
+              completedAt,
             });
             progressStore.addXp(lesson.xpReward);
+
+            lessonSyncData.status = 'completed';
+            lessonSyncData.completedAt = completedAt;
 
             const nonTestIds = getNonTestExercises(exLessonId).map((e) => e.id);
             const totalStars = nonTestIds.reduce((sum, eid) =>
@@ -366,6 +379,18 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         }
       }
     }
+
+    // Sync score + lesson progress to cloud (fire-and-forget, failures retry automatically)
+    syncManager.syncAfterExercise(exercise.id, {
+      overall: score.overall,
+      accuracy: score.breakdown.accuracy,
+      timing: score.breakdown.timing,
+      completeness: score.breakdown.completeness,
+      stars: score.stars,
+      xpEarned: score.xpEarned,
+    }, lessonSyncData).catch(() => {
+      // Silently caught — SyncManager handles retries internally
+    });
 
     // Update streak using XpSystem's proper streak logic (handles freezes, weekly tracking)
     const updatedStreak = calculateStreakUpdate(progressStore.streakData);

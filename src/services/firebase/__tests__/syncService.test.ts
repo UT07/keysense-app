@@ -40,12 +40,14 @@ const mockRemoveItem = AsyncStorage.removeItem as jest.Mock;
 // ============================================================================
 
 function createChange(overrides: Partial<SyncChange> = {}): SyncChange {
+  const { lessonProgress, ...rest } = overrides;
   return {
     type: 'exercise_completed',
     data: { exerciseId: 'lesson-01-ex-01', score: 85 },
     timestamp: Date.now(),
     retryCount: 0,
-    ...overrides,
+    ...(lessonProgress ? { lessonProgress } : {}),
+    ...rest,
   };
 }
 
@@ -312,6 +314,79 @@ describe('SyncManager', () => {
       await expect(
         manager.syncAfterExercise('lesson-01-ex-01', { overall: 50, stars: 1 })
       ).resolves.not.toThrow();
+    });
+
+    it('should include lesson progress data when provided', async () => {
+      mockSyncProgress.mockResolvedValue({
+        serverChanges: [],
+        newSyncTimestamp: Date.now(),
+        conflicts: [],
+      });
+
+      const lessonProgress = {
+        lessonId: 'lesson-01',
+        status: 'completed' as const,
+        completedAt: 1700000000000,
+        exerciseId: 'lesson-01-ex-01',
+        exerciseScore: { highScore: 95, stars: 3, attempts: 2, averageScore: 90 },
+      };
+
+      await manager.syncAfterExercise('lesson-01-ex-01', { overall: 95, stars: 3 }, lessonProgress);
+
+      const savedJson = mockSetItem.mock.calls[0][1];
+      const savedQueue = JSON.parse(savedJson);
+      expect(savedQueue[0].lessonProgress).toEqual(lessonProgress);
+    });
+
+    it('should pass lesson progress through to syncProgress', async () => {
+      const lessonProgress = {
+        lessonId: 'lesson-01',
+        status: 'in_progress' as const,
+        exerciseId: 'lesson-01-ex-01',
+        exerciseScore: { highScore: 80, stars: 2, attempts: 1, averageScore: 80 },
+      };
+
+      // Queue the change
+      const changeWithLesson = createChange({ lessonProgress });
+      mockGetItem
+        .mockResolvedValueOnce(JSON.stringify([])) // queueChange reads empty
+        .mockResolvedValueOnce(JSON.stringify([changeWithLesson])); // flushQueue reads
+
+      mockSyncProgress.mockResolvedValue({
+        serverChanges: [],
+        newSyncTimestamp: Date.now(),
+        conflicts: [],
+      });
+
+      await manager.syncAfterExercise('lesson-01-ex-01', { overall: 80, stars: 2 }, lessonProgress);
+
+      // Verify syncProgress was called with lesson data in localChanges
+      expect(mockSyncProgress).toHaveBeenCalledWith(
+        'test-user',
+        expect.objectContaining({
+          localChanges: expect.arrayContaining([
+            expect.objectContaining({
+              lessonProgress: expect.objectContaining({
+                lessonId: 'lesson-01',
+              }),
+            }),
+          ]),
+        })
+      );
+    });
+
+    it('should work without lesson progress (backwards compatible)', async () => {
+      mockSyncProgress.mockResolvedValue({
+        serverChanges: [],
+        newSyncTimestamp: Date.now(),
+        conflicts: [],
+      });
+
+      await manager.syncAfterExercise('lesson-01-ex-01', { overall: 70, stars: 1 });
+
+      const savedJson = mockSetItem.mock.calls[0][1];
+      const savedQueue = JSON.parse(savedJson);
+      expect(savedQueue[0].lessonProgress).toBeUndefined();
     });
   });
 

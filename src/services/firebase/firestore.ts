@@ -94,6 +94,18 @@ export interface ProgressChange {
   xpAmount?: number;
   timestamp: Timestamp;
   synced: boolean;
+  lessonProgress?: {
+    lessonId: string;
+    status: 'in_progress' | 'completed';
+    completedAt?: number;
+    exerciseId: string;
+    exerciseScore: {
+      highScore: number;
+      stars: number;
+      attempts: number;
+      averageScore: number;
+    };
+  };
 }
 
 export interface ConflictResolution {
@@ -373,13 +385,37 @@ export async function syncProgress(uid: string, request: SyncRequest): Promise<S
         resolvedValue: conflictingServer,
       });
     } else {
-      // No conflict - apply local change
+      // No conflict - apply local change to syncLog
       const changeDoc = doc(db, 'users', uid, 'syncLog', localChange.id);
       batch.set(changeDoc, {
         ...localChange,
+        lessonProgress: undefined, // Don't store nested object in syncLog
         synced: true,
         timestamp: serverTimestamp(),
       });
+
+      // Apply lesson progress update to the progress subcollection
+      if (localChange.lessonProgress) {
+        const lp = localChange.lessonProgress;
+        const progressDoc = doc(db, 'users', uid, 'progress', lp.lessonId);
+        batch.set(
+          progressDoc,
+          {
+            lessonId: lp.lessonId,
+            status: lp.status,
+            ...(lp.completedAt ? { completedAt: Timestamp.fromMillis(lp.completedAt) } : {}),
+            [`exerciseScores.${lp.exerciseId}`]: {
+              exerciseId: lp.exerciseId,
+              highScore: lp.exerciseScore.highScore,
+              stars: lp.exerciseScore.stars,
+              attempts: lp.exerciseScore.attempts,
+              averageScore: lp.exerciseScore.averageScore,
+              lastAttemptAt: serverTimestamp(),
+            },
+          },
+          { merge: true }
+        );
+      }
     }
   }
 

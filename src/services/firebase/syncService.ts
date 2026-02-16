@@ -29,6 +29,18 @@ export interface SyncChange {
   data: Record<string, unknown>;
   timestamp: number;
   retryCount: number;
+  lessonProgress?: {
+    lessonId: string;
+    status: 'in_progress' | 'completed';
+    completedAt?: number;
+    exerciseId: string;
+    exerciseScore: {
+      highScore: number;
+      stars: number;
+      attempts: number;
+      averageScore: number;
+    };
+  };
 }
 
 export interface SyncResult {
@@ -137,6 +149,7 @@ export class SyncManager {
         xpAmount: item.data.xpAmount as number | undefined,
         timestamp: { toMillis: () => item.timestamp } as ProgressChange['timestamp'],
         synced: false,
+        lessonProgress: item.lessonProgress,
       }));
 
       const response = await syncProgress(uid, {
@@ -170,13 +183,15 @@ export class SyncManager {
    */
   async syncAfterExercise(
     exerciseId: string,
-    score: Record<string, unknown>
+    score: Record<string, unknown>,
+    lessonProgress?: SyncChange['lessonProgress']
   ): Promise<void> {
     const change: SyncChange = {
       type: 'exercise_completed',
       data: { exerciseId, ...score },
       timestamp: Date.now(),
       retryCount: 0,
+      lessonProgress,
     };
 
     await this.queueChange(change);
@@ -246,6 +261,7 @@ export class SyncManager {
         xpAmount: item.data.xpAmount as number | undefined,
         timestamp: { toMillis: () => item.timestamp } as ProgressChange['timestamp'],
         synced: false,
+        lessonProgress: item.lessonProgress,
       }));
 
       try {

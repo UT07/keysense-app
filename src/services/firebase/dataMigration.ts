@@ -4,9 +4,11 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Timestamp } from 'firebase/firestore';
 import { useProgressStore } from '../../stores/progressStore';
 import { auth } from './config';
 import { createGamificationData, addXp, createLessonProgress } from './firestore';
+import type { ExerciseProgress as FirestoreExerciseProgress } from './firestore';
 
 const MIGRATION_KEY = 'purrrfect_keys_migrated';
 
@@ -46,10 +48,23 @@ export async function migrateLocalToCloud(): Promise<{ migrated: boolean; error?
 
     // 2. Migrate lesson progress
     for (const [lessonId, lessonProgress] of Object.entries(progressState.lessonProgress)) {
+      // Convert local ExerciseProgress (number timestamps) to Firestore format (Timestamps)
+      const firestoreScores: Record<string, FirestoreExerciseProgress> = {};
+      for (const [exId, exProgress] of Object.entries(lessonProgress.exerciseScores)) {
+        firestoreScores[exId] = {
+          exerciseId: exProgress.exerciseId,
+          highScore: exProgress.highScore,
+          stars: exProgress.stars,
+          attempts: exProgress.attempts,
+          lastAttemptAt: Timestamp.fromMillis(exProgress.lastAttemptAt || Date.now()),
+          averageScore: exProgress.averageScore,
+        };
+      }
+
       await createLessonProgress(uid, lessonId, {
         lessonId,
         status: lessonProgress.status,
-        exerciseScores: lessonProgress.exerciseScores as any,
+        exerciseScores: firestoreScores,
         bestScore: lessonProgress.bestScore,
         totalAttempts: lessonProgress.totalAttempts ?? 0,
         totalTimeSpentSeconds: lessonProgress.totalTimeSpentSeconds ?? 0,
