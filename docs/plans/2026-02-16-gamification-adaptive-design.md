@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:writing-plans to create the implementation plan from this design.
 
-**Goal:** Transform Purrrfect Keys from a structured lesson app into a personalized, AI-driven piano learning experience where every user gets a unique journey, cats are living companions, and the keyboard supports two-handed play.
+**Goal:** Transform Purrrfect Keys from a structured lesson app into a personalized, AI-driven piano learning experience with Duolingo-level visual polish, living cat companions, AI-generated exercises for every user, and two-handed keyboard support.
 
 **Last Updated:** February 16, 2026
 
@@ -379,7 +379,153 @@ Data structure implemented now, UI in Phase 5:
 
 ---
 
-## 5. Implementation Scope
+## 5. UI Overhaul — Duolingo-Level Polish
+
+### 5.1 Design Philosophy
+
+Transform every screen from "functional dark theme" to "vibrant, reward-dopamine-loop" that college students actually want to open daily. Inspired by Duolingo's design language: bold colors, playful animations, clear visual hierarchy, celebration at every turn.
+
+**Current:** Dark concert hall theme (#0D0D0D bg, #1A1A1A surface, crimson accents)
+**Target:** Keep the dark base but inject life — gradients, glow effects, animated transitions, card depth, micro-interactions
+
+### 5.2 HomeScreen Redesign
+
+**Hero Section (top 40% of screen):**
+- Large animated cat avatar (selected cat) with mood-driven idle animation
+- XP progress ring around cat (like Duolingo's crown)
+- Streak flame badge with counter (animated flicker)
+- Daily goal progress arc below cat
+- Gradient background: deep purple (#1A0A2E) → dark (#0D0D0D)
+
+**Daily Challenge Card:**
+- Full-width card with gradient border (animated shimmer)
+- Cat speech bubble introducing the challenge
+- "2x XP" badge in corner
+- Timer showing hours until refresh
+
+**Continue Learning Section:**
+- Large rounded card with lesson progress bar
+- Exercise thumbnail preview (mini piano roll)
+- "Continue" button with crimson gradient + arrow
+
+**Quick Stats Row:**
+- 4 compact stat pills: Level, XP Today, Streak, Exercises Done
+- Each pill has icon + number + subtle glow matching stat color
+
+### 5.3 Level Map Redesign
+
+**Path style:** Duolingo-style vertical path with:
+- Circular lesson nodes on a winding road (not zigzag lines)
+- Nodes are large (80px) with clear state colors
+- Completed: gold fill + check + 3 stars below
+- Current: crimson fill + pulsing glow ring + "START" label
+- Locked: grey fill + lock icon + "Level X" requirement
+- Decorative elements between nodes (music notes, cat paw prints)
+- Background: subtle parallax scroll with floating musical elements
+
+**Lesson Node Press:**
+- Expand animation (node grows + info card slides up)
+- Shows: title, exercise count, XP reward, difficulty stars
+- "Start" button with haptic feedback
+
+### 5.4 Exercise Player UI Refresh
+
+**Score Display:**
+- Floating combo counter with bounce animation (Duolingo-style "+10 XP" popups)
+- Progress bar at top showing exercise completion %
+- Real-time accuracy indicator (color-coded ring)
+
+**Completion Celebration:**
+- Full-screen confetti for 3 stars (react-native-reanimated particles)
+- Cat jumps/dances with unique animation
+- Score counter animates up from 0
+- Stars light up one by one with sound effect
+- XP earned flies into the XP counter
+
+### 5.5 Profile Screen Glow-Up
+
+**Header:**
+- Large cat avatar with animated background (cat's theme color gradient)
+- Username with editable badge
+- Level badge: circular with level number + progress ring
+
+**Stats Grid:**
+- 2x2 cards with icon, number, label
+- Each card has subtle gradient matching stat type
+- Animated number counters on screen enter
+
+**Achievement Showcase:**
+- Horizontal scrollable row of recent achievements (shiny badges)
+- "View All" expands to full grid
+- Locked achievements: silhouette with "?" — tap shows requirements
+- Newly unlocked: glow animation for 24 hours
+
+### 5.6 Onboarding Polish
+
+**Visual improvements:**
+- Animated transitions between steps (slide + fade)
+- Cat avatar guides through each step (different cat for each step)
+- Skill assessment: animated piano keys light up as user plays
+- Progress dots → animated progress bar with cat walking along it
+
+### 5.7 Shared Design Tokens
+
+**New color palette additions (alongside existing dark theme):**
+```typescript
+const COLORS = {
+  // Existing
+  background: '#0D0D0D',
+  surface: '#1A1A1A',
+  primary: '#DC143C',
+
+  // New accent gradients
+  gradientPurple: ['#1A0A2E', '#2D1B4E'],
+  gradientGold: ['#FFD700', '#FFA500'],
+  gradientSuccess: ['#4CAF50', '#2E7D32'],
+
+  // Glow effects
+  glowCrimson: 'rgba(220, 20, 60, 0.3)',
+  glowGold: 'rgba(255, 215, 0, 0.3)',
+  glowPurple: 'rgba(138, 43, 226, 0.3)',
+
+  // Card surfaces (elevated)
+  cardSurface: '#242424',
+  cardBorder: '#333333',
+  cardHighlight: '#2A2A2A',
+
+  // Text hierarchy
+  textPrimary: '#FFFFFF',
+  textSecondary: '#AAAAAA',
+  textMuted: '#666666',
+  textAccent: '#DC143C',
+};
+```
+
+**Animation constants:**
+```typescript
+const ANIMATION = {
+  springConfig: { damping: 15, stiffness: 150 },
+  bounceConfig: { damping: 8, stiffness: 200 },
+  fadeIn: { duration: 300 },
+  slideUp: { duration: 400, easing: Easing.out(Easing.cubic) },
+  celebrationDuration: 2000,
+};
+```
+
+### 5.8 Micro-Interactions (Everywhere)
+
+- **Button press:** Scale 0.95 + haptic (already have PressableScale)
+- **Card enter viewport:** Fade up with stagger (100ms between cards)
+- **XP earned:** Number flies up and fades (+10 XP popup)
+- **Level up:** Full-screen celebration with cat + confetti
+- **Achievement unlock:** Toast slides down with shine animation
+- **Streak milestone:** Fire animation intensifies + cat celebration
+- **Tab switch:** Crossfade with slight slide
+- **Pull to refresh:** Cat stretches animation
+
+---
+
+## 6. Implementation Scope
 
 | Component | New Files | Modified Files | Estimated Effort |
 |-----------|-----------|---------------|-----------------|
@@ -395,7 +541,14 @@ Data structure implemented now, UI in Phase 5:
 | Streak System | ~1 | ~3 | 1 day |
 | Achievement Expansion | ~1 | ~2 | 1 day |
 | Cat Mood + Quests | ~1 | ~3 | 1 day |
-| **Total** | **~21** | **~29** | **14-18 days** |
+| UI: Design Tokens + Theme | ~2 | ~3 | 1 day |
+| UI: HomeScreen Redesign | ~1 | ~1 | 2 days |
+| UI: Level Map Redesign | ~0 | ~1 | 1.5 days |
+| UI: Exercise Player Polish | ~1 | ~2 | 1 day |
+| UI: Profile + Achievements | ~0 | ~2 | 1 day |
+| UI: Onboarding Polish | ~0 | ~1 | 0.5 days |
+| UI: Micro-Interactions | ~1 | ~5 | 1 day |
+| **Total** | **~25** | **~44** | **21-27 days** |
 
 ---
 
