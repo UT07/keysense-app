@@ -33,12 +33,6 @@ export default function App(): React.ReactElement {
         // Initialize Firebase Auth (resolves current user state)
         await useAuthStore.getState().initAuth();
 
-        // Sync Firebase display name to settingsStore if user has one
-        const authUser = useAuthStore.getState().user;
-        if (authUser?.displayName) {
-          useSettingsStore.getState().setDisplayName(authUser.displayName);
-        }
-
         // Hydrate progress state from AsyncStorage
         const savedProgress = await PersistenceManager.loadState(
           STORAGE_KEYS.PROGRESS,
@@ -94,6 +88,15 @@ export default function App(): React.ReactElement {
             ...(autoConnectMidi != null ? { autoConnectMidi: autoConnectMidi as boolean } : {}),
           });
           console.log('[App] Settings state hydrated from storage (onboarding:', hasCompletedOnboarding, ')');
+        }
+
+        // Sync Firebase display name to settingsStore AFTER hydration.
+        // MUST happen after settings hydration — otherwise setDisplayName's
+        // debounced save captures default state (hasCompletedOnboarding: false)
+        // and overwrites the hydrated value 500ms later.
+        const authUser = useAuthStore.getState().user;
+        if (authUser?.displayName) {
+          useSettingsStore.getState().setDisplayName(authUser.displayName);
         }
 
         // Hydrate achievement state

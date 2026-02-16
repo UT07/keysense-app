@@ -231,33 +231,31 @@ export const Keyboard = React.memo(
       setPressedNotes(new Set());
     }, [fireNoteOff]);
 
-    // Responder handlers
-    const onStartShouldSetResponder = useCallback(() => enabled, [enabled]);
-    const onMoveShouldSetResponder = useCallback(() => enabled, [enabled]);
+    // ── Multi-touch handlers ──────────────────────────────────────────
+    // Uses raw touch events (onTouchStart/End/Move) instead of the responder
+    // system, because the responder's onResponderGrant only fires ONCE (first
+    // finger). Additional fingers are invisible until they MOVE. Touch events
+    // fire for EVERY finger down/up, enabling true multi-touch.
 
-    const onResponderGrant = useCallback(
+    const handleTouchStart = useCallback(
       (event: GestureResponderEvent) => processTouches(event),
       [processTouches]
     );
 
-    const onResponderMove = useCallback(
+    const handleTouchMove = useCallback(
       (event: GestureResponderEvent) => processTouches(event),
       [processTouches]
     );
 
-    const onResponderRelease = useCallback(
-      (event: GestureResponderEvent) => {
-        // On final release, process remaining touches (should be empty)
-        processTouches(event);
-        // Ensure all notes are released
-        releaseAllTouches();
-      },
-      [processTouches, releaseAllTouches]
+    const handleTouchEnd = useCallback(
+      (event: GestureResponderEvent) => processTouches(event),
+      [processTouches]
     );
 
-    const onResponderTerminate = useCallback(() => {
-      releaseAllTouches();
-    }, [releaseAllTouches]);
+    const handleTouchCancel = useCallback(
+      () => releaseAllTouches(),
+      [releaseAllTouches]
+    );
 
     // Track scroll offset for hit-testing in scrollable mode
     const handleScroll = useCallback(
@@ -359,15 +357,24 @@ export const Keyboard = React.memo(
       </View>
     );
 
-    // Touch responder props (applied to the outermost container)
-    const responderProps = {
-      onStartShouldSetResponder,
-      onMoveShouldSetResponder,
-      onResponderGrant,
-      onResponderMove,
-      onResponderRelease,
-      onResponderTerminate,
+    // Touch event props for true multi-touch support
+    const touchProps = {
+      onTouchStart: handleTouchStart,
+      onTouchMove: handleTouchMove,
+      onTouchEnd: handleTouchEnd,
+      onTouchCancel: handleTouchCancel,
     };
+
+    // When scroll is disabled (exercises), claim the gesture responder to
+    // prevent the parent ScrollView from intercepting multi-touch gestures.
+    // When scroll is enabled (free play), let ScrollView handle scrolling
+    // and rely on auto-release timers for missed onTouchEnd events.
+    const gestureGuardProps = scrollable && !scrollEnabled ? {
+      onStartShouldSetResponder: () => true as boolean,
+      onMoveShouldSetResponder: () => true as boolean,
+      onResponderTerminationRequest: () => false as boolean,
+      onResponderTerminate: releaseAllTouches,
+    } : {};
 
     if (scrollable) {
       return (
@@ -381,7 +388,7 @@ export const Keyboard = React.memo(
             showsHorizontalScrollIndicator={false}
             scrollsToTop={false}
           >
-            <View {...responderProps}>
+            <View {...touchProps} {...gestureGuardProps}>
               {KeyboardContent}
             </View>
           </ScrollView>
@@ -395,7 +402,7 @@ export const Keyboard = React.memo(
         style={styles.container}
         testID={testID}
         onLayout={handleLayout}
-        {...responderProps}
+        {...touchProps}
       >
         {KeyboardContent}
       </View>

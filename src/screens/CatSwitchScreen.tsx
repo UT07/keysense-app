@@ -1,9 +1,10 @@
 /**
- * CatSwitchScreen - Full-screen cat character gallery
- * Horizontal snap-to-center FlatList with backstories, unlock status, and selection
+ * CatSwitchScreen - Subway Surfers-inspired character gallery
+ * Full-screen character showcase with color-matched backgrounds, stage platform,
+ * animated transitions, and burst selection effects.
  */
 
-import React, { useCallback, useRef, useMemo } from 'react';
+import React, { useCallback, useRef, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,23 +21,103 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
+  withTiming,
+  withSequence,
+  Easing,
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+  interpolate,
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 
-import { CatAvatar } from '../components/Mascot/CatAvatar';
+import { KeysieSvg } from '../components/Mascot/KeysieSvg';
 import { CAT_CHARACTERS, isCatUnlocked, getCatById } from '../components/Mascot/catCharacters';
 import type { CatCharacter } from '../components/Mascot/catCharacters';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useProgressStore } from '../stores/progressStore';
+import { COLORS, SPACING, BORDER_RADIUS } from '../theme/tokens';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = SCREEN_WIDTH * 0.75;
+const CARD_WIDTH = SCREEN_WIDTH * 0.78;
 const CARD_SPACING = 16;
 const SNAP_INTERVAL = CARD_WIDTH + CARD_SPACING;
 
-function SelectButton({ isSelected, isUnlocked, onPress }: {
+/** Animated burst particles on character select */
+function SelectBurst({ color, active }: { color: string; active: boolean }): React.ReactElement | null {
+  const particles = useMemo(() =>
+    Array.from({ length: 8 }, (_, i) => ({
+      id: i,
+      angle: (i * 45) * (Math.PI / 180),
+      delay: i * 40,
+    })),
+    [],
+  );
+
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    if (active) {
+      progress.value = 0;
+      progress.value = withTiming(1, { duration: 600, easing: Easing.out(Easing.cubic) });
+    }
+  }, [active, progress]);
+
+  if (!active) return null;
+
+  return (
+    <View style={styles.burstContainer} pointerEvents="none">
+      {particles.map((p) => (
+        <BurstParticle key={p.id} angle={p.angle} color={color} progress={progress} />
+      ))}
+    </View>
+  );
+}
+
+function BurstParticle({ angle, color, progress }: {
+  angle: number;
+  color: string;
+  progress: Animated.SharedValue<number>;
+}): React.ReactElement {
+  const animStyle = useAnimatedStyle(() => {
+    const dist = interpolate(progress.value, [0, 1], [0, 60]);
+    const opacity = interpolate(progress.value, [0, 0.3, 1], [0, 1, 0]);
+    const scale = interpolate(progress.value, [0, 0.5, 1], [0.3, 1.2, 0]);
+    return {
+      opacity,
+      transform: [
+        { translateX: Math.cos(angle) * dist },
+        { translateY: Math.sin(angle) * dist },
+        { scale },
+      ],
+    };
+  });
+
+  return (
+    <Animated.View style={[styles.burstParticle, { backgroundColor: color }, animStyle]} />
+  );
+}
+
+/** Stage platform beneath character */
+function StagePlatform({ color }: { color: string }): React.ReactElement {
+  return (
+    <View style={styles.stageContainer}>
+      {/* Main platform ellipse */}
+      <View style={[styles.stagePlatform, { backgroundColor: color + '25' }]} />
+      {/* Platform shadow */}
+      <View style={[styles.stageShadow, { backgroundColor: color + '12' }]} />
+      {/* Shine line */}
+      <View style={[styles.stageShine, { backgroundColor: color + '40' }]} />
+    </View>
+  );
+}
+
+/** Animated "Select" button with spring */
+function SelectButton({ isSelected, isUnlocked, onPress, color }: {
   isSelected: boolean;
   isUnlocked: boolean;
   onPress: () => void;
+  color: string;
 }): React.ReactElement {
   const scale = useSharedValue(1);
 
@@ -45,16 +126,17 @@ function SelectButton({ isSelected, isUnlocked, onPress }: {
   }));
 
   const handlePress = useCallback(() => {
-    scale.value = withSpring(0.9, { damping: 15 }, () => {
-      scale.value = withSpring(1, { damping: 10 });
-    });
+    scale.value = withSequence(
+      withTiming(0.88, { duration: 80 }),
+      withSpring(1, { damping: 8, stiffness: 200 }),
+    );
     onPress();
   }, [scale, onPress]);
 
   if (!isUnlocked) {
     return (
       <View style={[styles.selectButton, styles.selectButtonLocked]}>
-        <MaterialCommunityIcons name="lock" size={18} color="#666" />
+        <MaterialCommunityIcons name="lock" size={18} color={COLORS.textMuted} />
         <Text style={styles.selectButtonLockedText}>Locked</Text>
       </View>
     );
@@ -62,75 +144,146 @@ function SelectButton({ isSelected, isUnlocked, onPress }: {
 
   if (isSelected) {
     return (
-      <View style={[styles.selectButton, styles.selectButtonSelected]}>
-        <MaterialCommunityIcons name="check-circle" size={18} color="#FFFFFF" />
-        <Text style={styles.selectButtonSelectedText}>Selected</Text>
-      </View>
+      <Animated.View entering={FadeIn.duration(200)}>
+        <View style={[styles.selectButton, styles.selectButtonSelected, { borderColor: color }]}>
+          <MaterialCommunityIcons name="check-circle" size={18} color={color} />
+          <Text style={[styles.selectButtonSelectedText, { color }]}>Selected</Text>
+        </View>
+      </Animated.View>
     );
   }
 
   return (
     <Animated.View style={animatedStyle}>
       <TouchableOpacity
-        style={[styles.selectButton, styles.selectButtonAvailable]}
+        style={[styles.selectButton, { backgroundColor: color }]}
         onPress={handlePress}
-        activeOpacity={0.8}
+        activeOpacity={0.85}
       >
-        <Text style={styles.selectButtonAvailableText}>Select</Text>
+        <Text style={styles.selectButtonText}>Select</Text>
       </TouchableOpacity>
     </Animated.View>
   );
 }
 
-function CatCard({ cat, isSelected, isUnlocked, onSelect }: {
+/** Character card with full visual identity */
+function CatCard({ cat, isSelected, isUnlocked, onSelect, index }: {
   cat: CatCharacter;
   isSelected: boolean;
   isUnlocked: boolean;
   onSelect: (id: string) => void;
+  index: number;
 }): React.ReactElement {
+  const [showBurst, setShowBurst] = React.useState(false);
+
+  const handleSelect = useCallback(() => {
+    if (!isUnlocked) return;
+    setShowBurst(true);
+    onSelect(cat.id);
+    setTimeout(() => setShowBurst(false), 700);
+  }, [cat.id, isUnlocked, onSelect]);
+
   return (
-    <View
+    <Animated.View
+      entering={FadeInDown.delay(index * 60).springify().damping(14)}
       style={[
         styles.card,
-        isSelected && { borderColor: '#DC143C', borderWidth: 2 },
+        isSelected && { borderColor: cat.color + '80', borderWidth: 2 },
         !isUnlocked && styles.cardLocked,
       ]}
     >
-      {/* Avatar */}
-      <View style={styles.avatarSection}>
+      {/* Background gradient tinted to cat's color */}
+      <LinearGradient
+        colors={[cat.color + '15', 'transparent']}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 0.6 }}
+        style={StyleSheet.absoluteFill}
+      />
+
+      {/* Character showcase area */}
+      <View style={styles.showcaseArea}>
         {isUnlocked ? (
-          <CatAvatar catId={cat.id} size="large" showTooltipOnTap={false} />
+          <View style={styles.characterDisplay}>
+            <SelectBurst color={cat.color} active={showBurst} />
+            <KeysieSvg
+              mood={isSelected ? 'celebrating' : 'happy'}
+              size="large"
+              accentColor={cat.color}
+              pixelSize={140}
+              visuals={cat.visuals}
+            />
+          </View>
         ) : (
-          <View style={styles.lockedAvatarPlaceholder}>
-            <MaterialCommunityIcons name="lock-outline" size={40} color="#555" />
-            <Text style={styles.unlockLevelText}>Level {cat.unlockLevel}</Text>
+          <View style={styles.lockedCharacter}>
+            <View style={[styles.lockedSilhouette, { backgroundColor: cat.color + '10' }]}>
+              <MaterialCommunityIcons name="lock-outline" size={48} color={COLORS.textMuted} />
+            </View>
+            <View style={[styles.unlockBadge, { backgroundColor: cat.color + '30' }]}>
+              <MaterialCommunityIcons name="star" size={12} color={cat.color} />
+              <Text style={[styles.unlockBadgeText, { color: cat.color }]}>Level {cat.unlockLevel}</Text>
+            </View>
           </View>
         )}
+
+        {/* Stage platform */}
+        <StagePlatform color={isUnlocked ? cat.color : COLORS.textMuted} />
       </View>
 
-      {/* Info */}
-      <Text style={[styles.catName, !isUnlocked && { color: '#555' }]}>{cat.name}</Text>
-      <View style={[styles.personalityBadge, { backgroundColor: isUnlocked ? cat.color + '33' : '#222' }]}>
-        <Text style={[styles.personalityText, { color: isUnlocked ? cat.color : '#555' }]}>
-          {cat.personality}
+      {/* Cat info */}
+      <View style={styles.infoSection}>
+        <Text style={[styles.catName, !isUnlocked && { color: COLORS.textMuted }]}>
+          {cat.name}
+        </Text>
+
+        <View style={[styles.personalityBadge, { backgroundColor: isUnlocked ? cat.color + '25' : COLORS.surface }]}>
+          <Text style={[styles.personalityText, { color: isUnlocked ? cat.color : COLORS.textMuted }]}>
+            {cat.personality}
+          </Text>
+        </View>
+
+        <Text style={[styles.musicSkill, !isUnlocked && { color: COLORS.cardBorder }]}>
+          {cat.musicSkill}
+        </Text>
+
+        <Text
+          style={[styles.backstory, !isUnlocked && { color: COLORS.cardBorder }]}
+          numberOfLines={3}
+        >
+          {cat.backstory}
         </Text>
       </View>
-      <Text style={[styles.musicSkill, !isUnlocked && { color: '#444' }]}>{cat.musicSkill}</Text>
-
-      {/* Backstory */}
-      <Text
-        style={[styles.backstory, !isUnlocked && { color: '#333' }]}
-        numberOfLines={4}
-      >
-        {cat.backstory}
-      </Text>
 
       {/* Select button */}
       <SelectButton
         isSelected={isSelected}
         isUnlocked={isUnlocked}
-        onPress={() => onSelect(cat.id)}
+        onPress={handleSelect}
+        color={cat.color}
       />
+    </Animated.View>
+  );
+}
+
+/** Navigation dots showing current position */
+function PaginationDots({ total, currentIndex, cats }: {
+  total: number;
+  currentIndex: number;
+  cats: CatCharacter[];
+}): React.ReactElement {
+  return (
+    <View style={styles.paginationContainer}>
+      {Array.from({ length: total }, (_, i) => (
+        <View
+          key={i}
+          style={[
+            styles.paginationDot,
+            {
+              backgroundColor: i === currentIndex ? cats[i].color : COLORS.cardBorder,
+              width: i === currentIndex ? 20 : 8,
+            },
+          ]}
+        />
+      ))}
     </View>
   );
 }
@@ -141,17 +294,20 @@ export function CatSwitchScreen(): React.ReactElement {
   const selectedCatId = useSettingsStore((s) => s.selectedCatId);
   const setSelectedCatId = useSettingsStore((s) => s.setSelectedCatId);
   const flatListRef = useRef<FlatList>(null);
+  const [currentIndex, setCurrentIndex] = React.useState(0);
 
-  // Find initial index for selected cat
   const initialIndex = useMemo(
     () => Math.max(0, CAT_CHARACTERS.findIndex((c) => c.id === selectedCatId)),
     [selectedCatId],
   );
 
+  useEffect(() => {
+    setCurrentIndex(initialIndex);
+  }, [initialIndex]);
+
   const handleSelect = useCallback((catId: string) => {
     if (!isCatUnlocked(catId, level)) return;
     setSelectedCatId(catId);
-    // Update avatar emoji for backwards compat
     const cat = getCatById(catId);
     if (cat) {
       useSettingsStore.getState().setAvatarEmoji(cat.emoji);
@@ -159,142 +315,236 @@ export function CatSwitchScreen(): React.ReactElement {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }, [level, setSelectedCatId]);
 
-  const renderItem = useCallback(({ item }: { item: CatCharacter }) => (
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
+    if (viewableItems.length > 0 && viewableItems[0].index != null) {
+      setCurrentIndex(viewableItems[0].index);
+    }
+  }).current;
+
+  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
+
+  const renderItem = useCallback(({ item, index }: { item: CatCharacter; index: number }) => (
     <CatCard
       cat={item}
       isSelected={selectedCatId === item.id}
       isUnlocked={isCatUnlocked(item.id, level)}
       onSelect={handleSelect}
+      index={index}
     />
   ), [selectedCatId, level, handleSelect]);
 
   const keyExtractor = useCallback((item: CatCharacter) => item.id, []);
 
+  const currentCat = CAT_CHARACTERS[currentIndex] ?? CAT_CHARACTERS[0];
+
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Choose Your Cat</Text>
-        <View style={styles.headerSpacer} />
-      </View>
-
-      <Text style={styles.subtitle}>
-        Swipe to browse {CAT_CHARACTERS.length} cats — unlock more by leveling up!
-      </Text>
-
-      {/* Horizontal gallery */}
-      <FlatList
-        ref={flatListRef}
-        data={CAT_CHARACTERS}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        snapToInterval={SNAP_INTERVAL}
-        decelerationRate="fast"
-        contentContainerStyle={styles.listContent}
-        initialScrollIndex={initialIndex}
-        getItemLayout={(_data, index) => ({
-          length: SNAP_INTERVAL,
-          offset: SNAP_INTERVAL * index,
-          index,
-        })}
+    <View style={styles.container}>
+      {/* Dynamic background gradient matching current cat */}
+      <LinearGradient
+        colors={[currentCat.color + '18', COLORS.background, COLORS.background]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 0.4 }}
+        style={StyleSheet.absoluteFill}
       />
-    </SafeAreaView>
+
+      <SafeAreaView style={styles.safeArea}>
+        {/* Header */}
+        <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textPrimary} />
+          </TouchableOpacity>
+          <View>
+            <Text style={styles.headerTitle}>Choose Your Cat</Text>
+            <Text style={styles.headerSubtitle}>
+              {CAT_CHARACTERS.filter((c) => isCatUnlocked(c.id, level)).length} of {CAT_CHARACTERS.length} unlocked
+            </Text>
+          </View>
+          <View style={styles.headerSpacer} />
+        </Animated.View>
+
+        {/* Character gallery */}
+        <FlatList
+          ref={flatListRef}
+          data={CAT_CHARACTERS}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={SNAP_INTERVAL}
+          decelerationRate="fast"
+          contentContainerStyle={styles.listContent}
+          initialScrollIndex={initialIndex}
+          getItemLayout={(_data, index) => ({
+            length: SNAP_INTERVAL,
+            offset: SNAP_INTERVAL * index,
+            index,
+          })}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+        />
+
+        {/* Pagination dots */}
+        <Animated.View entering={FadeInUp.delay(300).duration(400)}>
+          <PaginationDots
+            total={CAT_CHARACTERS.length}
+            currentIndex={currentIndex}
+            cats={CAT_CHARACTERS}
+          />
+        </Animated.View>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D0D0D',
+    backgroundColor: COLORS.background,
+  },
+  safeArea: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    gap: SPACING.sm,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: COLORS.surface,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#FFFFFF',
+    color: COLORS.textPrimary,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 1,
   },
   headerSpacer: {
-    width: 40,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#888',
-    textAlign: 'center',
-    marginBottom: 20,
-    paddingHorizontal: 32,
+    flex: 1,
   },
   listContent: {
     paddingHorizontal: (SCREEN_WIDTH - CARD_WIDTH) / 2,
     gap: CARD_SPACING,
-    paddingVertical: 8,
+    paddingVertical: SPACING.sm,
   },
   card: {
     width: CARD_WIDTH,
-    backgroundColor: '#1A1A1A',
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.xl,
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#2A2A2A',
-    justifyContent: 'space-between',
+    borderColor: COLORS.cardBorder,
+    paddingBottom: SPACING.lg,
   },
   cardLocked: {
-    opacity: 0.6,
+    opacity: 0.65,
   },
-  avatarSection: {
-    marginBottom: 16,
+
+  // Character showcase
+  showcaseArea: {
+    alignItems: 'center',
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.sm,
   },
-  lockedAvatarPlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#1A1A1A',
+  characterDisplay: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  lockedCharacter: {
+    alignItems: 'center',
+  },
+  lockedSilhouette: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#333',
+    borderColor: COLORS.cardBorder,
     borderStyle: 'dashed',
+  },
+  unlockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.sm,
+    marginTop: SPACING.sm,
+  },
+  unlockBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  // Stage platform
+  stageContainer: {
+    alignItems: 'center',
+    marginTop: -8,
+  },
+  stagePlatform: {
+    width: 160,
+    height: 16,
+    borderRadius: 80,
+  },
+  stageShadow: {
+    width: 180,
+    height: 8,
+    borderRadius: 90,
+    marginTop: -4,
+  },
+  stageShine: {
+    width: 80,
+    height: 2,
+    borderRadius: 1,
+    marginTop: -10,
+  },
+
+  // Burst particles
+  burstContainer: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  unlockLevelText: {
-    fontSize: 12,
-    color: '#666',
-    fontWeight: '600',
-    marginTop: 4,
+  burstParticle: {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+
+  // Info section
+  infoSection: {
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.sm,
   },
   catName: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 8,
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.xs,
   },
   personalityBadge: {
     paddingHorizontal: 14,
     paddingVertical: 4,
-    borderRadius: 12,
-    marginBottom: 8,
+    borderRadius: BORDER_RADIUS.full,
+    marginBottom: SPACING.sm,
   },
   personalityText: {
     fontSize: 12,
@@ -302,53 +552,64 @@ const styles = StyleSheet.create({
   },
   musicSkill: {
     fontSize: 14,
-    color: '#B0B0B0',
-    marginBottom: 12,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.sm,
   },
   backstory: {
     fontSize: 13,
-    color: '#999',
+    color: COLORS.textSecondary,
     lineHeight: 19,
     textAlign: 'center',
-    marginBottom: 20,
-    paddingHorizontal: 8,
+    marginBottom: SPACING.md,
+    paddingHorizontal: SPACING.sm,
   },
+
+  // Select button
   selectButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    minWidth: 140,
+    paddingHorizontal: 36,
+    borderRadius: BORDER_RADIUS.md,
+    minWidth: 150,
+    alignSelf: 'center',
   },
-  selectButtonAvailable: {
-    backgroundColor: '#DC143C',
-  },
-  selectButtonAvailableText: {
+  selectButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
   selectButtonSelected: {
-    backgroundColor: '#2A2A2A',
-    borderWidth: 1,
-    borderColor: '#DC143C',
+    backgroundColor: 'transparent',
+    borderWidth: 2,
   },
   selectButtonSelectedText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
   },
   selectButtonLocked: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: COLORS.cardBorder,
   },
   selectButtonLockedText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
+    color: COLORS.textMuted,
+  },
+
+  // Pagination
+  paginationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    paddingBottom: SPACING.md,
+  },
+  paginationDot: {
+    height: 8,
+    borderRadius: 4,
   },
 });

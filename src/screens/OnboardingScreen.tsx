@@ -30,6 +30,9 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { Button, Card } from '../components/common';
+import { CatAvatar } from '../components/Mascot';
+import { KeysieSvg } from '../components/Mascot/KeysieSvg';
+import { getCatById, getDefaultCat } from '../components/Mascot/catCharacters';
 import { useSettingsStore } from '../stores/settingsStore';
 import { COLORS, SPACING, BORDER_RADIUS } from '../theme/tokens';
 
@@ -59,15 +62,15 @@ type SlideDirection = 'forward' | 'back';
 // ---------------------------------------------------------------------------
 
 interface StepCatInfo {
-  emoji: string;
+  catId: string;
   subtitle: string;
 }
 
 const STEP_CATS: Record<number, StepCatInfo> = {
-  1: { emoji: '\uD83D\uDC31', subtitle: 'Mini Meowww welcomes you!' },
-  2: { emoji: '\uD83C\uDFB9', subtitle: 'Jazzy wants to know your level' },
-  3: { emoji: '\uD83C\uDFB8', subtitle: 'Rocky checks your setup' },
-  4: { emoji: '\u2B50', subtitle: 'Professor Whiskers helps you set goals' },
+  1: { catId: 'mini-meowww', subtitle: 'Mini Meowww welcomes you!' },
+  2: { catId: 'jazzy', subtitle: 'Jazzy wants to know your level' },
+  3: { catId: 'chonky-monke', subtitle: 'Chonky Monk\u00E9 checks your setup' },
+  4: { catId: 'luna', subtitle: 'Luna helps you set goals' },
 };
 
 // ---------------------------------------------------------------------------
@@ -130,7 +133,7 @@ function WelcomeStep({
   return (
     <AnimatedStepWrapper direction={direction}>
       <View style={styles.iconContainer}>
-        <Text style={styles.iconLarge}>{catInfo.emoji}</Text>
+        <CatAvatar catId={catInfo.catId} size="large" showTooltipOnTap={false} />
       </View>
       <Text style={styles.stepTitle}>Welcome to Purrrfect Keys</Text>
       <Text style={styles.catIntro}>{catInfo.subtitle}</Text>
@@ -166,8 +169,11 @@ function ExperienceLevelStep({
 
   return (
     <AnimatedStepWrapper direction={direction}>
+      <View style={styles.stepCatRow}>
+        <CatAvatar catId={catInfo.catId} size="small" showTooltipOnTap={false} />
+        <Text style={styles.catIntro}>{catInfo.subtitle}</Text>
+      </View>
       <Text style={styles.stepTitle}>What's Your Experience Level?</Text>
-      <Text style={styles.catIntro}>{catInfo.subtitle}</Text>
       <Text style={styles.stepDescription}>
         This helps us personalize your learning experience
       </Text>
@@ -226,8 +232,11 @@ function EquipmentCheckStep({
 
   return (
     <AnimatedStepWrapper direction={direction}>
+      <View style={styles.stepCatRow}>
+        <CatAvatar catId={catInfo.catId} size="small" showTooltipOnTap={false} />
+        <Text style={styles.catIntro}>{catInfo.subtitle}</Text>
+      </View>
       <Text style={styles.stepTitle}>Do You Have a MIDI Keyboard?</Text>
-      <Text style={styles.catIntro}>{catInfo.subtitle}</Text>
       <Text style={styles.stepDescription}>
         MIDI keyboards provide the best learning experience, but you can also use the on-screen keyboard
       </Text>
@@ -279,8 +288,11 @@ function GoalSettingStep({
 
   return (
     <AnimatedStepWrapper direction={direction}>
+      <View style={styles.stepCatRow}>
+        <CatAvatar catId={catInfo.catId} size="small" showTooltipOnTap={false} />
+        <Text style={styles.catIntro}>{catInfo.subtitle}</Text>
+      </View>
       <Text style={styles.stepTitle}>What's Your Goal?</Text>
-      <Text style={styles.catIntro}>{catInfo.subtitle}</Text>
       <Text style={styles.stepDescription}>
         Choose what motivates you most
       </Text>
@@ -383,6 +395,7 @@ function OptionCard({
 function ProgressBar({ step }: { step: number }): React.ReactElement {
   const fillFraction = useSharedValue(step / 4);
   const catInfo = STEP_CATS[step] ?? STEP_CATS[1];
+  const cat = getCatById(catInfo.catId) ?? getDefaultCat();
 
   React.useEffect(() => {
     fillFraction.value = withTiming(step / 4, {
@@ -409,7 +422,13 @@ function ProgressBar({ step }: { step: number }): React.ReactElement {
     <View style={styles.progressBarContainer}>
       {/* Cat avatar walking along the bar */}
       <Animated.View style={[styles.catAvatarContainer, catStyle]}>
-        <Text style={styles.catAvatar}>{catInfo.emoji}</Text>
+        <KeysieSvg
+          mood="happy"
+          size="small"
+          accentColor={cat.color}
+          pixelSize={CAT_SIZE}
+          visuals={cat.visuals}
+        />
       </Animated.View>
 
       {/* Track */}
@@ -611,9 +630,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 1,
   },
-  catAvatar: {
-    fontSize: CAT_SIZE - 4,
-  },
 
   // Steps
   stepContainer: {
@@ -623,9 +639,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.lg,
   },
-  iconLarge: {
-    fontSize: 80,
-  },
   stepTitle: {
     fontSize: 24,
     fontWeight: '700',
@@ -633,12 +646,18 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     textAlign: 'center',
   },
+  stepCatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
   catIntro: {
     fontSize: 14,
-    fontWeight: '500',
-    color: COLORS.primary,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
     textAlign: 'center',
-    marginBottom: SPACING.sm,
   },
   stepSubtitle: {
     fontSize: 16,

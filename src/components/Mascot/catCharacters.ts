@@ -1,9 +1,19 @@
 /**
  * Cat Character Avatar System
- * 8 unique music-themed cat characters with backstories, skills, and unlock levels
+ * 8 unique music-themed cat characters with distinct visual identities
  */
 
 export type CatVariant = 'default' | 'tuxedo';
+export type CatPattern = 'solid' | 'tuxedo' | 'tabby' | 'siamese' | 'spotted';
+
+export interface CatVisuals {
+  bodyColor: string;
+  bellyColor: string;
+  earInnerColor: string;
+  eyeColor: string;
+  noseColor: string;
+  pattern: CatPattern;
+}
 
 export interface CatCharacter {
   id: string;
@@ -12,9 +22,11 @@ export interface CatCharacter {
   backstory: string;
   musicSkill: string;
   personality: string;
+  /** Accent color for headphones, UI elements */
   color: string;
   unlockLevel: number;
   variant?: CatVariant;
+  visuals: CatVisuals;
 }
 
 export const CAT_CHARACTERS: CatCharacter[] = [
@@ -29,6 +41,14 @@ export const CAT_CHARACTERS: CatCharacter[] = [
     color: '#DC143C',
     unlockLevel: 1,
     variant: 'tuxedo',
+    visuals: {
+      bodyColor: '#1A1A1A',
+      bellyColor: '#F5F5F5',
+      earInnerColor: '#DC143C',
+      eyeColor: '#2ECC71',
+      noseColor: '#DC143C',
+      pattern: 'tuxedo',
+    },
   },
   {
     id: 'jazzy',
@@ -40,6 +60,14 @@ export const CAT_CHARACTERS: CatCharacter[] = [
     personality: 'Cool & Smooth',
     color: '#9B59B6',
     unlockLevel: 2,
+    visuals: {
+      bodyColor: '#4A4A6A',
+      bellyColor: '#6B6B8A',
+      earInnerColor: '#9B59B6',
+      eyeColor: '#D4A5FF',
+      noseColor: '#9B59B6',
+      pattern: 'solid',
+    },
   },
   {
     id: 'chonky-monke',
@@ -51,6 +79,14 @@ export const CAT_CHARACTERS: CatCharacter[] = [
     personality: 'Absolute Unit',
     color: '#FF8C00',
     unlockLevel: 3,
+    visuals: {
+      bodyColor: '#E8871E',
+      bellyColor: '#FFF3E0',
+      earInnerColor: '#FFB74D',
+      eyeColor: '#FFD54F',
+      noseColor: '#FF8C00',
+      pattern: 'tabby',
+    },
   },
   {
     id: 'luna',
@@ -62,6 +98,14 @@ export const CAT_CHARACTERS: CatCharacter[] = [
     personality: 'Mysterious',
     color: '#5B6EAE',
     unlockLevel: 5,
+    visuals: {
+      bodyColor: '#1C1C3A',
+      bellyColor: '#2A2A52',
+      earInnerColor: '#5B6EAE',
+      eyeColor: '#7EB8FF',
+      noseColor: '#3D4F8A',
+      pattern: 'solid',
+    },
   },
   {
     id: 'biscuit',
@@ -73,6 +117,14 @@ export const CAT_CHARACTERS: CatCharacter[] = [
     personality: 'Cozy & Warm',
     color: '#F39C9C',
     unlockLevel: 8,
+    visuals: {
+      bodyColor: '#F5D5C8',
+      bellyColor: '#FFF0EB',
+      earInnerColor: '#F39C9C',
+      eyeColor: '#81D4FA',
+      noseColor: '#F48FB1',
+      pattern: 'solid',
+    },
   },
   {
     id: 'vinyl',
@@ -84,6 +136,14 @@ export const CAT_CHARACTERS: CatCharacter[] = [
     personality: 'Hipster',
     color: '#1ABC9C',
     unlockLevel: 12,
+    visuals: {
+      bodyColor: '#607D8B',
+      bellyColor: '#90A4AE',
+      earInnerColor: '#1ABC9C',
+      eyeColor: '#1ABC9C',
+      noseColor: '#546E7A',
+      pattern: 'spotted',
+    },
   },
   {
     id: 'aria',
@@ -95,6 +155,14 @@ export const CAT_CHARACTERS: CatCharacter[] = [
     personality: 'Elegant',
     color: '#FFD700',
     unlockLevel: 15,
+    visuals: {
+      bodyColor: '#F5E6D3',
+      bellyColor: '#FFF8F0',
+      earInnerColor: '#8B6914',
+      eyeColor: '#4FC3F7',
+      noseColor: '#8B6914',
+      pattern: 'siamese',
+    },
   },
   {
     id: 'tempo',
@@ -106,6 +174,14 @@ export const CAT_CHARACTERS: CatCharacter[] = [
     personality: 'Hyperactive',
     color: '#E74C3C',
     unlockLevel: 20,
+    visuals: {
+      bodyColor: '#D4553A',
+      bellyColor: '#FFCCBC',
+      earInnerColor: '#E74C3C',
+      eyeColor: '#FFEB3B',
+      noseColor: '#E74C3C',
+      pattern: 'tabby',
+    },
   },
 ];
 

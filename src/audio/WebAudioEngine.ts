@@ -25,7 +25,7 @@ import type { IAudioEngine, NoteHandle, AudioContextState } from './types';
 const DEFAULT_VOLUME = 0.8;
 const MAX_POLYPHONY = 10;
 const MIN_NOTE_DURATION = 0.05; // 50ms minimum before release
-const MAX_NOTE_DURATION = 10.0; // Safety net — oscillators auto-stop after 10s if release never fires
+const MAX_NOTE_DURATION = 5.0; // Safety net — oscillators auto-stop after 5s if release never fires
 
 /**
  * ADSR envelope — sustain while key is held
@@ -290,8 +290,11 @@ export class WebAudioEngine implements IAudioEngine {
       oscillators.push(osc2);
     }
 
-    // Create release callback
+    // Create release callback (idempotent — safe to call multiple times)
+    let released = false;
     const releaseCallback = (): void => {
+      if (released) return;
+      released = true;
       this.doRelease(note, oscillators, envelope, now);
     };
 
@@ -375,10 +378,17 @@ export class WebAudioEngine implements IAudioEngine {
       }
     }
 
-    // Remove from active notes after release completes
+    // Remove from active notes after release completes.
+    // CRITICAL: Check startTime to avoid deleting a re-triggered note's entry.
+    // Without this check, rapid re-triggers (same pitch within 200ms) cause the
+    // old release's cleanup to delete the NEW note — making it un-releasable
+    // and stuck at sustain level until the hard stop.
     setTimeout(() => {
-      this.activeNotes.delete(note);
-      this.updateOldestNoteKey();
+      const current = this.activeNotes.get(note);
+      if (current && current.startTime === startTime) {
+        this.activeNotes.delete(note);
+        this.updateOldestNoteKey();
+      }
     }, (ADSR.release + 0.05) * 1000);
   }
 
@@ -424,13 +434,13 @@ export class WebAudioEngine implements IAudioEngine {
   }
 
   /**
-   * Release a specific note via its handle
+   * Release a specific note via its handle.
+   * Always calls handle.release() — the callback captures its own oscillators
+   * and envelope in closure, so it works even if the activeNotes entry was
+   * cleaned up by a race condition (e.g., rapid re-trigger of the same pitch).
    */
   releaseNote(handle: NoteHandle): void {
-    const noteState = this.activeNotes.get(handle.note);
-    if (noteState) {
-      handle.release();
-    }
+    handle.release();
   }
 
   /**
