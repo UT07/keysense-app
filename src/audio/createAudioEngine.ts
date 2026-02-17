@@ -19,6 +19,7 @@
  */
 
 import { Platform } from 'react-native';
+import { Audio } from 'expo-av';
 import type { IAudioEngine } from './types';
 import { ExpoAudioEngine } from './ExpoAudioEngine';
 
@@ -26,6 +27,7 @@ import { ExpoAudioEngine } from './ExpoAudioEngine';
  * Singleton instance managed by the factory
  */
 let factoryInstance: IAudioEngine | null = null;
+let audioModeConfigured = false;
 
 /**
  * Try to create a WebAudioEngine. Returns null if react-native-audio-api
@@ -51,6 +53,28 @@ function tryCreateWebAudioEngine(): IAudioEngine | null {
 }
 
 /**
+ * Configure iOS audio session for playback in silent mode.
+ * Must be called before any audio engine initialization.
+ * Uses expo-av's Audio.setAudioModeAsync which works regardless of
+ * which engine (WebAudio/ExpoAV) is ultimately used for synthesis.
+ */
+async function ensureAudioModeConfigured(): Promise<void> {
+  if (audioModeConfigured) return;
+  audioModeConfigured = true;
+
+  try {
+    await Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      shouldDuckAndroid: true,
+    });
+    console.log('[createAudioEngine] iOS audio mode configured (playsInSilentModeIOS=true)');
+  } catch (error) {
+    console.warn('[createAudioEngine] Audio mode configuration failed:', error);
+  }
+}
+
+/**
  * Create the best available audio engine.
  *
  * Prefers WebAudioEngine (low-latency oscillator synthesis via JSI)
@@ -65,6 +89,9 @@ export function createAudioEngine(): IAudioEngine {
   }
 
   const selectionStart = Date.now();
+
+  // Configure iOS audio session eagerly (fire-and-forget — resolves before first playNote)
+  ensureAudioModeConfigured();
 
   // Log device/platform info for debugging audio latency across environments
   console.log(

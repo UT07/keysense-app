@@ -1,5 +1,5 @@
 # Purrrfect Keys: AI-Powered Piano Learning App
-## Product Requirements Document v2.1 (Updated February 16, 2026)
+## Product Requirements Document v2.2 (Updated February 17, 2026)
 
 ---
 
@@ -17,18 +17,19 @@ Purrrfect Keys is a mobile-first piano learning application that combines Duolin
 
 | Persona | Description | Primary Need | Success Metric |
 |---------|-------------|--------------|----------------|
-| **Complete Beginner** | Never touched a piano, owns a MIDI keyboard | Structured 10-min daily routine | Complete first song in 2 weeks |
+| **Complete Beginner** | Never touched a piano, has any keyboard | Structured 10-min daily routine | Complete first song in 2 weeks |
 | **Returning Adult** | Played as a child, wants to restart | Quick wins, flexible schedule | Play a recognizable song in 1 week |
 | **Self-Taught Intermediate** | Can play some songs, hit a plateau | Technique correction, theory gaps | Master one new technique per month |
-| **MIDI Keyboard Owner** | Has hardware, needs software to learn | Leverage existing equipment | Immediate value from purchase |
+| **Kid with Cheap Keyboard** | Has a non-MIDI keyboard, uses phone mic | Fun learning experience, game-like | Stay engaged for 30+ days |
+| **MIDI Keyboard Owner** | Has USB/BT MIDI hardware | Best-in-class detection | Immediate value from equipment |
 
 ### 1.4 Key Constraints
 
 | Constraint | Requirement | Rationale |
 |------------|-------------|-----------|
-| **Timeline** | 12-week MVP | Solo developer with AI assistance |
+| **Timeline** | 16-week roadmap (Feb 17 → Jun 8, 2026) | Solo developer with AI assistance |
 | **Platform** | iOS + Android (React Native) | Maximum reach, single codebase |
-| **Input Method** | MIDI-first, microphone fallback | Reliability over complexity |
+| **Input Method** | MIDI + Microphone (polyphonic) + On-screen | Maximum user reach — most learners lack MIDI |
 | **Latency** | <20ms playback, <150ms feedback | Professional feel |
 | **Privacy** | On-device audio processing | Differentiator, GDPR compliance |
 | **Offline** | Core learning loop works offline | Subway practice, unreliable wifi |
@@ -836,24 +837,28 @@ The initial curriculum includes 30 hand-crafted exercises across 6 lessons. Post
 
 ---
 
-## 10. Future Roadmap (Post-MVP)
+## 10. Development Roadmap (16 Weeks: Feb 17 → Jun 8, 2026)
 
-### v1.1 (Month 2-3) — COMPLETE
-- ~~Cat dialogue system with 8 unlockable cat companions (personality-driven coaching)~~ DONE
-- ~~Adaptive learning engine (difficulty adjustment based on performance patterns)~~ DONE
-- ~~UI overhaul with Concert Hall dark theme and gamification polish~~ DONE
-- ~~Exercise loading from content library (JSON → ExerciseStore)~~ DONE
-- Song library expansion (10 popular songs, public domain)
-- Practice reminders with smart timing
+See `docs/plans/2026-02-17-16-week-roadmap.md` for detailed task breakdowns.
 
-### v1.2 (Month 4-5)
-- Subscription model (Pro tier)
-- Advanced technique analysis
-- Social features (share progress)
-- Web portability via react-native-audio-api (Web Audio API compatible)
+| Phase | Weeks | Key Deliverables |
+|-------|-------|-----------------|
+| **5: Adaptive Learning** | 1-3 | AI curriculum engine, voice coaching (TTS), free play analysis, 365-day framework |
+| **6: Avatar Evolution** | 4-6 | Pokemon-style evolution, 1-of-3 starter pick, gem currency, 12+ abilities |
+| **7: Game Feel** | 7-8 | Rive animations, micro-interactions, sound design, performance audit |
+| **8: Audio Input** | 9-10 | Mic polyphonic detection, input method selector, adaptive timing |
+| **Music Library** | 1-12 | 30+ songs (parallel pipeline), browse UI, section coaching, mastery |
+| **9: Social** | 11-12 | Friends, weekly leagues, challenges, push notifications |
+| **10: Launch** | 13-16 | QA sprint, beta, App Store submission |
 
-### v2.0 (Month 6+)
-- Web version (leveraging audio API portability)
+### Monetization
+- **Launch:** 100% free — no paywalls, no tiers, all features accessible
+- **Post-Launch:** 3-tier freemium model (tiers and pricing TBD after launch feedback)
+- **Dual currency:** XP (progression/evolution) + Gems (earned from high scores, used to unlock cats)
+
+### Post-Launch (v2.0+)
+- 3-tier freemium implementation
+- Web version (leveraging react-native-audio-api portability)
 - Teacher dashboard (B2B)
 - Guitar support (new instrument module)
 - Custom song import (MusicXML/MIDI file parsing)

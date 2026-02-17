@@ -303,7 +303,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   // Responsive layout — supports both portrait and landscape
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isPortrait = screenHeight > screenWidth;
-  const keyHeight = isPortrait ? 130 : 100;
+  const singleKeyHeight = isPortrait ? 120 : 90;
   const topBarHeight = isPortrait ? 76 : 40;
 
   const hasAutoSetSpeed = useRef(false);
@@ -676,7 +676,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   // onLayout will refine these to exact container measurements.
   const [pianoRollDims, setPianoRollDims] = useState({
     width: screenWidth,
-    height: Math.max(200, screenHeight - keyHeight - topBarHeight),
+    height: Math.max(200, screenHeight - singleKeyHeight - topBarHeight),
   });
   const ghostNotesEnabled = useExerciseStore(s => s.ghostNotesEnabled);
 
@@ -1386,7 +1386,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         )}
 
         {/* Bottom: Full-width keyboard (split or normal) */}
-        <View style={[styles.keyboardContainer, { height: keyHeight }]}>
+        <View style={[styles.keyboardContainer, { height: keyboardMode === 'split' ? singleKeyHeight * 2 + 4 : singleKeyHeight }]}>
           {keyboardMode === 'split' ? (
             <SplitKeyboard
               notes={exercise.notes}
@@ -1398,7 +1398,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
               enabled={true}
               hapticEnabled={true}
               showLabels={true}
-              keyHeight={Math.round(keyHeight * 0.6)}
+              keyHeight={singleKeyHeight}
               focusNoteLeft={focusNoteLeft}
               focusNoteRight={focusNoteRight}
               testID="exercise-keyboard"
@@ -1417,7 +1417,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
               scrollable={true}
               scrollEnabled={false}
               focusNote={nextExpectedNote}
-              keyHeight={keyHeight}
+              keyHeight={singleKeyHeight}
               testID="exercise-keyboard"
             />
           )}

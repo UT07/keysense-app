@@ -1,7 +1,8 @@
 # KeySense Master Plan
 
-**Last Updated:** February 16, 2026
+**Last Updated:** February 17, 2026
 **Goal:** Production-quality piano learning app on App Store & Play Store
+**Target Launch:** June 8, 2026 (16-week roadmap)
 
 ---
 
@@ -14,14 +15,19 @@
 | Phase 3 | Firebase Auth + Sync | **COMPLETE** | 100% |
 | Phase 4+ | Adaptive Learning + Gamification UI Overhaul | **COMPLETE** | 100% (22/22 tasks) |
 | — | Avatar Redesign + Rive System | **COMPLETE** | 100% |
-| — | Gameplay UX Rework | **COMPLETE** | 10/10 tasks — vertical notes, smart keyboard, demo mode, ghost notes, 1109 tests |
-| Next | Game Feel & Polish | **PLANNED** | 0% — fun facts, transitions, micro-interactions |
-| Phase 6 | Social & Advanced Gamification | **PLANNED** | 0% |
-| Phase 7 | Music Library | **DESIGNED** | 0% |
-| Phase 7.5 | Pre-Launch QA Sprint | **PLANNED** | 0% — AI quality, performance, gamification, content |
-| Phase 8 | App Store Launch | **PLANNED** | 0% |
+| — | Gameplay UX Rework | **COMPLETE** | 10/10 tasks |
+| — | QA Sprint | **COMPLETE** | 18 new test suites, 6 bug fixes, 1488 tests |
+| Phase 5 | Adaptive Learning Revamp | **NEXT** | 0% — Weeks 1-3: AI curriculum, voice coaching, free play |
+| Phase 6 | Avatar Evolution & Gamification | **PLANNED** | 0% — Weeks 4-6: Pokemon evolution, gems, abilities |
+| Phase 7 | Game Feel & Polish | **PLANNED** | 0% — Weeks 7-8: micro-interactions, Rive, transitions |
+| Phase 8 | Audio Input System | **PLANNED** | 0% — R&D Weeks 1-8, sole priority Weeks 9-10 |
+| — | Music Library | **PARALLEL** | 0% — Pipeline Weeks 1-10, UI Weeks 11-12 |
+| Phase 9 | Social & Leaderboards | **PLANNED** | 0% — Weeks 11-12 |
+| Phase 10 | QA + Launch | **PLANNED** | 0% — Weeks 13-16 |
 
-**Current Codebase Health:** 0 TypeScript errors, 1,109 tests passing, 46 suites
+**Current Codebase Health:** 0 TypeScript errors, 1,488 tests passing, 64 suites
+
+**Full Roadmap:** `docs/plans/2026-02-17-16-week-roadmap.md`
 
 ---
 
@@ -185,79 +191,47 @@ User tested on iPhone 13 Pro, identified critical UX issues. All 10 tasks delive
 
 ---
 
-## Phase 5: Game Feel & Polish (PLANNED)
+## 16-Week Roadmap (Feb 17 → Jun 8, 2026)
 
-Separate phase, not blocking priority features. Can run in parallel with or after the gameplay UX rework.
+**Detailed plan:** `docs/plans/2026-02-17-16-week-roadmap.md`
 
-| Area | What | Inspiration |
-|------|------|-------------|
-| Pre-Level Screen | Fun fact + animated mascot + countdown before each exercise | Duolingo lesson intros |
-| Avatars | Actual Rive .riv animation files for all 8 cats | Subway Surfers characters |
-| Progression Feel | Animated XP bar, level-up celebrations, streak animations | Duolingo XP system |
-| Transitions | Screen transitions with personality (slide/bounce/fade) | Duolingo's smooth flow |
-| Micro-interactions | Button press animations, haptic patterns, sound effects | Subway Surfers UI |
+### Phase 5: Adaptive Learning Revamp (Weeks 1-3)
+- AI curriculum engine replacing static lesson order
+- Voice coaching via TTS (Gemini → Expo Speech)
+- Free play analysis + drill generation
+- Weak spot detection + progressive difficulty
 
----
+### Phase 6: Avatar Evolution & Gamification (Weeks 4-6)
+- Pokemon-style cat evolution (Baby → Teen → Adult → Master)
+- Pick 1 of 3 starters, unlock others with Gems
+- Dual currency: XP (evolution) + Gems (purchasing)
+- 12+ gameplay-enhancing cat abilities
+- 50+ achievements, daily rewards
 
-## Phase 6: Social & Advanced Gamification (PLANNED)
+### Phase 7: Game Feel & Polish (Weeks 7-8)
+- Rive animations, screen transitions, haptics
+- Sound design, skeleton loading states
+- Performance audit, accessibility pass
 
-### 6A. Community & Social
-- Friends system, activity feed, friend challenges, share achievements
+### Phase 8: Audio Input System (R&D Weeks 1-8, sole priority Weeks 9-10)
+- Microphone polyphonic detection for non-MIDI keyboards
+- Input method selector (MIDI / Mic / On-screen)
+- Adaptive timing windows + speed defaults per input
+- ML model for chord detection (TFLite/CoreML)
 
-### 6B. Leagues & Leaderboards
-- Weekly leagues (Bronze → Diamond), promotion/demotion, ranked list
+### Music Library (parallel pipeline Weeks 1-10, UI Weeks 11-12)
+- 30+ songs across 5 genres (public domain)
+- MIDI → Exercise JSON pipeline
+- Browse/search/filter UI, section-based practice
+- AI coaching per song section, mastery tiers
 
-### 6C. Awards & Achievements System
-- 30+ unlockable badges, badge gallery, push notifications
+### Phase 9: Social & Leaderboards (Weeks 11-12)
+- Friends, weekly leagues (Bronze → Diamond), challenges
+- Push notifications, activity feed
 
-### 6D. Gifts & Rewards
-- Daily login rewards, streak rewards, streak freeze, gift system
-
----
-
-## Phase 7: Music Library (DESIGNED)
-
-### 7A. Data Model & Infrastructure
-- Song format extending Exercise JSON with layers (melody, leftHand, fullArrangement)
-
-### 7B. MIDI Pipeline — 100+ Songs
-- Public domain MIDI → Exercise JSON pipeline (Classical, Pop, Film, Jazz, Folk, Games, Holiday)
-
-### 7C. Music Library UI
-- Browse screen with genre carousel, song cards, search/filters
-
-### 7D. Music Gamification
-- Mastery tiers per song (Bronze→Platinum), weekly challenges, collections
-
----
-
-## Phase 7.5: Pre-Launch QA Sprint (PLANNED)
-
-Comprehensive testing before App Store submission. Covers all aspects of the app.
-
-| Area | Tests | Pass Criteria |
-|------|-------|---------------|
-| AI Coach Quality | 20 exercises scored, review feedback quality | 80%+ feedback rated "helpful" by tester |
-| AI Exercise Generation | Generate 50 exercises, validate musicality | No broken exercises, difficulty matches profile |
-| Performance | Profile on iPhone 13 Pro + low-end Android | <20ms touch-to-sound, 60fps PianoRoll, <2s screen load |
-| Gamification | Full lesson 1-6 playthrough + mastery tests | Progression feels fair, XP/streaks correct |
-| UI/UX | All screens walkthrough, both orientations | No broken layouts, consistent theme, accessible |
-| Content | Validate all 30+ exercises | No wrong notes, smooth difficulty curve |
-| Offline | Full session without network | Core loop works, sync resumes on reconnect |
-| Edge Cases | Kill mid-exercise, rapid navigation, etc. | No crashes, state recovery |
-| Demo Mode | Test on all 6 lessons | Demo plays correctly, ghost notes work, auto-fade triggers |
-
----
-
-## Phase 8: App Store Launch (PLANNED)
-
-| Task | Deliverable |
-|------|-------------|
-| Build finalization | EAS Build, native MIDI, code signing |
-| Performance optimization | Profile, fix jank, reduce bundle size |
-| App Store assets | Icon, screenshots, description, privacy policy |
-| Beta testing | TestFlight + Internal Testing |
-| Launch | Submit to stores, monitor crashes |
+### Phase 10: QA + Launch (Weeks 13-16)
+- Comprehensive QA sprint, beta testing, App Store submission
+- Launch 100% FREE — 3-tier freemium model post-launch
 
 ---
 

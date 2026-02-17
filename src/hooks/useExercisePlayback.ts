@@ -443,6 +443,8 @@ export function useExercisePlayback({
         } catch (error) {
           console.error('[useExercisePlayback] Manual playback error:', error);
         }
+      } else if (enableAudio && !isAudioReady) {
+        console.warn(`[useExercisePlayback] Audio not ready — note ${note} skipped. Engine state: ${audioEngine.getState()}`);
       }
 
       // Only record notes for scoring when exercise is playing

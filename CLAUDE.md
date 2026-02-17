@@ -6,12 +6,26 @@ Built with React Native (Expo) + Firebase + Gemini AI.
 
 **Stack:** Expo SDK 52+, TypeScript 5.x, react-native-audio-api, Zustand, Firebase
 
-## Current Sprint: Phase 5 — Game Feel & Polish (next up)
+## Current Sprint: 16-Week Roadmap (Feb 17 → Jun 8, 2026)
+
+**Codebase Health:** 64 test suites, 1,488 tests passing, 0 TypeScript errors
 
 Previous sprints all COMPLETE:
 - Phase 4+ (Gamification + Adaptive Learning + UI Overhaul): 22/22 tasks
 - Avatar Redesign + Rive System: committed
-- Gameplay UX Rework: 10/10 tasks (vertical falling notes, smart keyboard, demo mode, ghost notes)
+- Gameplay UX Rework: 10/10 tasks
+- QA Sprint: 18 new test suites, 6 bug fixes
+
+**Active Roadmap:**
+- Phase 5: Adaptive Learning Revamp (Weeks 1-3) — AI curriculum, voice coaching, free play
+- Phase 6: Avatar Evolution & Gamification (Weeks 4-6) — Pokemon evolution, gems, abilities
+- Phase 7: Game Feel & Polish (Weeks 7-8) — micro-interactions, Rive, transitions
+- Phase 8: Audio Input (Weeks 9-10) — mic polyphonic detection (R&D parallel from Week 1)
+- Music Library (parallel pipeline, UI integration Weeks 11-12)
+- Phase 9: Social & Leaderboards (Weeks 11-12)
+- Phase 10: QA + Launch (Weeks 13-16)
+
+See `docs/plans/2026-02-17-16-week-roadmap.md` for full details.
 
 ## Quick Commands
 
