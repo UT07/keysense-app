@@ -747,11 +747,28 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   // Derived state
   const countInComplete = currentBeat >= 0;
 
-  // Track the MIDI note of the next expected note for keyboard auto-scroll
-  const [nextExpectedNote, setNextExpectedNote] = useState<number | undefined>(undefined);
+  // Track the MIDI note of the next expected note for keyboard auto-scroll.
+  // Initialize from the first note so the keyboard starts scrolled correctly.
+  const [nextExpectedNote, setNextExpectedNote] = useState<number | undefined>(() => {
+    if (exercise.notes.length === 0) return undefined;
+    const sorted = [...exercise.notes].sort((a, b) => a.startBeat - b.startBeat);
+    return sorted[0].note;
+  });
   // Split-mode: per-hand focus notes for independent auto-scroll
-  const [focusNoteLeft, setFocusNoteLeft] = useState<number | undefined>(undefined);
-  const [focusNoteRight, setFocusNoteRight] = useState<number | undefined>(undefined);
+  const [focusNoteLeft, setFocusNoteLeft] = useState<number | undefined>(() => {
+    if (keyboardMode !== 'split') return undefined;
+    const leftNotes = exercise.notes
+      .filter(n => n.hand === 'left' || (!n.hand && n.note < splitPoint))
+      .sort((a, b) => a.startBeat - b.startBeat);
+    return leftNotes[0]?.note;
+  });
+  const [focusNoteRight, setFocusNoteRight] = useState<number | undefined>(() => {
+    if (keyboardMode !== 'split') return undefined;
+    const rightNotes = exercise.notes
+      .filter(n => n.hand === 'right' || (!n.hand && n.note >= splitPoint))
+      .sort((a, b) => a.startBeat - b.startBeat);
+    return rightNotes[0]?.note;
+  });
 
   useEffect(() => {
     // Find the next unconsumed note(s) at the nearest upcoming beat

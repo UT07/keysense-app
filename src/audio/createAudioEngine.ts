@@ -54,11 +54,13 @@ function tryCreateWebAudioEngine(): IAudioEngine | null {
 
 /**
  * Configure iOS audio session for playback in silent mode.
- * Must be called before any audio engine initialization.
+ * Must be called (and awaited) before any audio engine initialization.
  * Uses expo-av's Audio.setAudioModeAsync which works regardless of
  * which engine (WebAudio/ExpoAV) is ultimately used for synthesis.
+ *
+ * Exported so useExercisePlayback can await it before engine.initialize().
  */
-async function ensureAudioModeConfigured(): Promise<void> {
+export async function ensureAudioModeConfigured(): Promise<void> {
   if (audioModeConfigured) return;
   audioModeConfigured = true;
 

@@ -14,7 +14,7 @@ import { useEffect, useCallback, useRef, useState } from 'react';
 import type { Exercise, MidiNoteEvent, ExerciseScore } from '@/core/exercises/types';
 import { scoreExercise } from '@/core/exercises/ExerciseValidator';
 import { getMidiInput } from '@/input/MidiInput';
-import { createAudioEngine } from '@/audio/createAudioEngine';
+import { createAudioEngine, ensureAudioModeConfigured } from '@/audio/createAudioEngine';
 import { useExerciseStore } from '@/stores/exerciseStore';
 import { useProgressStore } from '@/stores/progressStore';
 import { getLessonIdForExercise } from '../content/ContentLoader';
@@ -155,6 +155,10 @@ export function useExercisePlayback({
 
     const initAudio = async () => {
       try {
+        // Ensure iOS audio session is configured BEFORE engine init.
+        // This must complete before any audio plays or iOS may suspend output.
+        await ensureAudioModeConfigured();
+
         // If already initialized (singleton was kept alive), skip re-init
         if (audioEngine.isReady()) {
           if (mounted) {
