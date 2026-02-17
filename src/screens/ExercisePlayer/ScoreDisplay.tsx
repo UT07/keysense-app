@@ -91,6 +91,9 @@ export const ScoreDisplay: React.FC<ScoreDisplayProps> = ({
   };
 
   if (compact) {
+    // Compact mode: title + progress bar + percent only.
+    // Combo and feedback are shown in the feedbackOverlay between piano roll and keyboard,
+    // so duplicating them here causes visual clutter on narrow screens.
     return (
       <View style={styles.compactContainer} testID={testID}>
         <Text style={styles.compactTitle} numberOfLines={1}>
@@ -105,23 +108,6 @@ export const ScoreDisplay: React.FC<ScoreDisplayProps> = ({
             ]}
           />
         </View>
-
-        {combo > 0 && (
-          <Animated.View style={[styles.compactCombo, comboAnimStyle]}>
-            <Text style={styles.compactComboText}>{combo}x</Text>
-          </Animated.View>
-        )}
-
-        {feedback && (
-          <View
-            style={[
-              styles.compactFeedbackBadge,
-              { backgroundColor: getFeedbackColor() },
-            ]}
-          >
-            <Text style={styles.compactFeedbackText}>{getFeedbackText()}</Text>
-          </View>
-        )}
 
         <Text style={styles.compactPercent}>
           {Math.round(progressPercent)}%
@@ -218,27 +204,6 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#DC143C',
     borderRadius: 2,
-  },
-  compactCombo: {
-    backgroundColor: 'rgba(220, 20, 60, 0.15)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  compactComboText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#DC143C',
-  },
-  compactFeedbackBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  compactFeedbackText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#FFFFFF',
   },
   compactPercent: {
     fontSize: 11,

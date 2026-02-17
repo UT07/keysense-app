@@ -80,6 +80,10 @@ function handleAuthError(error: unknown): string {
       return 'This account has been disabled. Please contact support.';
     case 'auth/too-many-requests':
       return 'Too many attempts. Please wait a moment and try again.';
+    case 'auth/operation-not-allowed':
+      return 'This sign-in method is not enabled. Please contact support or try another method.';
+    case 'auth/network-request-failed':
+      return 'Network error. Please check your internet connection and try again.';
     case 'auth/credential-already-in-use':
       return 'This credential is already linked to another account.';
     case 'auth/requires-recent-login':
@@ -118,10 +122,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signInAnonymously: async () => {
+    console.log('[Auth] signInAnonymously started');
     set({ isLoading: true, error: null });
 
     try {
       const result = await firebaseSignInAnonymously(auth);
+      console.log('[Auth] signInAnonymously success, uid:', result.user.uid);
       set({
         user: result.user,
         isAuthenticated: true,
@@ -130,6 +136,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         error: null,
       });
     } catch (error) {
+      console.error('[Auth] signInAnonymously failed:', error);
       set({
         isLoading: false,
         error: handleAuthError(error),

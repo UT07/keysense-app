@@ -235,13 +235,14 @@ describe('Exercise Flow Integration Test', () => {
   });
 
   it('loads exercise and displays initial state', async () => {
-    const { getByTestId, getByText } = render(
+    const { getByTestId, getAllByText } = render(
       <ExercisePlayer exercise={TEST_EXERCISE} />
     );
 
     await waitFor(() => {
       expect(getByTestId('exercise-player')).toBeTruthy();
-      expect(getByText('C Major Scale Test')).toBeTruthy();
+      // Title appears in both ScoreDisplay and ExerciseIntroOverlay
+      expect(getAllByText('C Major Scale Test').length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -356,10 +357,11 @@ describe('Exercise Flow Integration Test', () => {
   });
 
   it('displays hint before start', async () => {
-    const { getByText } = render(
+    const { getAllByText } = render(
       <ExercisePlayer exercise={TEST_EXERCISE} />
     );
 
-    expect(getByText('Play C-D-E-F in order')).toBeTruthy();
+    // Hint appears in both HintDisplay and ExerciseIntroOverlay
+    expect(getAllByText('Play C-D-E-F in order').length).toBeGreaterThanOrEqual(1);
   });
 });

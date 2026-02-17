@@ -60,6 +60,7 @@ import { getAchievementById } from '../../core/achievements/achievements';
 import type { PlaybackSpeed } from '../../stores/types';
 import { useDevKeyboardMidi } from '../../input/DevKeyboardMidi';
 import { DemoPlaybackService } from '../../services/demoPlayback';
+import { ExerciseIntroOverlay } from './ExerciseIntroOverlay';
 import { COLORS } from '../../theme/tokens';
 
 export interface ExercisePlayerProps {
@@ -302,7 +303,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   // Responsive layout — supports both portrait and landscape
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isPortrait = screenHeight > screenWidth;
-  const keyHeight = isPortrait ? 120 : 100;
+  const keyHeight = isPortrait ? 130 : 100;
   const topBarHeight = isPortrait ? 76 : 40;
 
   const hasAutoSetSpeed = useRef(false);
@@ -667,6 +668,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   });
 
   // UI state (separate from playback logic)
+  const [showIntro, setShowIntro] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const [highlightedKeys, setHighlightedKeys] = useState<Set<number>>(new Set());
   const [expectedNotes, setExpectedNotes] = useState<Set<number>>(new Set());
@@ -693,11 +695,11 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
 
     if (windowNotes.length > 0) {
       const newRange = computeStickyRange(windowNotes, keyboardRange);
-      if (newRange.startNote !== keyboardRange.startNote) {
+      if (newRange.startNote !== keyboardRange.startNote || newRange.octaveCount !== keyboardRange.octaveCount) {
         setKeyboardRange(newRange);
       }
     }
-  }, [Math.floor(currentBeat)]); // Only recompute on whole-beat changes
+  }, [Math.floor(currentBeat), keyboardRange]); // Include keyboardRange to avoid stale closure
 
   const keyboardStartNote = keyboardRange.startNote;
   const keyboardOctaveCount = keyboardRange.octaveCount;
@@ -800,6 +802,16 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     }
   }, [currentBeat, exercise.notes, testMode, keyboardMode, splitPoint]);
 
+  // Force keyboard range update when the next expected note is outside the current range
+  useEffect(() => {
+    if (nextExpectedNote === undefined) return;
+    const rangeMin = keyboardRange.startNote;
+    const rangeMax = keyboardRange.startNote + keyboardRange.octaveCount * 12 - 1;
+    if (nextExpectedNote < rangeMin || nextExpectedNote > rangeMax) {
+      setKeyboardRange(computeZoomedRange([nextExpectedNote], keyboardRange.octaveCount));
+    }
+  }, [nextExpectedNote, keyboardRange]);
+
   // Playback loop is now handled by useExercisePlayback hook
 
   /**
@@ -881,6 +893,11 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         useExerciseStore.getState().setCurrentBeat(beat);
       },
       (notes) => setDemoActiveNotes(notes),
+      // onComplete: auto-called when demo finishes playing the exercise
+      () => {
+        setIsDemoPlaying(false);
+        setDemoActiveNotes(new Set());
+      },
     );
   }, [exercise, isPlaying, pausePlayback, handleManualNoteOn, handleManualNoteOff]);
 
@@ -1226,80 +1243,10 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         </View>
       )}
 
-      {/* Landscape layout: vertical stack — top bar, piano roll, keyboard */}
+      {/* Vertical stack — top bar, piano roll, keyboard */}
       <View style={styles.mainColumn}>
-        {/* Top bar: score + hint + controls in a single compact row */}
+        {/* Clean top bar: exit + score + play/pause only */}
         <View style={styles.topBar}>
-          <ScoreDisplay
-            exercise={exercise}
-            currentBeat={currentBeat}
-            combo={comboCount}
-            feedback={feedback.type}
-            comboAnimValue={comboScale}
-            compact
-          />
-
-          <View style={styles.topBarDivider} />
-
-          <HintDisplay
-            hints={testMode ? { beforeStart: 'Mastery test — play from memory!', commonMistakes: [], successMessage: '' } : exercise.hints}
-            isPlaying={isPlaying}
-            countInComplete={countInComplete}
-            feedback={feedback.type}
-            compact
-          />
-
-          <View style={styles.topBarDivider} />
-
-          {/* Speed selector pill — tap to cycle 0.5x → 0.75x → 1x */}
-          <TouchableOpacity
-            onPress={cycleSpeed}
-            style={[
-              styles.speedPill,
-              playbackSpeed < 1.0 && styles.speedPillActive,
-            ]}
-            testID="speed-selector"
-            accessibilityLabel={`Playback speed ${playbackSpeed}x. Tap to change.`}
-          >
-            <Text style={[
-              styles.speedPillText,
-              playbackSpeed < 1.0 && styles.speedPillTextActive,
-            ]}>
-              {playbackSpeed === 1.0 ? '1x' : `${playbackSpeed}x`}
-            </Text>
-          </TouchableOpacity>
-
-          <View style={styles.topBarDivider} />
-
-          {/* Demo button */}
-          <TouchableOpacity
-            onPress={isDemoPlaying ? stopDemo : startDemo}
-            style={[styles.speedPill, isDemoPlaying && styles.speedPillActive]}
-            testID="demo-button"
-          >
-            <Text style={[styles.speedPillText, isDemoPlaying && styles.speedPillTextActive]}>
-              {isDemoPlaying ? 'Stop' : 'Demo'}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Ghost notes toggle — visible after demo watched */}
-          {demoWatched && (
-            <>
-              <View style={styles.topBarDivider} />
-              <TouchableOpacity
-                onPress={() => useExerciseStore.getState().setGhostNotesEnabled(!ghostNotesEnabled)}
-                style={[styles.speedPill, ghostNotesEnabled && styles.speedPillActive]}
-                testID="ghost-toggle"
-              >
-                <Text style={[styles.speedPillText, ghostNotesEnabled && styles.speedPillTextActive]}>
-                  Ghost
-                </Text>
-              </TouchableOpacity>
-            </>
-          )}
-
-          <View style={styles.topBarDivider} />
-
           <ExerciseControls
             isPlaying={isPlaying}
             isPaused={isPaused}
@@ -1310,7 +1257,82 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
             compact
             testID="exercise-controls"
           />
+
+          <View style={{ flex: 1 }}>
+            <ScoreDisplay
+              exercise={exercise}
+              currentBeat={currentBeat}
+              combo={comboCount}
+              feedback={feedback.type}
+              comboAnimValue={comboScale}
+              compact
+            />
+          </View>
+
+          {/* Speed pill — only shown when not 1x */}
+          {playbackSpeed < 1.0 && (
+            <TouchableOpacity
+              onPress={cycleSpeed}
+              style={[styles.speedPill, styles.speedPillActive]}
+              testID="speed-selector"
+            >
+              <Text style={[styles.speedPillText, styles.speedPillTextActive]}>
+                {`${playbackSpeed}x`}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
+
+        {/* Secondary controls — visible when not playing or paused */}
+        {(!isPlaying || isPaused) && (
+          <View style={styles.secondaryBar} testID="secondary-controls">
+            <HintDisplay
+              hints={testMode ? { beforeStart: 'Mastery test — play from memory!', commonMistakes: [], successMessage: '' } : exercise.hints}
+              isPlaying={isPlaying}
+              countInComplete={countInComplete}
+              feedback={feedback.type}
+              compact
+            />
+
+            <View style={{ flex: 1 }} />
+
+            {/* Speed selector */}
+            <TouchableOpacity
+              onPress={cycleSpeed}
+              style={[styles.speedPill, playbackSpeed < 1.0 && styles.speedPillActive]}
+              testID="speed-selector-full"
+              accessibilityLabel={`Playback speed ${playbackSpeed}x. Tap to change.`}
+            >
+              <Text style={[styles.speedPillText, playbackSpeed < 1.0 && styles.speedPillTextActive]}>
+                {playbackSpeed === 1.0 ? '1x' : `${playbackSpeed}x`}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Demo button */}
+            <TouchableOpacity
+              onPress={isDemoPlaying ? stopDemo : startDemo}
+              style={[styles.speedPill, isDemoPlaying && styles.speedPillActive]}
+              testID="demo-button"
+            >
+              <Text style={[styles.speedPillText, isDemoPlaying && styles.speedPillTextActive]}>
+                {isDemoPlaying ? 'Stop' : 'Demo'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Ghost notes toggle — visible after demo watched */}
+            {demoWatched && (
+              <TouchableOpacity
+                onPress={() => useExerciseStore.getState().setGhostNotesEnabled(!ghostNotesEnabled)}
+                style={[styles.speedPill, ghostNotesEnabled && styles.speedPillActive]}
+                testID="ghost-toggle"
+              >
+                <Text style={[styles.speedPillText, ghostNotesEnabled && styles.speedPillTextActive]}>
+                  Ghost
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* Center: Vertical piano roll fills remaining vertical space */}
         <View style={styles.pianoRollContainer} onLayout={(e) => {
@@ -1452,6 +1474,18 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         />
       )}
 
+      {/* Exercise intro overlay — shows objectives before starting */}
+      {showIntro && !isPlaying && !showCompletion && !isDemoPlaying && (
+        <ExerciseIntroOverlay
+          exercise={exercise}
+          onReady={() => {
+            setShowIntro(false);
+            handleStart();
+          }}
+          testID="exercise-intro"
+        />
+      )}
+
       {/* Completion modal */}
       {showCompletion && finalScore && (
         <CompletionModal
@@ -1507,10 +1541,15 @@ const styles = StyleSheet.create({
     borderBottomColor: '#2A2A2A',
     gap: 8,
   },
-  topBarDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: '#333333',
+  secondaryBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    backgroundColor: '#151515',
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+    gap: 8,
   },
   pianoRollContainer: {
     flex: 1,

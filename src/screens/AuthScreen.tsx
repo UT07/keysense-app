@@ -128,7 +128,12 @@ export function AuthScreen(): React.ReactElement {
 
   const handleSkip = useCallback(async () => {
     await signInAnonymously();
-    // If sign-in failed, the error is shown via the error banner in the UI.
+    // If sign-in failed, show an Alert (the error banner is also set but
+    // may be too subtle to notice on first try).
+    const storeError = useAuthStore.getState().error;
+    if (storeError) {
+      Alert.alert('Could not skip', storeError);
+    }
     // If it succeeded, isAuthenticated becomes true and AppNavigator
     // automatically navigates away from this screen.
   }, [signInAnonymously]);

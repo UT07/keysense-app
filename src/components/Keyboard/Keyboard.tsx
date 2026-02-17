@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
   whiteKeyContainer: {
     flex: 1,
     position: 'relative',
-    minWidth: 40,
+    minWidth: 48,
   },
   blackKeyOverlay: {
     position: 'absolute',

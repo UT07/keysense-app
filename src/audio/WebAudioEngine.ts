@@ -98,6 +98,14 @@ export class WebAudioEngine implements IAudioEngine {
       const initMs = Date.now() - initStart;
       console.log(`[WebAudioEngine] Context created in ${initMs}ms (sampleRate=${this.context.sampleRate})`);
 
+      // Attempt to resume the context (may succeed on Android, will be deferred on iOS
+      // until first user gesture triggers playNote which has its own resume check)
+      if (this.context.state === 'suspended') {
+        this.context.resume().catch(() => {
+          // Expected on iOS before user gesture — playNote() handles this
+        });
+      }
+
       // Pre-warm the audio pipeline to avoid cold-start latency on first real note
       this.warmUpAudio();
 
@@ -213,6 +221,12 @@ export class WebAudioEngine implements IAudioEngine {
   playNote(note: number, velocity: number = 0.8): NoteHandle {
     if (!this.context || !this.masterGain) {
       throw new Error('WebAudioEngine not initialized. Call initialize() first');
+    }
+
+    // iOS requires a user gesture to unlock the AudioContext from suspended state.
+    // Resume synchronously on first user-initiated playNote call.
+    if (this.context.state === 'suspended') {
+      this.context.resume();
     }
 
     const normalizedVelocity = Math.max(0.0, Math.min(1.0, velocity));

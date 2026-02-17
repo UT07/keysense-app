@@ -114,18 +114,25 @@ export class DemoPlaybackService {
    * @param onBeatUpdate - Called every frame (~16ms) with the current beat position
    * @param onActiveNotes - Called every frame with the Set of currently sounding MIDI notes
    */
+  /** Called when demo finishes (auto-stop at end of exercise) */
+  private onCompleteCallback?: () => void;
+  private audioEngineRef?: DemoAudioEngine;
+
   start(
     exercise: Pick<Exercise, 'notes' | 'settings'>,
     audioEngine: DemoAudioEngine,
     speedMultiplier: number = 0.6,
     onBeatUpdate?: (beat: number) => void,
     onActiveNotes?: (notes: Set<number>) => void,
+    onComplete?: () => void,
   ): void {
     // Clean up any previous playback
     this.stop();
 
     this.isPlaying = true;
     this.startTime = Date.now();
+    this.onCompleteCallback = onComplete;
+    this.audioEngineRef = audioEngine;
     this.schedule = generateDemoSchedule(exercise.notes);
     this.scheduledNoteIndices.clear();
     this.releasedNoteIndices.clear();
@@ -193,7 +200,9 @@ export class DemoPlaybackService {
 
       // Auto-stop when exercise is complete (totalBeats + 1 beat buffer)
       if (currentBeat > totalBeats + 1) {
+        const cb = this.onCompleteCallback;
         this.stop();
+        cb?.();
       }
     }, 16); // ~60fps
   }
@@ -210,10 +219,19 @@ export class DemoPlaybackService {
       this.intervalId = null;
     }
 
+    // Release all active notes before clearing — prevents notes ringing forever
+    if (this.audioEngineRef) {
+      for (const handle of this.activeHandles.values()) {
+        this.audioEngineRef.releaseNote(handle);
+      }
+    }
+
     // Clean up tracking state
     this.activeHandles.clear();
     this.scheduledNoteIndices.clear();
     this.releasedNoteIndices.clear();
     this.schedule = [];
+    this.audioEngineRef = undefined;
+    this.onCompleteCallback = undefined;
   }
 }

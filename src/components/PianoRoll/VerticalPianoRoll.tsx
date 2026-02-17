@@ -19,7 +19,7 @@ import type { NoteEvent } from '@/core/exercises/types';
 // ---------------------------------------------------------------------------
 
 /** Vertical pixels per beat of music */
-export const PIXELS_PER_BEAT = 140;
+export const PIXELS_PER_BEAT = 100;
 
 /** Hit line position as a ratio of container height (0.8 = 80% from top) */
 export const HIT_LINE_RATIO = 0.8;
@@ -209,7 +209,8 @@ export const VerticalPianoRoll = React.memo(
 
     // translateY drives the scrolling. As currentBeat increases the content
     // layer shifts down so that notes at currentBeat align with the hit line.
-    const translateY = currentBeat * PIXELS_PER_BEAT;
+    // During countdown (currentBeat < 0) freeze at 0 so notes stay still.
+    const translateY = Math.max(0, currentBeat) * PIXELS_PER_BEAT;
 
     // Total beats in exercise (used for beat line generation)
     const maxBeat =
@@ -244,8 +245,10 @@ export const VerticalPianoRoll = React.memo(
         const topPosition = hitLineY - note.startBeat * PIXELS_PER_BEAT;
 
         const noteEnd = note.startBeat + note.durationBeats;
-        const isPast = noteEnd < currentBeat;
-        const isActive = note.startBeat <= currentBeat && currentBeat < noteEnd;
+        // During countdown (currentBeat < 0), no notes are active or past
+        const clampedBeat = Math.max(0, currentBeat);
+        const isPast = noteEnd < clampedBeat;
+        const isActive = clampedBeat >= 0 && note.startBeat <= clampedBeat && clampedBeat < noteEnd;
 
         let color = COLORS.upcoming;
         let borderColor = 'rgba(255, 255, 255, 0.2)';

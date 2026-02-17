@@ -82,6 +82,7 @@ export function useExercisePlayback({
   const activeNotesRef = useRef<Map<number, any>>(new Map());
   const mountedRef = useRef(true);
   const handleCompletionRef = useRef<() => void>(() => {});
+  const lastStateUpdateRef = useRef(0); // Throttle state updates to ~20fps for perf
   const playedNotesRef = useRef<MidiNoteEvent[]>([]); // Ref for scoring (avoids stale closure)
 
   // Track component mount lifecycle
@@ -271,8 +272,13 @@ export function useExercisePlayback({
       // Calculate beat: elapsed_ms / (60000 / tempo) - countIn
       const beat = (elapsed / 60000) * tempo - countInBeats;
 
-      setCurrentBeat(beat);
-      exerciseStore.setCurrentBeat(beat);
+      // Throttle React state updates to ~20fps to reduce re-renders.
+      // Internal timing (scoring, completion) stays at 60fps via refs.
+      if (currentTime - lastStateUpdateRef.current >= 50) {
+        lastStateUpdateRef.current = currentTime;
+        setCurrentBeat(beat);
+        exerciseStore.setCurrentBeat(beat);
+      }
 
       // Check for completion (use ref to avoid stale closure)
       if (beat > exerciseDuration) {

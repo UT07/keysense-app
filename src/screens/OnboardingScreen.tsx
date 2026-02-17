@@ -141,9 +141,9 @@ function WelcomeStep({
         Learn piano in 5 minutes a day with AI-powered feedback
       </Text>
       <View style={styles.featureList}>
-        <FeatureItem icon="\u26A1" text="Real-time feedback on your playing" />
-        <FeatureItem icon="\uD83C\uDFAF" text="Personalized learning path" />
-        <FeatureItem icon="\uD83D\uDD25" text="Build daily practice habits" />
+        <FeatureItem icon="⚡" text="Real-time feedback on your playing" />
+        <FeatureItem icon="🎯" text="Personalized learning path" />
+        <FeatureItem icon="🔥" text="Build daily practice habits" />
       </View>
       <Button title="Get Started" onPress={onNext} size="large" style={styles.button} />
     </AnimatedStepWrapper>
@@ -180,21 +180,21 @@ function ExperienceLevelStep({
 
       <View style={styles.optionsList}>
         <OptionCard
-          icon="\uD83C\uDF31"
+          icon="🌱"
           title="Complete Beginner"
           description="Never touched a piano before"
           selected={value === 'beginner'}
           onPress={() => onValueChange('beginner')}
         />
         <OptionCard
-          icon="\uD83D\uDCDA"
+          icon="📚"
           title="I Know Some Basics"
           description="Can play simple melodies"
           selected={value === 'intermediate'}
           onPress={() => onValueChange('intermediate')}
         />
         <OptionCard
-          icon="\uD83C\uDFBC"
+          icon="🎼"
           title="Returning Player"
           description="Played before, want to restart"
           selected={value === 'returning'}
@@ -243,14 +243,14 @@ function EquipmentCheckStep({
 
       <View style={styles.midiOptions}>
         <OptionCard
-          icon="\u2328\uFE0F"
+          icon="⌨️"
           title="Yes, I Have a MIDI Keyboard"
           description="USB or Bluetooth connected device"
           selected={value === true}
           onPress={() => onValueChange(true)}
         />
         <OptionCard
-          icon="\uD83D\uDCF1"
+          icon="📱"
           title="No, I'll Use Screen Keyboard"
           description="Great! You can start learning right away"
           selected={value === false}
@@ -299,21 +299,21 @@ function GoalSettingStep({
 
       <View style={styles.optionsList}>
         <OptionCard
-          icon="\uD83C\uDFB5"
+          icon="🎵"
           title="Play My Favorite Songs"
           description="Learn recognizable melodies quickly"
           selected={value === 'songs'}
           onPress={() => onValueChange('songs')}
         />
         <OptionCard
-          icon="\uD83C\uDFAF"
+          icon="🎯"
           title="Learn Proper Technique"
           description="Build solid fundamentals for long-term growth"
           selected={value === 'technique'}
           onPress={() => onValueChange('technique')}
         />
         <OptionCard
-          icon="\uD83D\uDE80"
+          icon="🚀"
           title="Just Explore & Have Fun"
           description="No pressure, let's experiment!"
           selected={value === 'exploration'}
