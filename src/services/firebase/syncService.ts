@@ -7,8 +7,11 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from './config';
-import { syncProgress } from './firestore';
-import type { ProgressChange } from './firestore';
+import { syncProgress, getAllLessonProgress, getGamificationData } from './firestore';
+import type { ProgressChange, LessonProgress as FirestoreLessonProgress } from './firestore';
+import { useProgressStore } from '../../stores/progressStore';
+import { levelFromXp } from '../../core/progression/XpSystem';
+import type { LessonProgress, ExerciseProgress } from '../../core/exercises/types';
 
 // ============================================================================
 // Constants
@@ -304,6 +307,174 @@ export class SyncManager {
   }
 
   // --------------------------------------------------------------------------
+  // Pull Remote State (Download)
+  // --------------------------------------------------------------------------
+
+  /**
+   * Fetch progress from Firestore and merge with local state.
+   * Uses "highest wins" strategy: higher XP, higher scores, more attempts.
+   * Called on app startup when authenticated and after sign-in on a new device.
+   */
+  async pullRemoteProgress(): Promise<{
+    pulled: boolean;
+    merged: boolean;
+    error?: string;
+  }> {
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      return { pulled: false, merged: false, error: 'No authenticated user' };
+    }
+
+    try {
+      // Fetch remote data in parallel
+      const [remoteLessons, remoteGamification] = await Promise.all([
+        getAllLessonProgress(uid),
+        getGamificationData(uid),
+      ]);
+
+      if (!remoteLessons.length && !remoteGamification) {
+        console.log('[Sync] No remote data found — nothing to pull');
+        return { pulled: true, merged: false };
+      }
+
+      const localState = useProgressStore.getState();
+      let didMerge = false;
+
+      // Merge XP: take the higher value
+      if (remoteGamification && remoteGamification.xp > localState.totalXp) {
+        useProgressStore.setState({
+          totalXp: remoteGamification.xp,
+          level: levelFromXp(remoteGamification.xp),
+        });
+        didMerge = true;
+        console.log(
+          `[Sync] Merged remote XP: ${remoteGamification.xp} (local was ${localState.totalXp})`,
+        );
+      }
+
+      // Merge streak: take the one with the higher current streak
+      if (remoteGamification) {
+        const remoteStreak = remoteGamification.streak;
+        const localStreak = localState.streakData;
+        if (remoteStreak.currentStreak > localStreak.currentStreak) {
+          useProgressStore.getState().updateStreakData({
+            currentStreak: remoteStreak.currentStreak,
+            longestStreak: Math.max(
+              remoteStreak.longestStreak,
+              localStreak.longestStreak,
+            ),
+            lastPracticeDate: remoteStreak.lastPracticeDate,
+          });
+          didMerge = true;
+        } else if (
+          remoteStreak.longestStreak > localStreak.longestStreak
+        ) {
+          useProgressStore.getState().updateStreakData({
+            longestStreak: remoteStreak.longestStreak,
+          });
+          didMerge = true;
+        }
+      }
+
+      // Merge lesson progress: per-exercise, take higher scores
+      if (remoteLessons.length > 0) {
+        for (const remoteLesson of remoteLessons) {
+          const localLesson = localState.lessonProgress[remoteLesson.lessonId];
+
+          if (!localLesson) {
+            // Lesson doesn't exist locally — adopt the remote version entirely
+            const convertedLesson = convertFirestoreLesson(remoteLesson);
+            useProgressStore
+              .getState()
+              .updateLessonProgress(remoteLesson.lessonId, convertedLesson);
+            didMerge = true;
+            continue;
+          }
+
+          // Lesson exists locally — merge per-exercise scores
+          let lessonChanged = false;
+          const remoteScores = remoteLesson.exerciseScores ?? {};
+          for (const [exId, remoteEx] of Object.entries(remoteScores)) {
+            const localEx = localLesson.exerciseScores[exId];
+
+            if (!localEx) {
+              // Exercise doesn't exist locally — adopt remote
+              useProgressStore.getState().updateExerciseProgress(
+                remoteLesson.lessonId,
+                exId,
+                convertFirestoreExercise(remoteEx),
+              );
+              lessonChanged = true;
+            } else if (remoteEx.highScore > localEx.highScore) {
+              // Remote has a higher score — take it
+              useProgressStore.getState().updateExerciseProgress(
+                remoteLesson.lessonId,
+                exId,
+                {
+                  ...localEx,
+                  highScore: remoteEx.highScore,
+                  stars: Math.max(remoteEx.stars, localEx.stars) as 0 | 1 | 2 | 3,
+                  attempts: Math.max(remoteEx.attempts, localEx.attempts),
+                  averageScore: remoteEx.averageScore,
+                },
+              );
+              lessonChanged = true;
+            } else if (remoteEx.attempts > localEx.attempts) {
+              // Remote has more attempts (even if score is lower)
+              useProgressStore.getState().updateExerciseProgress(
+                remoteLesson.lessonId,
+                exId,
+                {
+                  ...localEx,
+                  attempts: remoteEx.attempts,
+                },
+              );
+              lessonChanged = true;
+            }
+          }
+
+          // Upgrade lesson status if remote is more advanced
+          const statusRank = { locked: 0, available: 1, in_progress: 2, completed: 3 };
+          if (statusRank[remoteLesson.status] > statusRank[localLesson.status]) {
+            useProgressStore.getState().updateLessonProgress(
+              remoteLesson.lessonId,
+              {
+                ...localLesson,
+                ...(lessonChanged
+                  ? useProgressStore.getState().lessonProgress[remoteLesson.lessonId]
+                  : {}),
+                status: remoteLesson.status,
+                ...(remoteLesson.completedAt
+                  ? {
+                      completedAt:
+                        typeof remoteLesson.completedAt === 'object' &&
+                        'toMillis' in remoteLesson.completedAt
+                          ? (remoteLesson.completedAt as any).toMillis()
+                          : undefined,
+                    }
+                  : {}),
+              },
+            );
+            lessonChanged = true;
+          }
+
+          if (lessonChanged) didMerge = true;
+        }
+      }
+
+      if (didMerge) {
+        console.log('[Sync] Remote progress merged into local state');
+      }
+
+      return { pulled: true, merged: didMerge };
+    } catch (error) {
+      const msg = (error as Error)?.message ?? 'Unknown error';
+      console.warn('[Sync] Failed to pull remote progress:', msg);
+      return { pulled: false, merged: false, error: msg };
+    }
+  }
+
+  // --------------------------------------------------------------------------
   // Private Helpers
   // --------------------------------------------------------------------------
 
@@ -320,6 +491,47 @@ export class SyncManager {
   private async saveQueue(queue: SyncChange[]): Promise<void> {
     await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
   }
+}
+
+// ============================================================================
+// Firestore → Local Type Converters
+// ============================================================================
+
+function convertFirestoreExercise(
+  remote: FirestoreLessonProgress['exerciseScores'][string],
+): ExerciseProgress {
+  return {
+    exerciseId: remote.exerciseId,
+    highScore: remote.highScore,
+    stars: remote.stars as 0 | 1 | 2 | 3,
+    attempts: remote.attempts,
+    lastAttemptAt:
+      remote.lastAttemptAt && typeof remote.lastAttemptAt === 'object' && 'toMillis' in remote.lastAttemptAt
+        ? (remote.lastAttemptAt as any).toMillis()
+        : Date.now(),
+    averageScore: remote.averageScore,
+    completedAt: remote.highScore > 0 ? Date.now() : undefined,
+  };
+}
+
+function convertFirestoreLesson(remote: FirestoreLessonProgress): LessonProgress {
+  const exerciseScores: Record<string, ExerciseProgress> = {};
+  for (const [exId, exData] of Object.entries(remote.exerciseScores ?? {})) {
+    exerciseScores[exId] = convertFirestoreExercise(exData);
+  }
+
+  return {
+    lessonId: remote.lessonId,
+    status: remote.status,
+    exerciseScores,
+    bestScore: remote.bestScore,
+    completedAt:
+      remote.completedAt && typeof remote.completedAt === 'object' && 'toMillis' in remote.completedAt
+        ? (remote.completedAt as any).toMillis()
+        : undefined,
+    totalAttempts: remote.totalAttempts,
+    totalTimeSpentSeconds: remote.totalTimeSpentSeconds,
+  };
 }
 
 // ============================================================================

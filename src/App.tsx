@@ -173,6 +173,19 @@ export default function App(): React.ReactElement {
               console.log('[App] Local data migrated to cloud');
             }
           });
+
+          // Pull remote progress from Firestore and merge with local state.
+          // This enables cross-device sync: when the same account is used on
+          // simulator and physical device, both get the latest progress.
+          syncManager.pullRemoteProgress().then((result) => {
+            if (result.merged) {
+              console.log('[App] Remote progress merged into local state');
+            } else if (result.pulled) {
+              console.log('[App] Remote progress checked — no new data');
+            }
+          }).catch((err) => {
+            console.warn('[App] Remote progress pull failed:', err);
+          });
         }
       } catch (e) {
         console.warn('[App] Failed to hydrate progress state:', e);
