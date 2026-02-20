@@ -78,11 +78,22 @@ function generatePianoWav(): ArrayBuffer {
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  let output = '';
+
+  for (let i = 0; i < bytes.length; i += 3) {
+    const a = bytes[i];
+    const b = i + 1 < bytes.length ? bytes[i + 1] : 0;
+    const c = i + 2 < bytes.length ? bytes[i + 2] : 0;
+    const triple = (a << 16) | (b << 8) | c;
+
+    output += alphabet[(triple >> 18) & 0x3f];
+    output += alphabet[(triple >> 12) & 0x3f];
+    output += i + 1 < bytes.length ? alphabet[(triple >> 6) & 0x3f] : '=';
+    output += i + 2 < bytes.length ? alphabet[triple & 0x3f] : '=';
   }
-  return btoa(binary);
+
+  return output;
 }
 
 /**

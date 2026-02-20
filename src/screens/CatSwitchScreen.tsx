@@ -113,11 +113,12 @@ function StagePlatform({ color }: { color: string }): React.ReactElement {
 }
 
 /** Animated "Select" button with spring */
-function SelectButton({ isSelected, isUnlocked, onPress, color }: {
+function SelectButton({ isSelected, isUnlocked, onPress, color, testID }: {
   isSelected: boolean;
   isUnlocked: boolean;
   onPress: () => void;
   color: string;
+  testID?: string;
 }): React.ReactElement {
   const scale = useSharedValue(1);
 
@@ -159,6 +160,7 @@ function SelectButton({ isSelected, isUnlocked, onPress, color }: {
         style={[styles.selectButton, { backgroundColor: color }]}
         onPress={handlePress}
         activeOpacity={0.85}
+        testID={testID}
       >
         <Text style={styles.selectButtonText}>Select</Text>
       </TouchableOpacity>
@@ -259,6 +261,7 @@ function CatCard({ cat, isSelected, isUnlocked, onSelect, index }: {
         isUnlocked={isUnlocked}
         onPress={handleSelect}
         color={cat.color}
+        testID={`cat-switch-select-${cat.id}`}
       />
     </Animated.View>
   );
@@ -338,7 +341,7 @@ export function CatSwitchScreen(): React.ReactElement {
   const currentCat = CAT_CHARACTERS[currentIndex] ?? CAT_CHARACTERS[0];
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} testID="cat-switch-screen">
       {/* Dynamic background gradient matching current cat */}
       <LinearGradient
         colors={[currentCat.color + '18', COLORS.background, COLORS.background]}
@@ -354,6 +357,7 @@ export function CatSwitchScreen(): React.ReactElement {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            testID="cat-switch-back"
           >
             <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textPrimary} />
           </TouchableOpacity>
@@ -372,6 +376,7 @@ export function CatSwitchScreen(): React.ReactElement {
           data={CAT_CHARACTERS}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
+          testID="cat-switch-list"
           horizontal
           showsHorizontalScrollIndicator={false}
           snapToInterval={SNAP_INTERVAL}

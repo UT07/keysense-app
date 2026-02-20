@@ -36,7 +36,18 @@ export function computeZoomedRange(
   const minNote = Math.min(...activeNotes);
   const maxNote = Math.max(...activeNotes);
   const center = (minNote + maxNote) / 2;
-  const totalSemitones = maxOctaves * 12;
+  let octaves = maxOctaves;
+  let totalSemitones = octaves * 12;
+
+  // If the note span exceeds the available range, widen to fit.
+  // This prevents the oscillation bug where shift-up for maxNote and
+  // shift-down for minNote fight each other endlessly.
+  const span = maxNote - minNote;
+  if (span >= totalSemitones) {
+    octaves = Math.ceil((span + 1) / 12);
+    totalSemitones = octaves * 12;
+  }
+
   const halfSpan = totalSemitones / 2;
 
   // Start by centering the range on the midpoint of active notes
@@ -48,7 +59,6 @@ export function computeZoomedRange(
   // Ensure all active notes fit within the range
   // If maxNote exceeds the range end, shift startNote up
   if (startNote + totalSemitones <= maxNote) {
-    // Need to shift up -- compute minimum startNote that fits maxNote
     startNote = Math.ceil((maxNote + 1 - totalSemitones) / 12) * 12;
   }
 
@@ -67,7 +77,7 @@ export function computeZoomedRange(
     }
   }
 
-  return { startNote, octaveCount: maxOctaves };
+  return { startNote, octaveCount: octaves };
 }
 
 /**

@@ -3,10 +3,10 @@
  * A 5-round mini-exercise during onboarding that calibrates the learner profile
  * and determines which lesson to start at.
  *
- * State machine: INTRO -> PLAYING_ROUND -> ROUND_RESULT -> ... -> COMPLETE
+ * State machine: INTRO -> COUNT_IN -> PLAYING -> RESULT -> ... -> COMPLETE
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,12 +18,15 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { Button } from '../components/common';
-import { PianoRoll } from '../components/PianoRoll/PianoRoll';
+import { VerticalPianoRoll, deriveMidiRange } from '../components/PianoRoll/VerticalPianoRoll';
 import { Keyboard } from '../components/Keyboard/Keyboard';
+import { computeZoomedRange } from '../components/Keyboard/computeZoomedRange';
 import { MascotBubble } from '../components/Mascot/MascotBubble';
 import { useLearnerProfileStore } from '../stores/learnerProfileStore';
 import { useProgressStore } from '../stores/progressStore';
 import { useSettingsStore } from '../stores/settingsStore';
+import { createAudioEngine, ensureAudioModeConfigured } from '../audio/createAudioEngine';
+import type { NoteHandle } from '../audio/types';
 import { getRandomCatMessage } from '../content/catDialogue';
 import { COLORS, SPACING, BORDER_RADIUS } from '../theme/tokens';
 import type { NoteEvent, MidiNoteEvent } from '../core/exercises/types';
@@ -32,7 +35,7 @@ import type { NoteEvent, MidiNoteEvent } from '../core/exercises/types';
 // Types
 // ---------------------------------------------------------------------------
 
-type AssessmentPhase = 'intro' | 'playing' | 'result' | 'complete';
+type AssessmentPhase = 'intro' | 'countIn' | 'playing' | 'result' | 'complete';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -48,6 +51,26 @@ interface PlayedNote {
   note: number;
   timestamp: number;
 }
+
+export interface SkillCheckCapturedNote {
+  note: number;
+  noteOnTimestamp: number;
+  noteOffTimestamp: number | null;
+  durationMs: number;
+}
+
+interface PressReleaseScoringConfig {
+  timingToleranceMs?: number;
+  timingGracePeriodMs?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const ASSESSMENT_COUNT_IN_BEATS = 4;
+const ASSESSMENT_TIMING_TOLERANCE_MS = 75;
+const ASSESSMENT_TIMING_GRACE_MS = 220;
 
 // ---------------------------------------------------------------------------
 // Round Data
@@ -135,11 +158,8 @@ function getCatMood(score: number): 'celebrating' | 'encouraging' | 'happy' {
 // ---------------------------------------------------------------------------
 
 /**
- * Score a single round based on played notes vs expected notes.
+ * Backward-compatible round score based on note-on events only.
  * Returns a score between 0 and 1.
- *
- * Score = (correct_pitches / total_notes * 0.6) + (avg_timing_score * 0.4)
- * Where timing_score = max(0, 1 - abs(offset_ms) / 500)
  */
 export function scoreRound(
   expectedNotes: NoteEvent[],
@@ -154,13 +174,11 @@ export function scoreRound(
   let totalTimingScore = 0;
   let matchedCount = 0;
 
-  // Track which played notes have been consumed to avoid double-matching
   const consumedPlayedIndices = new Set<number>();
 
   for (const expected of expectedNotes) {
     const expectedTimeMs = expected.startBeat * msPerBeat;
 
-    // Find the best matching played note for this expected note
     let bestMatchIndex = -1;
     let bestTimingOffset = Infinity;
 
@@ -193,6 +211,114 @@ export function scoreRound(
   return pitchScore * 0.6 + avgTimingScore * 0.4;
 }
 
+export function calculateTimingScore01(
+  offsetMs: number,
+  toleranceMs: number,
+  gracePeriodMs: number,
+): number {
+  const absOffset = Math.abs(offsetMs);
+
+  if (absOffset <= toleranceMs) {
+    return 1;
+  }
+
+  if (absOffset <= gracePeriodMs) {
+    const t = (absOffset - toleranceMs) / Math.max(1, gracePeriodMs - toleranceMs);
+    return 1 - t * 0.5;
+  }
+
+  if (absOffset <= gracePeriodMs * 2) {
+    const t = (absOffset - gracePeriodMs) / Math.max(1, gracePeriodMs);
+    return Math.max(0, 0.5 * (1 - t));
+  }
+
+  return 0;
+}
+
+/**
+ * Score each expected note on pitch, press timing, and release timing.
+ * Output remains normalized to 0..1 for existing placement logic.
+ */
+export function scoreRoundPressRelease(
+  expectedNotes: NoteEvent[],
+  playedNotes: SkillCheckCapturedNote[],
+  tempo: number,
+  beatZeroEpochMs: number,
+  config: PressReleaseScoringConfig = {},
+): number {
+  if (expectedNotes.length === 0) return 0;
+
+  const toleranceMs = config.timingToleranceMs ?? ASSESSMENT_TIMING_TOLERANCE_MS;
+  const gracePeriodMs = config.timingGracePeriodMs ?? ASSESSMENT_TIMING_GRACE_MS;
+  const msPerBeat = 60000 / tempo;
+
+  const sortedExpected = [...expectedNotes].sort((a, b) => a.startBeat - b.startBeat);
+  const consumedPlayed = new Set<number>();
+  let aggregateScore = 0;
+
+  for (const expected of sortedExpected) {
+    const expectedPress = beatZeroEpochMs + expected.startBeat * msPerBeat;
+    const expectedRelease = expectedPress + expected.durationBeats * msPerBeat;
+
+    let bestIndex = -1;
+    let bestPressDistance = Infinity;
+
+    for (let i = 0; i < playedNotes.length; i++) {
+      if (consumedPlayed.has(i)) continue;
+      const played = playedNotes[i];
+      if (played.note !== expected.note) continue;
+      const pressDistance = Math.abs(played.noteOnTimestamp - expectedPress);
+      if (pressDistance < bestPressDistance) {
+        bestPressDistance = pressDistance;
+        bestIndex = i;
+      }
+    }
+
+    if (bestIndex < 0) {
+      for (let i = 0; i < playedNotes.length; i++) {
+        if (consumedPlayed.has(i)) continue;
+        const played = playedNotes[i];
+        const pressDistance = Math.abs(played.noteOnTimestamp - expectedPress);
+        if (pressDistance < bestPressDistance) {
+          bestPressDistance = pressDistance;
+          bestIndex = i;
+        }
+      }
+    }
+
+    if (bestIndex < 0) {
+      continue;
+    }
+
+    consumedPlayed.add(bestIndex);
+    const played = playedNotes[bestIndex];
+
+    const pitchScore = played.note === expected.note ? 1 : 0;
+    const pressScore = calculateTimingScore01(
+      played.noteOnTimestamp - expectedPress,
+      toleranceMs,
+      gracePeriodMs,
+    );
+
+    const releaseScore = played.noteOffTimestamp == null
+      ? 0
+      : calculateTimingScore01(
+          played.noteOffTimestamp - expectedRelease,
+          toleranceMs,
+          gracePeriodMs,
+        );
+
+    const noteScore =
+      pitchScore * 0.5 +
+      pressScore * 0.25 +
+      releaseScore * 0.25;
+
+    aggregateScore += noteScore;
+  }
+
+  return Math.max(0, Math.min(1, aggregateScore / sortedExpected.length));
+}
+
 /**
  * Determine which lesson to start at based on round scores.
  */
@@ -205,7 +331,6 @@ export function determineStartLesson(roundScores: number[]): string {
   if (first3Perfect) return 'lesson-05';
   if (first2Perfect) return 'lesson-03';
 
-  // Find first failed round
   const firstFail = roundScores.findIndex((s) => s < 0.6);
   if (firstFail <= 0) return 'lesson-01';
   if (firstFail <= 1) return 'lesson-02';
@@ -222,89 +347,40 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export function SkillAssessmentScreen(): React.ReactElement {
   const navigation = useNavigation<NavigationProp>();
   const catId = useSettingsStore((s) => s.selectedCatId) || 'mini-meowww';
+  const playbackSpeed = useSettingsStore((s) => s.playbackSpeed);
 
-  // State machine
   const [phase, setPhase] = useState<AssessmentPhase>('intro');
+  const phaseRef = useRef<AssessmentPhase>('intro');
   const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
   const [roundScores, setRoundScores] = useState<number[]>([]);
   const [currentScore, setCurrentScore] = useState(0);
   const [currentBeat, setCurrentBeat] = useState(0);
   const [startLesson, setStartLesson] = useState('lesson-01');
 
-  // Refs for tracking played notes in a round
-  const playedNotesRef = useRef<PlayedNote[]>([]);
-  const roundStartTimeRef = useRef(0);
+  const capturedNotesRef = useRef<SkillCheckCapturedNote[]>([]);
+  const activeCapturedByNoteRef = useRef<Map<number, number[]>>(new Map());
+
+  const roundStartEpochRef = useRef(0);
+  const beatZeroEpochRef = useRef(0);
   const beatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const audioEngineRef = useRef(createAudioEngine());
+  const audioReadyRef = useRef(false);
+  const activeNoteHandlesRef = useRef<Map<number, NoteHandle>>(new Map());
+
   const currentRound = ASSESSMENT_ROUNDS[currentRoundIndex];
 
-  // Expected notes as a Set for keyboard highlighting
-  const expectedNoteSet = React.useMemo(() => {
-    if (!currentRound) return new Set<number>();
-    return new Set(currentRound.notes.map((n) => n.note));
-  }, [currentRound]);
+  // Apply playback speed multiplier to round tempo (matches ExercisePlayer behavior)
+  const effectiveTempo = currentRound
+    ? Math.round(currentRound.tempo * playbackSpeed)
+    : 60;
 
-  // Focus note for auto-scroll (center of the expected notes)
-  const focusNote = React.useMemo(() => {
-    if (!currentRound || currentRound.notes.length === 0) return undefined;
-    const notes = currentRound.notes.map((n) => n.note);
-    return Math.round(notes.reduce((a, b) => a + b, 0) / notes.length);
-  }, [currentRound]);
-
-  // Cleanup intervals on unmount
   useEffect(() => {
-    return () => {
-      if (beatIntervalRef.current) clearInterval(beatIntervalRef.current);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, []);
+    phaseRef.current = phase;
+  }, [phase]);
 
-  // Start a round: begin beat counter and set timeout for round end
-  const startRound = useCallback(() => {
-    if (!currentRound) return;
-
-    playedNotesRef.current = [];
-    roundStartTimeRef.current = Date.now();
-    setCurrentBeat(0);
-    setPhase('playing');
-
-    const msPerBeat = 60000 / currentRound.tempo;
-    const maxBeat = Math.max(
-      ...currentRound.notes.map((n) => n.startBeat + n.durationBeats),
-    );
-    const totalDurationMs = (maxBeat + 2) * msPerBeat; // +2 beats grace period
-
-    // Advance beat counter
-    const startTime = Date.now();
-    beatIntervalRef.current = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const beat = elapsed / msPerBeat;
-      setCurrentBeat(beat);
-
-      if (beat >= maxBeat + 2) {
-        // Auto-end the round
-        if (beatIntervalRef.current) {
-          clearInterval(beatIntervalRef.current);
-          beatIntervalRef.current = null;
-        }
-        finishRound();
-      }
-    }, 50);
-
-    // Safety timeout in case interval doesn't fire
-    timeoutRef.current = setTimeout(() => {
-      if (beatIntervalRef.current) {
-        clearInterval(beatIntervalRef.current);
-        beatIntervalRef.current = null;
-      }
-      finishRound();
-    }, totalDurationMs + 500);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentRound, currentRoundIndex]);
-
-  // Score the round and transition to result phase
-  const finishRound = useCallback(() => {
+  const clearRoundTimers = useCallback(() => {
     if (beatIntervalRef.current) {
       clearInterval(beatIntervalRef.current);
       beatIntervalRef.current = null;
@@ -313,47 +389,220 @@ export function SkillAssessmentScreen(): React.ReactElement {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
+  }, []);
+
+  const releaseAllAudioNotes = useCallback(() => {
+    try {
+      audioEngineRef.current.releaseAllNotes();
+    } catch {
+      // Audio cleanup is best-effort.
+    }
+    activeNoteHandlesRef.current.clear();
+  }, []);
+
+  const closeCapturedNote = useCallback((note: number, noteOffTimestamp: number) => {
+    const noteStack = activeCapturedByNoteRef.current.get(note);
+    if (!noteStack || noteStack.length === 0) return;
+
+    const noteIndex = noteStack.pop()!;
+    if (noteStack.length === 0) {
+      activeCapturedByNoteRef.current.delete(note);
+    }
+
+    const captured = capturedNotesRef.current[noteIndex];
+    if (!captured || captured.noteOffTimestamp != null) return;
+
+    captured.noteOffTimestamp = noteOffTimestamp;
+    captured.durationMs = Math.max(0, noteOffTimestamp - captured.noteOnTimestamp);
+  }, []);
+
+  const closeAllCapturedNotes = useCallback((noteOffTimestamp: number) => {
+    for (const [note, stack] of activeCapturedByNoteRef.current.entries()) {
+      while (stack.length > 0) {
+        closeCapturedNote(note, noteOffTimestamp);
+      }
+    }
+    activeCapturedByNoteRef.current.clear();
+  }, [closeCapturedNote]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const initAudio = async () => {
+      try {
+        await ensureAudioModeConfigured();
+        if (!audioEngineRef.current.isReady()) {
+          await audioEngineRef.current.initialize();
+        }
+        if (mounted) {
+          audioReadyRef.current = true;
+        }
+      } catch (error) {
+        console.warn('[SkillAssessment] Audio init failed. Continuing without sound.', error);
+        if (mounted) {
+          audioReadyRef.current = false;
+        }
+      }
+    };
+
+    initAudio();
+
+    return () => {
+      mounted = false;
+      clearRoundTimers();
+      closeAllCapturedNotes(Date.now());
+      releaseAllAudioNotes();
+    };
+  }, [clearRoundTimers, closeAllCapturedNotes, releaseAllAudioNotes]);
+
+  const playAudioNote = useCallback((note: number, velocity: number = 0.8) => {
+    if (!audioReadyRef.current) return;
+
+    try {
+      const existingHandle = activeNoteHandlesRef.current.get(note);
+      if (existingHandle) {
+        audioEngineRef.current.releaseNote(existingHandle);
+      }
+
+      const handle = audioEngineRef.current.playNote(note, velocity);
+      activeNoteHandlesRef.current.set(note, handle);
+    } catch (error) {
+      console.warn('[SkillAssessment] Failed to play note:', error);
+    }
+  }, []);
+
+  const releaseAudioNote = useCallback((note: number) => {
+    if (!audioReadyRef.current) return;
+
+    const handle = activeNoteHandlesRef.current.get(note);
+    if (!handle) return;
+
+    try {
+      audioEngineRef.current.releaseNote(handle);
+      activeNoteHandlesRef.current.delete(note);
+    } catch {
+      activeNoteHandlesRef.current.delete(note);
+    }
+  }, []);
+
+  const finishRound = useCallback(() => {
+    if (phaseRef.current !== 'countIn' && phaseRef.current !== 'playing') {
+      return;
+    }
+
+    clearRoundTimers();
+    closeAllCapturedNotes(Date.now());
+    releaseAllAudioNotes();
 
     const round = ASSESSMENT_ROUNDS[currentRoundIndex];
     if (!round) return;
 
-    const score = scoreRound(
+    const score = scoreRoundPressRelease(
       round.notes,
-      playedNotesRef.current,
-      round.tempo,
-      roundStartTimeRef.current,
+      capturedNotesRef.current,
+      effectiveTempo,
+      beatZeroEpochRef.current,
+      {
+        timingToleranceMs: ASSESSMENT_TIMING_TOLERANCE_MS,
+        timingGracePeriodMs: ASSESSMENT_TIMING_GRACE_MS,
+      },
     );
 
     setCurrentScore(score);
     setRoundScores((prev) => [...prev, score]);
     setPhase('result');
-  }, [currentRoundIndex]);
+  }, [clearRoundTimers, closeAllCapturedNotes, releaseAllAudioNotes, currentRoundIndex, effectiveTempo]);
 
-  // Handle note input from keyboard
-  const handleNoteOn = useCallback(
-    (event: MidiNoteEvent) => {
-      if (phase !== 'playing') return;
-      playedNotesRef.current.push({
-        note: event.note,
-        timestamp: event.timestamp,
-      });
-    },
-    [phase],
-  );
+  const startRound = useCallback(() => {
+    if (!currentRound) return;
 
-  // Move to next round or complete the assessment
+    clearRoundTimers();
+    releaseAllAudioNotes();
+
+    capturedNotesRef.current = [];
+    activeCapturedByNoteRef.current.clear();
+
+    const msPerBeat = 60000 / effectiveTempo;
+    const maxBeat = Math.max(...currentRound.notes.map((n) => n.startBeat + n.durationBeats));
+
+    roundStartEpochRef.current = Date.now();
+    beatZeroEpochRef.current = roundStartEpochRef.current + ASSESSMENT_COUNT_IN_BEATS * msPerBeat;
+
+    setCurrentBeat(-ASSESSMENT_COUNT_IN_BEATS);
+    setPhase('countIn');
+
+    beatIntervalRef.current = setInterval(() => {
+      const elapsed = Date.now() - roundStartEpochRef.current;
+      const beat = elapsed / msPerBeat - ASSESSMENT_COUNT_IN_BEATS;
+      setCurrentBeat(beat);
+
+      if (beat >= 0 && phaseRef.current === 'countIn') {
+        setPhase('playing');
+      }
+
+      if (beat >= maxBeat + 2) {
+        finishRound();
+      }
+    }, 50);
+
+    const totalDurationMs = (ASSESSMENT_COUNT_IN_BEATS + maxBeat + 2) * msPerBeat;
+    timeoutRef.current = setTimeout(() => {
+      finishRound();
+    }, totalDurationMs + 500);
+  }, [currentRound, effectiveTempo, clearRoundTimers, finishRound, releaseAllAudioNotes]);
+
+  const handleNoteOn = useCallback((event: MidiNoteEvent) => {
+    playAudioNote(event.note, event.velocity / 127);
+
+    if (phaseRef.current !== 'countIn' && phaseRef.current !== 'playing') {
+      return;
+    }
+
+    if (event.timestamp < beatZeroEpochRef.current) {
+      return;
+    }
+
+    const noteIndex = capturedNotesRef.current.length;
+    capturedNotesRef.current.push({
+      note: event.note,
+      noteOnTimestamp: event.timestamp,
+      noteOffTimestamp: null,
+      durationMs: 0,
+    });
+
+    const stack = activeCapturedByNoteRef.current.get(event.note) ?? [];
+    stack.push(noteIndex);
+    activeCapturedByNoteRef.current.set(event.note, stack);
+  }, [playAudioNote]);
+
+  const handleNoteOff = useCallback((note: number) => {
+    releaseAudioNote(note);
+
+    if (phaseRef.current !== 'countIn' && phaseRef.current !== 'playing') {
+      return;
+    }
+
+    const timestamp = Date.now();
+    if (timestamp < beatZeroEpochRef.current) {
+      return;
+    }
+
+    closeCapturedNote(note, timestamp);
+  }, [closeCapturedNote, releaseAudioNote]);
+
   const handleNextRound = useCallback(() => {
     if (currentRoundIndex + 1 >= ASSESSMENT_ROUNDS.length) {
-      // All rounds done -- compute final results
-      const allScores = [...roundScores]; // currentScore already pushed by finishRound
+      const allScores =
+        roundScores.length >= ASSESSMENT_ROUNDS.length
+          ? roundScores.slice(0, ASSESSMENT_ROUNDS.length)
+          : [...roundScores, currentScore];
+
       const lesson = determineStartLesson(allScores);
       setStartLesson(lesson);
 
-      // Update learner profile
       const profileStore = useLearnerProfileStore.getState();
       const progressStore = useProgressStore.getState();
 
-      // Record each round as an exercise result
       let totalPitchScore = 0;
       let totalTimingScore = 0;
 
@@ -365,11 +614,11 @@ export function SkillAssessmentScreen(): React.ReactElement {
           accuracy: score,
         }));
         profileStore.recordExerciseResult({
-          tempo: round.tempo,
+          tempo: Math.round(round.tempo * playbackSpeed),
           score,
           noteResults,
         });
-        // Approximate: pitchScore is 60% of total, timingScore is 40%
+
         totalPitchScore += Math.min(1, score / 0.6) * 0.6;
         totalTimingScore += Math.min(1, score / 0.4) * 0.4;
       }
@@ -379,7 +628,6 @@ export function SkillAssessmentScreen(): React.ReactElement {
       profileStore.updateSkill('pitchAccuracy', avgPitchScore);
       profileStore.updateSkill('timingAccuracy', avgTimingScore);
 
-      // Persist assessment date and overall score
       const avgScore = allScores.length > 0
         ? allScores.reduce((a, b) => a + b, 0) / allScores.length
         : 0;
@@ -388,7 +636,6 @@ export function SkillAssessmentScreen(): React.ReactElement {
         assessmentScore: Math.round(avgScore * 100),
       });
 
-      // Mark earlier lessons as completed if skipping
       const lessonNumber = parseInt(lesson.replace('lesson-', ''), 10);
       if (!isNaN(lessonNumber) && lessonNumber > 1) {
         for (let i = 1; i < lessonNumber; i++) {
@@ -408,21 +655,55 @@ export function SkillAssessmentScreen(): React.ReactElement {
       setPhase('complete');
     } else {
       setCurrentRoundIndex((prev) => prev + 1);
+      setCurrentBeat(0);
       setPhase('intro');
     }
-  }, [currentRoundIndex, roundScores]);
+  }, [currentRoundIndex, roundScores, currentScore, playbackSpeed]);
 
-  // Continue after assessment -- go back to onboarding
   const handleContinue = useCallback(() => {
     navigation.goBack();
   }, [navigation]);
 
-  // ---------------------------------------------------------------------------
-  // Render helpers
-  // ---------------------------------------------------------------------------
+  const expectedNoteSet = useMemo(() => {
+    if (!currentRound) return new Set<number>();
+    return new Set(currentRound.notes.map((n) => n.note));
+  }, [currentRound]);
+
+  const focusNote = useMemo(() => {
+    if (!currentRound || currentRound.notes.length === 0) return undefined;
+    const notes = currentRound.notes.map((n) => n.note);
+    return Math.round(notes.reduce((a, b) => a + b, 0) / notes.length);
+  }, [currentRound]);
+
+  // MIDI range for the VerticalPianoRoll display
+  const pianoRollRange = useMemo(() => {
+    if (!currentRound) return { min: 48, max: 72, range: 24 };
+    return deriveMidiRange(currentRound.notes);
+  }, [currentRound]);
+
+  const keyboardRange = useMemo(() => {
+    if (!currentRound || currentRound.notes.length === 0) {
+      return { startNote: 48, octaveCount: 2 };
+    }
+
+    const noteValues = currentRound.notes.map((n) => n.note);
+    const uniqueNotes = Array.from(new Set(noteValues));
+    // Use note SPAN to determine octave count, not note count.
+    // Most assessment rounds span less than an octave — 2 octaves gives
+    // plenty of room while keeping keys large enough to tap accurately.
+    const span = Math.max(...uniqueNotes) - Math.min(...uniqueNotes);
+    const octaveCount = span > 12 ? 2 : 2; // Always 2 octaves for assessment
+    return computeZoomedRange(uniqueNotes, octaveCount);
+  }, [currentRound]);
+
+  // Freeze notes during countdown — they stay still until playing begins.
+  // Use -0.5 so beat-0 notes sit just above the hit line as a clear target.
+  // Once playing starts, switch to live currentBeat so notes scroll normally.
+  const skillCheckBeat = phase === 'countIn' ? -0.5 : currentBeat;
+  const countdownValue = Math.max(1, Math.ceil(-currentBeat));
 
   const renderIntro = () => (
-    <View style={styles.centeredContent}>
+    <View style={styles.centeredContent} testID="assessment-intro">
       <View style={styles.roundBadge}>
         <Text style={styles.roundBadgeText}>
           Round {currentRoundIndex + 1} of {ASSESSMENT_ROUNDS.length}
@@ -433,7 +714,7 @@ export function SkillAssessmentScreen(): React.ReactElement {
       <Text style={styles.description}>{currentRound.description}</Text>
 
       <View style={styles.tempoInfo}>
-        <Text style={styles.tempoLabel}>Tempo: {currentRound.tempo} BPM</Text>
+        <Text style={styles.tempoLabel}>Tempo: {effectiveTempo} BPM{playbackSpeed < 1.0 ? ` (${playbackSpeed}x)` : ''}</Text>
       </View>
 
       <MascotBubble
@@ -447,52 +728,73 @@ export function SkillAssessmentScreen(): React.ReactElement {
         onPress={startRound}
         size="large"
         style={styles.actionButton}
+        testID="assessment-start-round"
       />
     </View>
   );
 
-  const renderPlaying = () => (
-    <View style={styles.playingContainer}>
-      <View style={styles.roundHeader}>
-        <Text style={styles.roundHeaderText}>
-          Round {currentRoundIndex + 1} of {ASSESSMENT_ROUNDS.length}
-        </Text>
-        <Text style={styles.roundTitle}>{currentRound.title}</Text>
-      </View>
+  const renderPlaying = () => {
+    // Compute keyboard props: use non-scrollable when keys fit on screen
+    const whiteKeyCount = Math.round(keyboardRange.octaveCount * 7);
+    const screenW = SCREEN_WIDTH;
+    const fitsOnScreen = whiteKeyCount * 56 <= screenW; // 56px min white key width
 
-      <View style={styles.pianoRollContainer}>
-        <PianoRoll
-          notes={currentRound.notes}
-          currentBeat={currentBeat}
-          tempo={currentRound.tempo}
-          testID="assessment-piano-roll"
-        />
-      </View>
+    return (
+      <View style={styles.playingContainer} testID="assessment-playing">
+        <View style={styles.roundHeader}>
+          <Text style={styles.roundHeaderText}>
+            Round {currentRoundIndex + 1} of {ASSESSMENT_ROUNDS.length}
+          </Text>
+          <Text style={styles.roundTitle}>{currentRound.title}</Text>
+        </View>
 
-      <View style={styles.keyboardContainer}>
-        <Keyboard
-          startNote={48}
-          octaveCount={3}
-          onNoteOn={handleNoteOn}
-          expectedNotes={expectedNoteSet}
-          enabled={true}
-          showLabels={true}
-          scrollable={true}
-          scrollEnabled={false}
-          focusNote={focusNote}
-          keyHeight={100}
-          testID="assessment-keyboard"
-        />
+        <View style={styles.pianoRollContainer}>
+          <VerticalPianoRoll
+            notes={currentRound.notes}
+            currentBeat={skillCheckBeat}
+            tempo={effectiveTempo}
+            containerWidth={screenW - SPACING.sm * 2}
+            containerHeight={250}
+            midiMin={pianoRollRange.min}
+            midiMax={pianoRollRange.max}
+            timingGracePeriodMs={ASSESSMENT_TIMING_GRACE_MS}
+            testID="assessment-piano-roll"
+          />
+
+          {phase === 'countIn' && (
+            <View style={styles.countInOverlay} testID="assessment-countin">
+              <Text style={styles.countInLabel}>Get Ready</Text>
+              <Text style={styles.countInValue} testID="assessment-countin-value">{countdownValue}</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.keyboardContainer}>
+          <Keyboard
+            startNote={keyboardRange.startNote}
+            octaveCount={keyboardRange.octaveCount}
+            onNoteOn={handleNoteOn}
+            onNoteOff={handleNoteOff}
+            expectedNotes={expectedNoteSet}
+            enabled={true}
+            showLabels={true}
+            scrollable={!fitsOnScreen}
+            scrollEnabled={false}
+            focusNote={focusNote}
+            keyHeight={120}
+            testID="assessment-keyboard"
+          />
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderResult = () => {
     const percentage = Math.round(currentScore * 100);
     const passed = currentScore >= 0.6;
 
     return (
-      <View style={styles.centeredContent}>
+      <View style={styles.centeredContent} testID="assessment-result">
         <View style={styles.roundBadge}>
           <Text style={styles.roundBadgeText}>
             Round {currentRoundIndex + 1} of {ASSESSMENT_ROUNDS.length}
@@ -522,6 +824,7 @@ export function SkillAssessmentScreen(): React.ReactElement {
           onPress={handleNextRound}
           size="large"
           style={styles.actionButton}
+          testID="assessment-next-round"
         />
       </View>
     );
@@ -540,7 +843,7 @@ export function SkillAssessmentScreen(): React.ReactElement {
         : `Lesson ${parseInt(startLesson.replace('lesson-', ''), 10)}`;
 
     return (
-      <View style={styles.centeredContent}>
+      <View style={styles.centeredContent} testID="assessment-complete">
         <Text style={styles.completeTitle}>Assessment Complete!</Text>
 
         <View style={styles.summaryCard}>
@@ -584,14 +887,14 @@ export function SkillAssessmentScreen(): React.ReactElement {
           onPress={handleContinue}
           size="large"
           style={styles.actionButton}
+          testID="assessment-continue"
         />
       </View>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Progress dots header */}
+    <SafeAreaView style={styles.container} testID="skill-assessment-screen">
       {phase !== 'complete' && (
         <View style={styles.progressHeader}>
           <Text style={styles.progressTitle}>Skill Check</Text>
@@ -612,8 +915,9 @@ export function SkillAssessmentScreen(): React.ReactElement {
           </View>
         </View>
       )}
+
       {phase === 'intro' && renderIntro()}
-      {phase === 'playing' && renderPlaying()}
+      {(phase === 'countIn' || phase === 'playing') && renderPlaying()}
       {phase === 'result' && renderResult()}
       {phase === 'complete' && renderComplete()}
     </SafeAreaView>
@@ -670,8 +974,6 @@ const styles = StyleSheet.create({
   playingContainer: {
     flex: 1,
   },
-
-  // Round badge
   roundBadge: {
     backgroundColor: COLORS.surface,
     paddingHorizontal: SPACING.md,
@@ -684,8 +986,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-
-  // Title & description
   title: {
     fontSize: 28,
     fontWeight: '700',
@@ -699,8 +999,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
     textAlign: 'center',
   },
-
-  // Tempo info
   tempoInfo: {
     backgroundColor: COLORS.surface,
     paddingHorizontal: SPACING.md,
@@ -713,8 +1011,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-
-  // Playing phase
   roundHeader: {
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
@@ -733,13 +1029,33 @@ const styles = StyleSheet.create({
   pianoRollContainer: {
     flex: 1,
     paddingHorizontal: SPACING.sm,
+    position: 'relative',
+    minHeight: 200,
+  },
+  countInOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    borderRadius: BORDER_RADIUS.md,
+    marginHorizontal: SPACING.sm,
+  },
+  countInLabel: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: SPACING.sm,
+  },
+  countInValue: {
+    fontSize: 64,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    lineHeight: 72,
   },
   keyboardContainer: {
     marginTop: 'auto' as const,
     paddingBottom: SPACING.md,
   },
-
-  // Result phase
   scoreCircle: {
     width: 120,
     height: 120,
@@ -768,8 +1084,6 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginBottom: SPACING.lg,
   },
-
-  // Complete phase
   completeTitle: {
     fontSize: 28,
     fontWeight: '700',
@@ -847,8 +1161,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.primary,
   },
-
-  // Action button
   actionButton: {
     marginTop: SPACING.lg,
     width: '100%',

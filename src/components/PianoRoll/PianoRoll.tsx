@@ -15,12 +15,16 @@ export interface PianoRollProps {
   tempo?: number;
   timeSignature?: [number, number];
   visibleBeats?: number;
+  guideMode?: 'marker' | 'pressRelease';
+  showBeatGrid?: boolean;
+  releaseGuideOffsetBeats?: number;
   onNoteHighlight?: (noteIndex: number) => void;
   testID?: string;
 }
 
 const NOTE_HEIGHT = 44;
 const PIXELS_PER_BEAT = 140;
+const DEFAULT_TIMING_GRACE_MS = 220;
 
 // Default MIDI range used when no notes are provided
 const DEFAULT_MIDI_MIN = 48; // C3
@@ -57,6 +61,8 @@ const COLORS = {
   staffAccent: '#D0D0D0',
   marker: '#FF1744',
   markerGlow: 'rgba(255, 23, 68, 0.2)',
+  pressLine: '#FF1744',
+  releaseLine: '#40C4FF',
   background: '#1A1A2E',
   beatLine: 'rgba(255, 255, 255, 0.08)',
   beatLineAccent: 'rgba(255, 255, 255, 0.15)',
@@ -91,9 +97,12 @@ export const PianoRoll = React.memo(
   ({
     notes,
     currentBeat = 0,
-    tempo: _tempo = 120,
+    tempo = 120,
     timeSignature = [4, 4],
     visibleBeats: _visibleBeats = 8,
+    guideMode = 'marker',
+    showBeatGrid = true,
+    releaseGuideOffsetBeats,
     onNoteHighlight: _onNoteHighlight,
     testID,
   }: PianoRollProps) => {
@@ -105,6 +114,13 @@ export const PianoRoll = React.memo(
 
     // The playback marker sits at 1/3 of the screen
     const markerX = screenWidth / 3;
+    const msPerBeat = 60000 / tempo;
+    const derivedReleaseGuideOffsetBeats = Math.max(
+      0.2,
+      releaseGuideOffsetBeats ?? DEFAULT_TIMING_GRACE_MS / msPerBeat,
+    );
+    const releaseLineX = markerX + derivedReleaseGuideOffsetBeats * PIXELS_PER_BEAT;
+    const shouldRenderBeatGrid = guideMode === 'pressRelease' ? false : showBeatGrid;
 
     // Calculate the translateX offset to keep currentBeat aligned with the marker
     const translateX = -currentBeat * PIXELS_PER_BEAT;
@@ -182,9 +198,10 @@ export const PianoRoll = React.memo(
           ]}
         >
           {/* Beat grid lines */}
-          {beatLines.map(({ beat, isMeasureLine }) => (
+          {shouldRenderBeatGrid && beatLines.map(({ beat, isMeasureLine }) => (
             <View
               key={`beat-${beat}`}
+              testID={`piano-roll-beat-line-${beat}`}
               style={[
                 styles.beatLine,
                 {
@@ -202,7 +219,7 @@ export const PianoRoll = React.memo(
           {visualNotes.map((vn) => (
             <View key={`note-${vn.index}`}>
               {/* Active glow behind the note */}
-              {vn.isActive && (
+              {guideMode !== 'pressRelease' && vn.isActive && (
                 <View
                   style={[
                     styles.noteGlow,
@@ -248,9 +265,18 @@ export const PianoRoll = React.memo(
           ))}
         </View>
 
-        {/* Fixed playback marker line */}
-        <View style={[styles.markerGlow, { left: markerX - 8 }]} />
-        <View style={[styles.playbackMarker, { left: markerX - 1 }]} />
+        {/* Guide lines */}
+        {guideMode === 'marker' ? (
+          <>
+            <View style={[styles.markerGlow, { left: markerX - 8 }]} />
+            <View style={[styles.playbackMarker, { left: markerX - 1 }]} testID="marker-line" />
+          </>
+        ) : (
+          <>
+            <View style={[styles.pressLine, { left: markerX - 1.5 }]} testID="press-line" />
+            <View style={[styles.releaseLine, { left: releaseLineX - 1.5 }]} testID="release-line" />
+          </>
+        )}
 
         {/* Beat counter */}
         <View style={styles.beatCounter}>
@@ -327,6 +353,20 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: COLORS.markerGlow,
     zIndex: 19,
+  },
+  pressLine: {
+    position: 'absolute',
+    width: 3,
+    height: '100%',
+    backgroundColor: COLORS.pressLine,
+    zIndex: 20,
+  },
+  releaseLine: {
+    position: 'absolute',
+    width: 3,
+    height: '100%',
+    backgroundColor: COLORS.releaseLine,
+    zIndex: 20,
   },
   beatCounter: {
     position: 'absolute',

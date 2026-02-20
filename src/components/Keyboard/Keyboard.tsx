@@ -71,6 +71,7 @@ export const Keyboard = React.memo(
     const containerRef = useRef<View>(null);
     const scrollOffsetRef = useRef(0);
     const keyboardLayoutRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
+    const hasMeasuredRef = useRef(false);
 
     // Track which notes are pressed via multi-touch
     const [pressedNotes, setPressedNotes] = useState<Set<number>>(new Set());
@@ -94,24 +95,36 @@ export const Keyboard = React.memo(
     const whiteKeyWidth = keyHeight * 0.7;
     const keyboardWidth = whiteKeys.length * whiteKeyWidth;
 
-    // Auto-scroll to center the focusNote when it changes
+    // Auto-scroll to center the focusNote when it changes.
+    // First mount uses requestAnimationFrame + no animation to ensure
+    // the ScrollView content is laid out before scrolling.
+    const hasInitiallyScrolledRef = useRef(false);
     useEffect(() => {
-      if (!scrollable || !focusNote || !scrollViewRef.current) return;
-      if (focusNote < startNote || focusNote > endNote) return;
+      if (!scrollable || !focusNote || !scrollViewRef.current) return undefined;
+      if (focusNote < startNote || focusNote > endNote) return undefined;
 
       // Find the white key index for this note (or the nearest white key)
       const targetNote = [1, 3, 6, 8, 10].includes(focusNote % 12)
         ? focusNote - 1 // Black key → use the white key just below
         : focusNote;
       const whiteKeyIndex = whiteKeys.indexOf(targetNote);
-      if (whiteKeyIndex < 0) return;
+      if (whiteKeyIndex < 0) return undefined;
 
       // Calculate the scroll offset to center this key
       const { width: screenWidth } = Dimensions.get('window');
       const targetX = whiteKeyIndex * whiteKeyWidth - screenWidth / 2 + whiteKeyWidth / 2;
       const clampedX = Math.max(0, Math.min(targetX, keyboardWidth - screenWidth));
 
+      if (!hasInitiallyScrolledRef.current) {
+        // First mount: defer scroll to ensure layout is complete, no animation
+        hasInitiallyScrolledRef.current = true;
+        const raf = requestAnimationFrame(() => {
+          scrollViewRef.current?.scrollTo({ x: clampedX, animated: false });
+        });
+        return () => cancelAnimationFrame(raf);
+      }
       scrollViewRef.current.scrollTo({ x: clampedX, animated: true });
+      return undefined;
     }, [focusNote, scrollable, startNote, endNote, whiteKeys, whiteKeyWidth, keyboardWidth]);
 
     // Note on/off callbacks
@@ -138,6 +151,30 @@ export const Keyboard = React.memo(
       [enabled, onNoteOff]
     );
 
+    // Track keyboard layout for page→local coordinate conversion.
+    // measureInWindow gives absolute screen coordinates, but may return
+    // stale values during screen transition animations.
+    const remeasure = useCallback(() => {
+      containerRef.current?.measureInWindow((x, y, width, height) => {
+        if (width > 0 && height > 0) {
+          keyboardLayoutRef.current = { x, y, width, height };
+          hasMeasuredRef.current = true;
+        }
+      });
+    }, []);
+
+    const handleLayout = useCallback(() => {
+      remeasure();
+    }, [remeasure]);
+
+    // Re-measure after mount + delay to catch post-navigation animation shifts.
+    // Screen transitions on iOS can take 300-500ms, so measuring during
+    // handleLayout (which fires during the animation) gives stale y-coordinates.
+    useEffect(() => {
+      const timer = setTimeout(remeasure, 500);
+      return () => clearTimeout(timer);
+    }, [remeasure]);
+
     // Hit-test config for the current layout
     const hitTestConfig = useMemo(
       () => ({
@@ -157,17 +194,22 @@ export const Keyboard = React.memo(
     const processTouches = useCallback(
       (event: GestureResponderEvent) => {
         if (!enabled) return;
+        // Guard: if measureInWindow hasn't completed yet, keyboardLayoutRef is
+        // still {x:0, y:0} which makes localY = pageY (e.g. 750px) far exceed
+        // totalHeight (120px), causing hitTestPianoKey to return null for every touch.
+        if (!hasMeasuredRef.current) return;
 
         const touches = event.nativeEvent.touches ?? [];
         const newTouchMap = new Map<number, number>();
 
         // Map each active touch to a piano key
         for (const touch of touches) {
-          // Convert page coordinates to keyboard-local coordinates
+          // Always use pageX/pageY (screen-relative) with measured layout offset.
+          // IMPORTANT: locationX/locationY are relative to the TOUCH TARGET
+          // (the individual PianoKey view the touch landed on), NOT the keyboard
+          // container. This makes them useless for keyboard-wide hit testing.
           let localX = touch.pageX - keyboardLayoutRef.current.x;
-          const localY = touch.pageY - keyboardLayoutRef.current.y;
-
-          // Account for scroll offset in scrollable mode
+          let localY = touch.pageY - keyboardLayoutRef.current.y;
           if (scrollable) {
             localX += scrollOffsetRef.current;
           }
@@ -180,6 +222,16 @@ export const Keyboard = React.memo(
           const midiNote = hitTestPianoKey(localX, localY, config);
           if (midiNote !== null) {
             newTouchMap.set(Number(touch.identifier), midiNote);
+          } else if (__DEV__) {
+            // Diagnostic: log when a touch doesn't map to any key
+            console.warn(
+              '[Keyboard] hitTest miss',
+              `localX=${localX.toFixed(1)} localY=${localY.toFixed(1)}`,
+              `pageX=${touch.pageX.toFixed(1)} pageY=${touch.pageY.toFixed(1)}`,
+              `layout=${JSON.stringify(keyboardLayoutRef.current)}`,
+              `scroll=${scrollOffsetRef.current}`,
+              `configW=${config.totalWidth} configH=${config.totalHeight}`,
+            );
           }
         }
 
@@ -238,8 +290,15 @@ export const Keyboard = React.memo(
     // fire for EVERY finger down/up, enabling true multi-touch.
 
     const handleTouchStart = useCallback(
-      (event: GestureResponderEvent) => processTouches(event),
-      [processTouches]
+      (event: GestureResponderEvent) => {
+        // Re-measure on every touch start to handle post-navigation position shifts.
+        // measureInWindow is async but very fast (~1ms native call). The current
+        // touch uses existing coordinates; the measurement updates for subsequent
+        // moves/touches within the same gesture.
+        remeasure();
+        processTouches(event);
+      },
+      [processTouches, remeasure]
     );
 
     const handleTouchMove = useCallback(
@@ -264,13 +323,6 @@ export const Keyboard = React.memo(
       },
       []
     );
-
-    // Track keyboard layout for page→local coordinate conversion
-    const handleLayout = useCallback(() => {
-      containerRef.current?.measureInWindow((x, y, width, height) => {
-        keyboardLayoutRef.current = { x, y, width, height };
-      });
-    }, []);
 
     // Merge pressed notes from touch with highlighted notes from parent
     const mergedPressedNotes = useMemo(() => {
@@ -302,6 +354,7 @@ export const Keyboard = React.memo(
                 height: keyHeight,
               },
             ]}
+            testID={`key-${note}`}
           >
             <PianoKey
               midiNote={note}
@@ -314,24 +367,20 @@ export const Keyboard = React.memo(
           </View>
         ))}
 
-        {/* Black keys overlaid */}
+        {/* Black keys overlaid — overlay width = one white key, so PianoKey's
+             inner 60% width + right:-30% centers the visible key on the boundary
+             between adjacent white keys, matching the hit-test geometry exactly. */}
         {notes.map((note) => {
-          const noteInOctave = note % 12;
-          if (![1, 3, 6, 8, 10].includes(noteInOctave)) {
+          if (![1, 3, 6, 8, 10].includes(note % 12)) {
             return null;
           }
 
-          // Calculate position of black key based on white key position
-          const whiteKeyIndex = notes
-            .filter((n) => {
-              const inOct = n % 12;
-              return ![1, 3, 6, 8, 10].includes(inOct);
-            })
-            .findIndex(
-              (n) =>
-                notes.indexOf(note) > notes.indexOf(n) &&
-                notes.indexOf(note) - notes.indexOf(n) <= 1
-            );
+          // Black key sits between the white key below it and the next white key.
+          // midi - 1 is always the white key immediately below a black key.
+          const whiteKeyIndex = whiteKeys.indexOf(note - 1);
+          if (whiteKeyIndex < 0) return null;
+
+          const oneKeyPercent = 100 / whiteKeys.length;
 
           return (
             <View
@@ -339,9 +388,11 @@ export const Keyboard = React.memo(
               style={[
                 styles.blackKeyOverlay,
                 {
-                  left: `${(whiteKeyIndex + 1) * (100 / whiteKeys.length) - 6}%`,
+                  left: `${whiteKeyIndex * oneKeyPercent}%`,
+                  width: `${oneKeyPercent}%`,
                 },
               ]}
+              testID={`key-${note}`}
             >
               <PianoKey
                 midiNote={note}
@@ -432,7 +483,7 @@ const styles = StyleSheet.create({
   blackKeyOverlay: {
     position: 'absolute',
     top: 0,
-    width: '12%',
+    // width is set inline per-key as (100 / whiteKeys.length)% to match hit-test geometry
     height: '65%',
     zIndex: 10,
   },

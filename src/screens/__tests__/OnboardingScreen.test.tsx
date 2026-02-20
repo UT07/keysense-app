@@ -24,10 +24,13 @@ let mockSettingsState: any = {
   learningGoal: 'songs',
   dailyGoalMinutes: 10,
   selectedCatId: 'mini-meowww',
+  playbackSpeed: 0.5,
   setExperienceLevel: jest.fn(),
   setLearningGoal: jest.fn(),
   setDailyGoalMinutes: jest.fn(),
   setHasCompletedOnboarding: jest.fn(),
+  setPlaybackSpeed: jest.fn(),
+  updateMidiSettings: jest.fn(),
 };
 
 jest.mock('../../stores/settingsStore', () => ({
@@ -186,10 +189,13 @@ function resetSettingsState(overrides: Partial<typeof mockSettingsState> = {}) {
     learningGoal: 'songs',
     dailyGoalMinutes: 10,
     selectedCatId: 'mini-meowww',
+    playbackSpeed: 0.5,
     setExperienceLevel: jest.fn(),
     setLearningGoal: jest.fn(),
     setDailyGoalMinutes: jest.fn(),
     setHasCompletedOnboarding: jest.fn(),
+    setPlaybackSpeed: jest.fn(),
+    updateMidiSettings: jest.fn(),
     ...overrides,
   };
 }

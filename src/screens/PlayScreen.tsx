@@ -65,10 +65,14 @@ export function PlayScreen(): React.JSX.Element {
   const [currentNoteName, setCurrentNoteName] = useState<string>('');
   const [sessionNoteCount, setSessionNoteCount] = useState(0);
   const [showInstructions, setShowInstructions] = useState(true);
+  const [isPlayingBack, setIsPlayingBack] = useState(false);
   const recordingStartRef = useRef(0);
   const audioEngineRef = useRef(createAudioEngine());
   const activeHandlesRef = useRef<Map<number, NoteHandle>>(new Map());
   const autoReleaseTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const playbackCancelRef = useRef(false);
+  const playbackHandlesRef = useRef<Map<number, NoteHandle>>(new Map());
+  const playbackTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
 
   // --------------------------------------------------------------------------
   // Landscape orientation lock — useFocusEffect so it restores on tab switch
@@ -109,6 +113,14 @@ export function PlayScreen(): React.JSX.Element {
     init();
     return () => {
       mounted = false;
+      // Cancel any running playback
+      playbackCancelRef.current = true;
+      for (const t of playbackTimersRef.current) clearTimeout(t);
+      playbackTimersRef.current.clear();
+      for (const handle of playbackHandlesRef.current.values()) {
+        audioEngineRef.current.releaseNote(handle);
+      }
+      playbackHandlesRef.current.clear();
       // Release all active notes on unmount to prevent audio leak
       audioEngineRef.current.releaseAllNotes();
       activeHandlesRef.current.clear();
@@ -227,27 +239,102 @@ export function PlayScreen(): React.JSX.Element {
     setIsRecording(false);
   }, []);
 
+  const stopPlayback = useCallback(() => {
+    playbackCancelRef.current = true;
+    // Clear all scheduled release timers
+    for (const t of playbackTimersRef.current) clearTimeout(t);
+    playbackTimersRef.current.clear();
+    // Release all playback notes
+    for (const handle of playbackHandlesRef.current.values()) {
+      audioEngineRef.current.releaseNote(handle);
+    }
+    playbackHandlesRef.current.clear();
+    setIsPlayingBack(false);
+    setHighlightedNotes(new Set());
+    setCurrentNoteName('');
+  }, []);
+
   const playRecording = useCallback(async () => {
     if (recordedNotes.length === 0) return;
 
+    // Cancel any existing playback first
+    stopPlayback();
+    playbackCancelRef.current = false;
+    setIsPlayingBack(true);
+
     const baseTimestamp = recordedNotes[0].timestamp;
+    const highlighted = new Set<number>();
+
     for (const recorded of recordedNotes) {
+      if (playbackCancelRef.current) return;
+
       const delay = recorded.timestamp - baseTimestamp;
       await new Promise<void>((resolve) => setTimeout(resolve, delay > 0 ? delay : 0));
-      if (isAudioReady) {
-        audioEngineRef.current.playNote(recorded.note, recorded.velocity / 127);
+
+      if (playbackCancelRef.current) return;
+
+      // Release previous note at same pitch before replaying
+      const existing = playbackHandlesRef.current.get(recorded.note);
+      if (existing) {
+        audioEngineRef.current.releaseNote(existing);
+        playbackHandlesRef.current.delete(recorded.note);
       }
-      setHighlightedNotes(new Set([recorded.note]));
+
+      if (isAudioReady) {
+        const handle = audioEngineRef.current.playNote(recorded.note, recorded.velocity / 127);
+        playbackHandlesRef.current.set(recorded.note, handle);
+
+        // Schedule release based on recorded duration
+        const duration = recorded.releaseTimestamp
+          ? recorded.releaseTimestamp - recorded.timestamp
+          : 500; // fallback 500ms if no release was recorded
+        const timer = setTimeout(() => {
+          playbackTimersRef.current.delete(timer);
+          if (playbackCancelRef.current) return;
+          const current = playbackHandlesRef.current.get(recorded.note);
+          if (current === handle) {
+            audioEngineRef.current.releaseNote(current);
+            playbackHandlesRef.current.delete(recorded.note);
+            highlighted.delete(recorded.note);
+            setHighlightedNotes(new Set(highlighted));
+          }
+        }, duration);
+        playbackTimersRef.current.add(timer);
+      }
+
+      highlighted.add(recorded.note);
+      setHighlightedNotes(new Set(highlighted));
       setCurrentNoteName(midiToNoteName(recorded.note));
     }
 
+    if (playbackCancelRef.current) return;
+
+    // Wait for last notes to finish, then clear
+    const lastNote = recordedNotes[recordedNotes.length - 1];
+    const lastDuration = lastNote.releaseTimestamp
+      ? lastNote.releaseTimestamp - lastNote.timestamp
+      : 500;
+    await new Promise<void>((resolve) => {
+      const t = setTimeout(resolve, lastDuration + 100);
+      playbackTimersRef.current.add(t);
+    });
+
+    if (playbackCancelRef.current) return;
+
+    // Natural end — clean up
+    for (const handle of playbackHandlesRef.current.values()) {
+      audioEngineRef.current.releaseNote(handle);
+    }
+    playbackHandlesRef.current.clear();
+    setIsPlayingBack(false);
     setHighlightedNotes(new Set());
     setCurrentNoteName('');
-  }, [recordedNotes, isAudioReady]);
+  }, [recordedNotes, isAudioReady, stopPlayback]);
 
   const clearRecording = useCallback(() => {
+    stopPlayback();
     setRecordedNotes([]);
-  }, []);
+  }, [stopPlayback]);
 
   // --------------------------------------------------------------------------
   // Navigation
@@ -260,18 +347,18 @@ export function PlayScreen(): React.JSX.Element {
   // Render
   // --------------------------------------------------------------------------
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} testID="play-screen">
       {/* Top controls bar */}
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton} testID="freeplay-back">
           <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
 
         <Text style={styles.title}>Free Play</Text>
 
         {/* Live note display */}
-        <View style={styles.noteDisplay}>
-          <Text style={styles.noteText}>{currentNoteName || '\u2014'}</Text>
+        <View style={styles.noteDisplay} testID="freeplay-note-display-container">
+          <Text style={styles.noteText} testID="freeplay-note-display">{currentNoteName || '\u2014'}</Text>
         </View>
 
         {/* Session stats */}
@@ -287,6 +374,7 @@ export function PlayScreen(): React.JSX.Element {
           <TouchableOpacity
             onPress={() => setShowInstructions(true)}
             style={styles.helpButton}
+            testID="freeplay-help"
           >
             <MaterialCommunityIcons name="help-circle-outline" size={22} color="#B0B0B0" />
           </TouchableOpacity>
@@ -295,20 +383,26 @@ export function PlayScreen(): React.JSX.Element {
         {/* Recording controls */}
         <View style={styles.recordControls}>
           {!isRecording ? (
-            <TouchableOpacity onPress={startRecording} style={styles.controlTouchable}>
+            <TouchableOpacity onPress={startRecording} style={styles.controlTouchable} testID="freeplay-record-start">
               <MaterialCommunityIcons name="record-circle" size={22} color="#DC143C" />
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity onPress={stopRecording} style={styles.controlTouchable}>
+            <TouchableOpacity onPress={stopRecording} style={styles.controlTouchable} testID="freeplay-record-stop">
               <MaterialCommunityIcons name="stop-circle" size={22} color="#FF4444" />
             </TouchableOpacity>
           )}
           {recordedNotes.length > 0 && !isRecording && (
             <>
-              <TouchableOpacity onPress={playRecording} style={styles.controlTouchable}>
-                <MaterialCommunityIcons name="play-circle" size={22} color="#00E676" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={clearRecording} style={styles.controlTouchable}>
+              {isPlayingBack ? (
+                <TouchableOpacity onPress={stopPlayback} style={styles.controlTouchable} testID="freeplay-record-stop-playback">
+                  <MaterialCommunityIcons name="stop-circle" size={22} color="#FFA726" />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity onPress={playRecording} style={styles.controlTouchable} testID="freeplay-record-playback">
+                  <MaterialCommunityIcons name="play-circle" size={22} color="#00E676" />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={clearRecording} style={styles.controlTouchable} testID="freeplay-record-clear">
                 <MaterialCommunityIcons name="delete" size={22} color="#EF5350" />
               </TouchableOpacity>
             </>
@@ -318,7 +412,7 @@ export function PlayScreen(): React.JSX.Element {
 
       {/* Beginner-friendly instruction banner */}
       {showInstructions && (
-        <View style={styles.instructionsBanner}>
+        <View style={styles.instructionsBanner} testID="freeplay-instructions">
           <View style={styles.instructionsContent}>
             <MaterialCommunityIcons name="lightbulb-on-outline" size={18} color="#FFD700" />
             <View style={styles.instructionsTextWrap}>
@@ -331,12 +425,24 @@ export function PlayScreen(): React.JSX.Element {
             <TouchableOpacity
               onPress={() => setShowInstructions(false)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              testID="freeplay-instructions-close"
             >
               <MaterialCommunityIcons name="close" size={18} color="#666" />
             </TouchableOpacity>
           </View>
         </View>
       )}
+
+      {/* Note reference strip — shows octave markers and Middle C label */}
+      <View style={styles.noteRefStrip} testID="freeplay-note-ref">
+        <Text style={styles.noteRefLabel}>C3</Text>
+        <View style={styles.noteRefSpacer} />
+        <Text style={[styles.noteRefLabel, styles.noteRefMiddleC]}>Middle C (C4)</Text>
+        <View style={styles.noteRefSpacer} />
+        <Text style={styles.noteRefLabel}>C5</Text>
+        <View style={styles.noteRefSpacer} />
+        <Text style={styles.noteRefLabel}>C6</Text>
+      </View>
 
       {/* Full-width keyboard */}
       <View style={styles.keyboardContainer}>
@@ -447,6 +553,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#B0B0B0',
     lineHeight: 17,
+  },
+  noteRefStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    backgroundColor: '#141414',
+    borderTopWidth: 1,
+    borderTopColor: '#2A2A2A',
+  },
+  noteRefLabel: {
+    fontSize: 10,
+    color: '#666',
+    fontWeight: '600',
+    fontFamily: 'monospace',
+  },
+  noteRefMiddleC: {
+    color: '#DC143C',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  noteRefSpacer: {
+    flex: 1,
   },
   keyboardContainer: {
     flex: 1,

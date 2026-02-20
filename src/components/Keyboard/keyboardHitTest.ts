@@ -67,10 +67,10 @@ export function hitTestPianoKey(
       const whiteKeyIndex = whiteKeys.indexOf(lowerWhiteKey);
       if (whiteKeyIndex < 0) continue;
 
-      // Black key is centered between two white keys, width = 12% of total / whiteKeyCount * totalWidth
-      // In the CSS, it's positioned at (whiteKeyIndex + 1) * (100/N) - 6  with width 12%
-      const blackKeyWidthPercent = 0.12;
-      const blackKeyWidth = blackKeyWidthPercent * totalWidth;
+      // Black key is roughly 60% of a white key width and centered between
+      // adjacent white keys. Keeping hit boxes close to visual geometry avoids
+      // black keys stealing touches from nearby white keys.
+      const blackKeyWidth = whiteKeyWidth * 0.6;
       const blackKeyLeft = (whiteKeyIndex + 1) * whiteKeyWidth - blackKeyWidth / 2;
 
       if (x >= blackKeyLeft && x < blackKeyLeft + blackKeyWidth) {

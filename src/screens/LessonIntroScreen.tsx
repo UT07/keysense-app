@@ -291,7 +291,7 @@ export function LessonIntroScreen(): React.ReactElement {
 
   if (!lesson) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} testID="lesson-intro-screen">
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Lesson not found</Text>
           <TouchableOpacity onPress={handleBack} style={styles.errorButton}>
@@ -305,7 +305,7 @@ export function LessonIntroScreen(): React.ReactElement {
   const isAllCompleted = completedCount === lesson.exercises.length;
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} testID="lesson-intro-screen">
       {/* Header gradient */}
       <LinearGradient
         colors={['#1A1A2E', '#1A1A1A', '#0D0D0D']}
@@ -318,6 +318,7 @@ export function LessonIntroScreen(): React.ReactElement {
               onPress={handleBack}
               style={styles.backButton}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              testID="lesson-intro-back"
             >
               <MaterialCommunityIcons
                 name="arrow-left"
@@ -475,6 +476,7 @@ export function LessonIntroScreen(): React.ReactElement {
           onPress={handleStartLesson}
           style={styles.startButton}
           activeOpacity={0.8}
+          testID="lesson-intro-start"
         >
           <LinearGradient
             colors={['#DC143C', '#A3102E']}

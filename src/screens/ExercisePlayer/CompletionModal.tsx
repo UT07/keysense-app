@@ -29,6 +29,7 @@ import { getRandomCatMessage } from '../../content/catDialogue';
 import { coachingService } from '../../services/ai/CoachingService';
 import { useProgressStore } from '../../stores/progressStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { getLessonIdForExercise } from '../../content/ContentLoader';
 import { COLORS, SPACING, BORDER_RADIUS } from '../../theme/tokens';
 import type { Exercise, ExerciseScore } from '../../core/exercises/types';
 
@@ -87,16 +88,27 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
 
     const fetchFeedback = async () => {
       try {
-        const { level } = useProgressStore.getState();
-        const result = await coachingService.generateFeedback({
+        const { level, lessonProgress } = useProgressStore.getState();
+        const exLessonId = getLessonIdForExercise(exercise.id);
+        const attemptNumber = exLessonId
+          ? (lessonProgress[exLessonId]?.exerciseScores[exercise.id]?.attempts ?? 1)
+          : 1;
+        const feedbackPromise = coachingService.generateFeedback({
           exerciseId: exercise.id,
           exerciseTitle: exercise.metadata.title,
           difficulty: exercise.metadata.difficulty,
           score,
           userLevel: level,
-          attemptNumber: 1,
+          attemptNumber,
           recentScores: [],
         });
+        // 10s timeout — don't let a hung network block the completion screen
+        const result = await Promise.race([
+          feedbackPromise,
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Coach feedback timeout')), 10000)
+          ),
+        ]);
         if (!cancelled) setCoachFeedback(result.feedback);
       } catch {
         if (!cancelled) setCoachFeedback('Keep practicing! You are making great progress.');

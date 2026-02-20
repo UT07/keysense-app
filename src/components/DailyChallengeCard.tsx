@@ -68,7 +68,6 @@ export function DailyChallengeCard({ onPress }: DailyChallengeCardProps): React.
     const interval = setInterval(() => {
       setTimeRemaining(getTimeUntilMidnight());
     }, 60000);
-
     return () => clearInterval(interval);
   }, [isCompleted]);
 
@@ -78,7 +77,7 @@ export function DailyChallengeCard({ onPress }: DailyChallengeCardProps): React.
   useEffect(() => {
     shimmerProgress.value = withRepeat(
       withTiming(1, { duration: 2500, easing: Easing.linear }),
-      -1,
+      -1, // Infinite loop
       false,
     );
   }, [shimmerProgress]);

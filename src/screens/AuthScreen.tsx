@@ -73,9 +73,12 @@ export function AuthScreen(): React.ReactElement {
       const AppleAuth = require('expo-apple-authentication');
       const crypto = require('expo-crypto');
 
-      const nonce = await crypto.digestStringAsync(
+      // Generate a random raw nonce, then SHA256 hash it for Apple.
+      // Firebase expects the RAW nonce as rawNonce; Apple receives the hash.
+      const rawNonce = Math.random().toString(36).substring(2, 18) + Math.random().toString(36).substring(2, 18);
+      const hashedNonce = await crypto.digestStringAsync(
         crypto.CryptoDigestAlgorithm.SHA256,
-        Math.random().toString()
+        rawNonce
       );
 
       const appleCredential = await AppleAuth.signInAsync({
@@ -83,11 +86,11 @@ export function AuthScreen(): React.ReactElement {
           AppleAuth.AppleAuthenticationScope.FULL_NAME,
           AppleAuth.AppleAuthenticationScope.EMAIL,
         ],
-        nonce,
+        nonce: hashedNonce,
       });
 
       if (appleCredential.identityToken) {
-        await useAuthStore.getState().signInWithApple(appleCredential.identityToken, nonce);
+        await useAuthStore.getState().signInWithApple(appleCredential.identityToken, rawNonce);
       }
     } catch (err: unknown) {
       const errObj = err as { code?: string; message?: string };
@@ -139,7 +142,7 @@ export function AuthScreen(): React.ReactElement {
   }, [signInAnonymously]);
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} testID="auth-screen">
       <View style={styles.hero}>
         <CatAvatar catId={useSettingsStore.getState().selectedCatId ?? 'mini-meowww'} size="large" showGlow />
         <Text style={styles.title}>Let's make music!</Text>

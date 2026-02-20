@@ -128,19 +128,22 @@ export function AccountScreen(): React.ReactElement {
     try {
       const AppleAuth = require('expo-apple-authentication');
       const crypto = require('expo-crypto');
-      const nonce = await crypto.digestStringAsync(
+      // Generate a random raw nonce, then SHA256 hash it for Apple.
+      // Firebase expects the RAW nonce; Apple receives the hash.
+      const rawNonce = Math.random().toString(36).substring(2, 18) + Math.random().toString(36).substring(2, 18);
+      const hashedNonce = await crypto.digestStringAsync(
         crypto.CryptoDigestAlgorithm.SHA256,
-        Math.random().toString()
+        rawNonce
       );
       const cred = await AppleAuth.signInAsync({
         requestedScopes: [
           AppleAuth.AppleAuthenticationScope.FULL_NAME,
           AppleAuth.AppleAuthenticationScope.EMAIL,
         ],
-        nonce,
+        nonce: hashedNonce,
       });
       if (cred.identityToken) {
-        await useAuthStore.getState().linkWithApple(cred.identityToken, nonce);
+        await useAuthStore.getState().linkWithApple(cred.identityToken, rawNonce);
       }
     } catch (err: unknown) {
       const errObj = err as { code?: string; message?: string };
@@ -153,8 +156,8 @@ export function AccountScreen(): React.ReactElement {
   // Anonymous user → show account linking CTA
   if (isAnonymous) {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} testID="account-screen">
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} testID="account-back">
           <Text style={styles.backText}>← Account</Text>
         </TouchableOpacity>
 
@@ -165,16 +168,25 @@ export function AccountScreen(): React.ReactElement {
 
         <View style={styles.linkButtons}>
           {Platform.OS === 'ios' && (
-            <TouchableOpacity style={[styles.linkButton, styles.appleLink]} onPress={handleLinkApple}>
+            <TouchableOpacity
+              style={[styles.linkButton, styles.appleLink]}
+              onPress={handleLinkApple}
+              testID="account-link-apple"
+            >
               <Text style={[styles.linkButtonText, { color: '#000' }]}>Link with Apple</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={[styles.linkButton, styles.googleLink]} onPress={handleLinkGoogle}>
+          <TouchableOpacity
+            style={[styles.linkButton, styles.googleLink]}
+            onPress={handleLinkGoogle}
+            testID="account-link-google"
+          >
             <Text style={styles.linkButtonText}>Link with Google</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.linkButton, styles.emailLink]}
-            onPress={() => navigation.navigate('EmailAuth')}
+            onPress={() => navigation.navigate('EmailAuth', { isLinking: true })}
+            testID="account-link-email"
           >
             <Text style={styles.linkButtonText}>Link with Email</Text>
           </TouchableOpacity>
@@ -194,8 +206,8 @@ export function AccountScreen(): React.ReactElement {
 
   // Authenticated user → full account management
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} testID="account-screen">
+      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} testID="account-back">
         <Text style={styles.backText}>← Account</Text>
       </TouchableOpacity>
 
@@ -258,14 +270,24 @@ export function AccountScreen(): React.ReactElement {
 
       <View style={styles.dangerSection}>
         <Text style={styles.sectionTitle}>Danger Zone</Text>
-        <TouchableOpacity style={styles.dangerRow} onPress={handleSignOut} disabled={isLoading}>
+        <TouchableOpacity
+          style={styles.dangerRow}
+          onPress={handleSignOut}
+          disabled={isLoading}
+          testID="account-signout"
+        >
           {isLoading ? (
             <ActivityIndicator color="#FF6B6B" />
           ) : (
             <Text style={styles.dangerText}>Sign Out</Text>
           )}
         </TouchableOpacity>
-        <TouchableOpacity style={styles.dangerRow} onPress={handleDeleteAccount} disabled={isLoading}>
+        <TouchableOpacity
+          style={styles.dangerRow}
+          onPress={handleDeleteAccount}
+          disabled={isLoading}
+          testID="account-delete"
+        >
           <Text style={[styles.dangerText, styles.deleteText]}>Delete Account</Text>
         </TouchableOpacity>
       </View>

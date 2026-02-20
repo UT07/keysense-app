@@ -40,6 +40,10 @@ export interface UseExercisePlaybackReturn {
   currentBeat: number;
   playedNotes: MidiNoteEvent[];
 
+  // Real-time beat position (updated at 60fps, not throttled like currentBeat).
+  // Use this for timing-sensitive operations like scoring key presses.
+  realtimeBeatRef: React.MutableRefObject<number>;
+
   // Actions
   startPlayback: () => void;
   resumePlayback: () => void;
@@ -66,7 +70,8 @@ export function useExercisePlayback({
 }: UseExercisePlaybackOptions): UseExercisePlaybackReturn {
   const exerciseStore = useExerciseStore();
   const midiInput = getMidiInput();
-  const audioEngine = createAudioEngine();
+  const audioEngineRef = useRef(createAudioEngine());
+  const audioEngine = audioEngineRef.current;
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentBeat, setCurrentBeat] = useState(-exercise.settings.countIn);
@@ -83,7 +88,41 @@ export function useExercisePlayback({
   const mountedRef = useRef(true);
   const handleCompletionRef = useRef<() => void>(() => {});
   const lastStateUpdateRef = useRef(0); // Throttle state updates to ~20fps for perf
+  const hasCrossedZeroRef = useRef(false); // Track count-in → playback transition
   const playedNotesRef = useRef<MidiNoteEvent[]>([]); // Ref for scoring (avoids stale closure)
+  const realtimeBeatRef = useRef(-exercise.settings.countIn); // 60fps beat position for scoring
+  // Tracks noteOn indices so noteOff/release can attach durationMs for scoring.
+  const noteOnIndexMapRef = useRef<Map<number, number[]>>(new Map());
+
+  const trackNoteOnIndex = useCallback((note: number, index: number) => {
+    const stack = noteOnIndexMapRef.current.get(note) ?? [];
+    stack.push(index);
+    noteOnIndexMapRef.current.set(note, stack);
+  }, []);
+
+  const closeLatestNoteDuration = useCallback((note: number, releaseTimeMs: number) => {
+    const stack = noteOnIndexMapRef.current.get(note);
+    if (!stack || stack.length === 0) return;
+
+    const noteIndex = stack.pop()!;
+    if (stack.length === 0) {
+      noteOnIndexMapRef.current.delete(note);
+    }
+
+    const noteOnEvent = playedNotesRef.current[noteIndex];
+    if (noteOnEvent && noteOnEvent.type === 'noteOn' && noteOnEvent.durationMs == null) {
+      noteOnEvent.durationMs = Math.max(0, releaseTimeMs - noteOnEvent.timestamp);
+    }
+  }, []);
+
+  const closeAllOpenNoteDurations = useCallback((releaseTimeMs: number) => {
+    for (const [note, stack] of noteOnIndexMapRef.current.entries()) {
+      while (stack.length > 0) {
+        closeLatestNoteDuration(note, releaseTimeMs);
+      }
+    }
+    noteOnIndexMapRef.current.clear();
+  }, [closeLatestNoteDuration]);
 
   // Track component mount lifecycle
   useEffect(() => {
@@ -206,7 +245,9 @@ export function useExercisePlayback({
       if (midiEvent.type === 'noteOn') {
         // Normalize timestamp to Date.now() domain (native MIDI may use a different clock)
         const normalizedEvent = { ...midiEvent, timestamp: Date.now() };
+        const noteIndex = playedNotesRef.current.length;
         playedNotesRef.current.push(normalizedEvent);
+        trackNoteOnIndex(normalizedEvent.note, noteIndex);
         setPlayedNotes(playedNotesRef.current);
         exerciseStore.addPlayedNote(normalizedEvent);
       }
@@ -220,6 +261,10 @@ export function useExercisePlayback({
         } catch (error) {
           console.error('[useExercisePlayback] Audio playback error:', error);
         }
+      }
+
+      if (midiEvent.type === 'noteOff') {
+        closeLatestNoteDuration(midiEvent.note, Date.now());
       }
 
       // Release audio if note off
@@ -242,6 +287,8 @@ export function useExercisePlayback({
     midiInput,
     audioEngine,
     exerciseStore,
+    trackNoteOnIndex,
+    closeLatestNoteDuration,
   ]);
 
   /**
@@ -258,8 +305,14 @@ export function useExercisePlayback({
 
     const tempo = exercise.settings.tempo;
     const countInBeats = exercise.settings.countIn;
-    const exerciseDuration =
-      Math.max(...exercise.notes.map((n) => n.startBeat + n.durationBeats)) + 1;
+    const lastNoteBeat = Math.max(
+      ...exercise.notes.map((n) => n.startBeat + n.durationBeats),
+    );
+    // Reduced buffer from +2 to +0.5 beats. Old value caused 2s of dead silence
+    // at 60 BPM after the last note ended. Half a beat is enough for the user to
+    // register the last note's completion visually before the modal appears.
+    const exerciseDuration = lastNoteBeat + 0.5;
+    const totalExpectedNotes = exercise.notes.filter((n) => !n.optional).length;
 
     playbackIntervalRef.current = setInterval(() => {
       if (!mountedRef.current) {
@@ -276,16 +329,31 @@ export function useExercisePlayback({
       // Calculate beat: elapsed_ms / (60000 / tempo) - countIn
       const beat = (elapsed / 60000) * tempo - countInBeats;
 
+      // Always update the realtime ref at 60fps for scoring accuracy
+      realtimeBeatRef.current = beat;
+
       // Throttle React state updates to ~20fps to reduce re-renders.
       // Internal timing (scoring, completion) stays at 60fps via refs.
-      if (currentTime - lastStateUpdateRef.current >= 50) {
+      // Exception: bypass throttle at count-in → playback transition (beat 0)
+      // so the overlay disappears instantly and first notes aren't visually missed.
+      const forceUpdate = !hasCrossedZeroRef.current && beat >= 0;
+      if (forceUpdate) hasCrossedZeroRef.current = true;
+
+      if (forceUpdate || currentTime - lastStateUpdateRef.current >= 50) {
         lastStateUpdateRef.current = currentTime;
         setCurrentBeat(beat);
         exerciseStore.setCurrentBeat(beat);
       }
 
+      // Early completion: if the user has played at least as many notes as the
+      // exercise requires AND we've passed the last note's start beat, complete
+      // immediately instead of waiting for the full duration timeout.
+      const playedCount = playedNotesRef.current.length;
+      const earlyComplete =
+        playedCount >= totalExpectedNotes && beat >= lastNoteBeat;
+
       // Check for completion (use ref to avoid stale closure)
-      if (beat > exerciseDuration) {
+      if (earlyComplete || beat > exerciseDuration) {
         handleCompletionRef.current();
       }
     }, 16); // 60fps
@@ -303,7 +371,10 @@ export function useExercisePlayback({
   const startPlayback = useCallback(() => {
     startTimeRef.current = Date.now();
     pauseElapsedRef.current = 0;
+    hasCrossedZeroRef.current = false;
     playedNotesRef.current = [];
+    noteOnIndexMapRef.current.clear();
+    realtimeBeatRef.current = -exercise.settings.countIn;
     setIsPlaying(true);
     setCurrentBeat(-exercise.settings.countIn);
     setPlayedNotes([]);
@@ -342,6 +413,9 @@ export function useExercisePlayback({
     setIsPlaying(false);
     exerciseStore.setIsPlaying(false);
 
+    // Close any held notes at pause time so duration scoring remains accurate.
+    closeAllOpenNoteDurations(Date.now());
+
     // Release all active notes
     if (enableAudio && isAudioReady) {
       audioEngine.releaseAllNotes();
@@ -349,7 +423,7 @@ export function useExercisePlayback({
     }
 
     console.log('[useExercisePlayback] Playback paused');
-  }, [exerciseStore, enableAudio, isAudioReady, audioEngine]);
+  }, [exerciseStore, enableAudio, isAudioReady, audioEngine, closeAllOpenNoteDurations]);
 
   /**
    * Stop playback
@@ -361,9 +435,13 @@ export function useExercisePlayback({
       playbackIntervalRef.current = null;
     }
 
+    realtimeBeatRef.current = -exercise.settings.countIn;
     setIsPlaying(false);
     setCurrentBeat(-exercise.settings.countIn);
     exerciseStore.setIsPlaying(false);
+
+    // Close any held notes when stopping.
+    closeAllOpenNoteDurations(Date.now());
 
     // Release all active notes
     if (enableAudio && isAudioReady) {
@@ -372,7 +450,7 @@ export function useExercisePlayback({
     }
 
     console.log('[useExercisePlayback] Playback stopped');
-  }, [exercise.settings.countIn, exerciseStore, enableAudio, isAudioReady, audioEngine]);
+  }, [exercise.settings.countIn, exerciseStore, enableAudio, isAudioReady, audioEngine, closeAllOpenNoteDurations]);
 
   /**
    * Reset playback
@@ -401,6 +479,9 @@ export function useExercisePlayback({
     setIsPlaying(false);
     exerciseStore.setIsPlaying(false);
 
+    // Any notes still held at completion are closed at completion time.
+    closeAllOpenNoteDurations(Date.now());
+
     // Convert played note timestamps from epoch (Date.now()) to relative
     // (ms since beat 0). The scoring engine expects timestamps in the same
     // frame as expectedTimeMs = startBeat * msPerBeat.
@@ -426,7 +507,7 @@ export function useExercisePlayback({
 
     console.log('[useExercisePlayback] Exercise completed:', score);
     onComplete?.(score);
-  }, [exercise, exerciseStore, onComplete]);
+  }, [exercise, exerciseStore, onComplete, closeAllOpenNoteDurations]);
 
   // Keep ref in sync so the interval always calls the latest handleCompletion
   useEffect(() => {
@@ -462,11 +543,13 @@ export function useExercisePlayback({
         channel: 0,
       };
 
+      const noteIndex = playedNotesRef.current.length;
       playedNotesRef.current.push(midiEvent);
+      trackNoteOnIndex(note, noteIndex);
       setPlayedNotes([...playedNotesRef.current]);
       exerciseStore.addPlayedNote(midiEvent);
     },
-    [isPlaying, enableAudio, isAudioReady, audioEngine, exerciseStore]
+    [isPlaying, enableAudio, isAudioReady, audioEngine, exerciseStore, trackNoteOnIndex]
   );
 
   /**
@@ -474,6 +557,10 @@ export function useExercisePlayback({
    */
   const releaseNote = useCallback(
     (note: number) => {
+      if (isPlaying) {
+        closeLatestNoteDuration(note, Date.now());
+      }
+
       if (!enableAudio || !isAudioReady) return;
 
       const handle = activeNotesRef.current.get(note);
@@ -482,7 +569,7 @@ export function useExercisePlayback({
         activeNotesRef.current.delete(note);
       }
     },
-    [enableAudio, isAudioReady, audioEngine]
+    [isPlaying, enableAudio, isAudioReady, audioEngine, closeLatestNoteDuration]
   );
 
   return {
@@ -490,6 +577,7 @@ export function useExercisePlayback({
     isPlaying,
     currentBeat,
     playedNotes,
+    realtimeBeatRef,
 
     // Actions
     startPlayback,

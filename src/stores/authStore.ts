@@ -93,6 +93,53 @@ function handleAuthError(error: unknown): string {
   }
 }
 
+function shouldEnableLocalGuestMode(error: unknown): boolean {
+  const code = (error as { code?: string })?.code ?? '';
+
+  // These failures are common in dev/test builds where Firebase Auth may be
+  // unavailable or anonymous auth is disabled. We still allow "Skip for now".
+  return [
+    'auth/operation-not-allowed',
+    'auth/network-request-failed',
+    'auth/invalid-api-key',
+    'auth/app-not-authorized',
+    'auth/internal-error',
+    'auth/configuration-not-found',
+    'auth/admin-restricted-operation',
+    'auth/invalid-credential',
+  ].includes(code);
+}
+
+function createLocalGuestUser(): User {
+  return {
+    uid: `local-guest-${Date.now()}`,
+    email: null,
+    displayName: 'Guest',
+    isAnonymous: true,
+    emailVerified: false,
+    phoneNumber: null,
+    photoURL: null,
+    providerId: 'firebase',
+    metadata: {},
+    providerData: [],
+    refreshToken: '',
+    tenantId: null,
+    delete: async () => {},
+    getIdToken: async () => '',
+    getIdTokenResult: async () => ({
+      token: '',
+      expirationTime: '',
+      authTime: '',
+      issuedAtTime: '',
+      signInProvider: null,
+      signInSecondFactor: null,
+      claims: {},
+    }),
+    reload: async () => {},
+    toJSON: () => ({ uid: 'local-guest' }),
+  } as unknown as User;
+}
+
 // ============================================================================
 // Store
 // ============================================================================
@@ -136,6 +183,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         error: null,
       });
     } catch (error) {
+      if (shouldEnableLocalGuestMode(error)) {
+        const guestUser = createLocalGuestUser();
+        console.warn('[Auth] Anonymous auth unavailable, entering local guest mode.');
+        set({
+          user: guestUser,
+          isAuthenticated: true,
+          isAnonymous: true,
+          isLoading: false,
+          error: null,
+        });
+        return;
+      }
+
       console.error('[Auth] signInAnonymously failed:', error);
       set({
         isLoading: false,

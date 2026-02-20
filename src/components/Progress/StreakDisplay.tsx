@@ -51,40 +51,42 @@ export const StreakDisplay = React.memo(
     // Animate fire icon
     useEffect(() => {
       if (currentStreak > 0) {
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(fireAnim, {
-              toValue: 1,
-              duration: 400,
-              useNativeDriver: true,
-            }),
-            Animated.timing(fireAnim, {
-              toValue: 0,
-              duration: 400,
-              useNativeDriver: true,
-            }),
-          ])
-        ).start();
+        // Animated.loop(
+        Animated.sequence([
+          Animated.timing(fireAnim, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(fireAnim, {
+            toValue: 0,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          // ])
+          // ).start();
+        ]).start();
       }
     }, [currentStreak]);
 
     // Shake animation if at risk
     useEffect(() => {
       if (streakAtRisk && currentStreak > 0) {
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(shakeAnim, {
-              toValue: 1,
-              duration: 500,
-              useNativeDriver: true,
-            }),
-            Animated.timing(shakeAnim, {
-              toValue: 0,
-              duration: 500,
-              useNativeDriver: true,
-            }),
-          ])
-        ).start();
+        // Animated.loop(
+        Animated.sequence([
+          Animated.timing(shakeAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(shakeAnim, {
+            toValue: 0,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          // ])
+          // ).start();
+        ]).start();
       }
     }, [streakAtRisk, currentStreak]);
 

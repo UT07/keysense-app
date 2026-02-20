@@ -31,7 +31,7 @@ import { useAuthStore } from '../stores/authStore';
 // Types
 export type RootStackParamList = {
   Auth: undefined;
-  EmailAuth: undefined;
+  EmailAuth: { isLinking?: boolean } | undefined;
   Onboarding: undefined;
   MainTabs: undefined;
   Exercise: { exerciseId: string; testMode?: boolean; aiMode?: boolean };
@@ -72,6 +72,7 @@ function MainTabs() {
         name="Home"
         component={HomeScreen}
         options={{
+          tabBarButtonTestID: 'tab-home',
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="home" size={size} color={color} />
           ),
@@ -81,6 +82,7 @@ function MainTabs() {
         name="Learn"
         component={LevelMapScreen}
         options={{
+          tabBarButtonTestID: 'tab-learn',
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="school" size={size} color={color} />
           ),
@@ -90,6 +92,7 @@ function MainTabs() {
         name="Play"
         component={PlayScreen}
         options={{
+          tabBarButtonTestID: 'tab-play',
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="piano" size={size} color={color} />
           ),
@@ -99,6 +102,7 @@ function MainTabs() {
         name="Profile"
         component={ProfileScreen}
         options={{
+          tabBarButtonTestID: 'tab-profile',
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="account" size={size} color={color} />
           ),

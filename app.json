@@ -15,8 +15,18 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.purrrfectkeys.app",
       "buildNumber": "1",
+      "googleServicesFile": "./firebase/GoogleService-Info.plist",
       "config": {
         "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.619761780367-tqf3t4srqtkklkigep0clojvoailsteu"
+            ]
+          }
+        ]
       }
     },
     "android": {
@@ -25,6 +35,7 @@
         "backgroundColor": "#0D0D0D"
       },
       "package": "com.purrrfectkeys.app",
+      "googleServicesFile": "./firebase/google-services.json",
       "versionCode": 1,
       "permissions": [
         "android.permission.RECORD_AUDIO",
@@ -54,7 +65,7 @@
       [
         "@react-native-google-signin/google-signin",
         {
-          "iosUrlScheme": "com.googleusercontent.apps.GOOGLE_IOS_CLIENT_ID"
+          "iosUrlScheme": "com.googleusercontent.apps.619761780367-tqf3t4srqtkklkigep0clojvoailsteu"
         }
       ]
     ],

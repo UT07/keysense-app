@@ -62,6 +62,18 @@ jest.mock('@react-navigation/native', () => {
   };
 });
 
+// Mock expo-av (Audio engine dependency — expo-av uses ESM internals)
+jest.mock('expo-av', () => ({
+  Audio: {
+    Sound: {
+      createAsync: jest.fn(() =>
+        Promise.resolve({ sound: { playAsync: jest.fn(), unloadAsync: jest.fn(), setStatusAsync: jest.fn(), replayAsync: jest.fn() }, status: {} })
+      ),
+    },
+    setAudioModeAsync: jest.fn(() => Promise.resolve()),
+  },
+}));
+
 // Mock AsyncStorage (Expo Go compatible version)
 jest.mock('@react-native-async-storage/async-storage', () => {
   const storage = new Map();

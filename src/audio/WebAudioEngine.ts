@@ -22,10 +22,10 @@ import {
 } from 'react-native-audio-api';
 import type { IAudioEngine, NoteHandle, AudioContextState } from './types';
 
-const DEFAULT_VOLUME = 0.8;
+const DEFAULT_VOLUME = 0.5;
 const MAX_POLYPHONY = 10;
 const MIN_NOTE_DURATION = 0.05; // 50ms minimum before release
-const MAX_NOTE_DURATION = 5.0; // Safety net — oscillators auto-stop after 5s if release never fires
+const MAX_NOTE_DURATION = 10.0; // Safety net — oscillators auto-stop after 10s if release never fires
 
 /**
  * ADSR envelope — sustain while key is held
@@ -55,6 +55,7 @@ function midiToFrequency(midiNote: number): number {
 interface ActiveNote {
   note: number;
   oscillators: RNOscillatorNode[];
+  harmonicGains: RNGainNode[];
   envelope: RNGainNode;
   startTime: number;
   releaseCallback: () => void;
@@ -262,18 +263,28 @@ export class WebAudioEngine implements IAudioEngine {
     // Create ADSR envelope gain node
     const envelope = this.context.createGain();
     const attackEnd = now + ADSR.attack;
-    const sustainLevel = Math.max(0.001, normalizedVelocity * ADSR.sustain);
+
+    // Scale velocity based on current polyphony to prevent clipping.
+    // Web Audio sums all signals linearly — without this, 2 notes at full velocity
+    // produce amplitude > 1.0 causing hard digital clipping (crackling/distortion).
+    // Using 1/sqrt(n) approximates equal-loudness scaling for concurrent notes.
+    const polyScale = Math.min(1.0, 1.0 / Math.sqrt(Math.max(1, this.activeNotes.size)));
+    const scaledVelocity = normalizedVelocity * polyScale;
+    const sustainLevel = Math.max(0.001, scaledVelocity * ADSR.sustain);
     const decayEnd = attackEnd + ADSR.decay;
 
     // Attack: near-silent -> peak velocity
     envelope.gain.setValueAtTime(0.001, now);
-    envelope.gain.linearRampToValueAtTime(normalizedVelocity, attackEnd);
+    envelope.gain.linearRampToValueAtTime(scaledVelocity, attackEnd);
 
     // Decay: peak -> sustain level (natural piano decay with slight hold)
     envelope.gain.exponentialRampToValueAtTime(sustainLevel, decayEnd);
 
-    // Hard stop ceiling — oscillators physically stop after MAX_NOTE_DURATION
+    // Fade to silence before hard stop to prevent clicks from abrupt oscillator termination
     const hardStop = now + MAX_NOTE_DURATION;
+    const fadeOutStart = hardStop - ADSR.release;
+    envelope.gain.setValueAtTime(sustainLevel, fadeOutStart);
+    envelope.gain.exponentialRampToValueAtTime(0.001, hardStop);
 
     // Connect envelope to master gain
     envelope.connect(this.masterGain);
@@ -287,13 +298,17 @@ export class WebAudioEngine implements IAudioEngine {
     osc1.stop(hardStop);
 
     const oscillators: RNOscillatorNode[] = [osc1];
+    const harmonicGains: RNGainNode[] = [];
 
-    // Second harmonic (octave) at half amplitude — adds warmth
+    // Second harmonic (octave) — adds warmth.
+    // Reduced from 0.4 to 0.25 to prevent clipping when multiple notes
+    // play simultaneously (Web Audio sums signals linearly with no limiter).
     const harmonicFreq = fundamentalFreq * 2;
     if (harmonicFreq < 22000) {
       const harmonicGain = this.context.createGain();
-      harmonicGain.gain.value = 0.4;
+      harmonicGain.gain.value = 0.25;
       harmonicGain.connect(envelope);
+      harmonicGains.push(harmonicGain);
 
       const osc2 = this.context.createOscillator();
       osc2.type = 'sine';
@@ -309,7 +324,7 @@ export class WebAudioEngine implements IAudioEngine {
     const releaseCallback = (): void => {
       if (released) return;
       released = true;
-      this.doRelease(note, oscillators, envelope, now);
+      this.doRelease(note, oscillators, harmonicGains, envelope, now);
     };
 
     // Create NoteHandle
@@ -323,6 +338,7 @@ export class WebAudioEngine implements IAudioEngine {
     this.activeNotes.set(note, {
       note,
       oscillators,
+      harmonicGains,
       envelope,
       startTime: now,
       releaseCallback,
@@ -331,9 +347,18 @@ export class WebAudioEngine implements IAudioEngine {
     // Update oldest note tracking for O(1) eviction
     this.updateOldestNoteKey();
 
-    // Auto-cleanup from activeNotes map after max duration + release
+    // Auto-cleanup: disconnect all nodes and remove from map after max duration.
+    // This is the safety net for notes that never get explicitly released.
     setTimeout(() => {
-      if (this.activeNotes.get(note)?.startTime === now) {
+      const current = this.activeNotes.get(note);
+      if (current && current.startTime === now) {
+        for (const osc of current.oscillators) {
+          try { osc.disconnect(); } catch { /* noop */ }
+        }
+        for (const gain of current.harmonicGains) {
+          try { gain.disconnect(); } catch { /* noop */ }
+        }
+        try { current.envelope.disconnect(); } catch { /* noop */ }
         this.activeNotes.delete(note);
         this.updateOldestNoteKey();
       }
@@ -349,6 +374,7 @@ export class WebAudioEngine implements IAudioEngine {
   private doRelease(
     note: number,
     oscillators: RNOscillatorNode[],
+    harmonicGains: RNGainNode[],
     envelope: RNGainNode,
     startTime: number
   ): void {
@@ -392,34 +418,77 @@ export class WebAudioEngine implements IAudioEngine {
       }
     }
 
-    // Remove from active notes after release completes.
-    // CRITICAL: Check startTime to avoid deleting a re-triggered note's entry.
-    // Without this check, rapid re-triggers (same pitch within 200ms) cause the
-    // old release's cleanup to delete the NEW note — making it un-releasable
-    // and stuck at sustain level until the hard stop.
+    // Disconnect all audio nodes after release + buffer to prevent graph leak.
+    // Without this, gain nodes accumulate in the audio graph indefinitely,
+    // causing native audio resource exhaustion on long recordings.
+    const disconnectDelayMs = (ADSR.release + 0.1) * 1000;
     setTimeout(() => {
+      try {
+        for (const osc of oscillators) {
+          try { osc.disconnect(); } catch { /* already disconnected */ }
+        }
+        for (const gain of harmonicGains) {
+          try { gain.disconnect(); } catch { /* already disconnected */ }
+        }
+        try { envelope.disconnect(); } catch { /* already disconnected */ }
+      } catch {
+        // Non-critical cleanup failure
+      }
+
+      // Remove from active notes map.
+      // CRITICAL: Check startTime to avoid deleting a re-triggered note's entry.
       const current = this.activeNotes.get(note);
       if (current && current.startTime === startTime) {
         this.activeNotes.delete(note);
         this.updateOldestNoteKey();
       }
-    }, (ADSR.release + 0.05) * 1000);
+    }, disconnectDelayMs);
   }
 
   /**
-   * Immediately stop a note (for eviction or re-trigger, not user release)
-   * Stops oscillators directly without a release envelope
+   * Immediately stop a note (for eviction or re-trigger, not user release).
+   * Applies a micro-fade (5ms) before stopping to prevent audible clicks
+   * from abrupt waveform discontinuity (DC offset jump at stop boundary).
    */
   private stopNote(note: number): void {
     const active = this.activeNotes.get(note);
     if (!active) return;
 
-    for (const osc of active.oscillators) {
+    // Micro-fade: 5ms exponential ramp to near-silence before stopping
+    if (this.context) {
+      const now = this.context.currentTime;
+      const fadeEnd = now + 0.005;
       try {
-        osc.stop();
-      } catch {
-        // Already stopped
+        active.envelope.gain.cancelScheduledValues(now);
+        active.envelope.gain.setValueAtTime(Math.max(0.001, active.envelope.gain.value), now);
+        active.envelope.gain.exponentialRampToValueAtTime(0.001, fadeEnd);
+      } catch { /* envelope may already be disconnected */ }
+
+      // Schedule stop after fade
+      for (const osc of active.oscillators) {
+        try { osc.stop(fadeEnd + 0.001); } catch { /* Already stopped */ }
       }
+
+      // Disconnect nodes after fade completes
+      setTimeout(() => {
+        for (const osc of active.oscillators) {
+          try { osc.disconnect(); } catch { /* Already disconnected */ }
+        }
+        for (const gain of active.harmonicGains) {
+          try { gain.disconnect(); } catch { /* Already disconnected */ }
+        }
+        try { active.envelope.disconnect(); } catch { /* Already disconnected */ }
+      }, 10);
+    } else {
+      // No context: immediate cleanup
+      for (const osc of active.oscillators) {
+        try { osc.stop(); } catch { /* Already stopped */ }
+        try { osc.disconnect(); } catch { /* Already disconnected */ }
+      }
+      for (const gain of active.harmonicGains) {
+        try { gain.disconnect(); } catch { /* Already disconnected */ }
+      }
+      try { active.envelope.disconnect(); } catch { /* Already disconnected */ }
     }
 
     this.activeNotes.delete(note);
@@ -463,12 +532,13 @@ export class WebAudioEngine implements IAudioEngine {
   releaseAllNotes(): void {
     for (const [, active] of this.activeNotes) {
       for (const osc of active.oscillators) {
-        try {
-          osc.stop();
-        } catch {
-          // Already stopped
-        }
+        try { osc.stop(); } catch { /* Already stopped */ }
+        try { osc.disconnect(); } catch { /* Already disconnected */ }
       }
+      for (const gain of active.harmonicGains) {
+        try { gain.disconnect(); } catch { /* Already disconnected */ }
+      }
+      try { active.envelope.disconnect(); } catch { /* Already disconnected */ }
     }
     this.activeNotes.clear();
     this.oldestNoteKey = -1;

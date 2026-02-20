@@ -52,7 +52,7 @@ function useFloatingIdle() {
         withTiming(-4, { duration: 1800, easing: Easing.inOut(Easing.ease) }),
         withTiming(0, { duration: 1800, easing: Easing.inOut(Easing.ease) }),
       ),
-      -1,
+      -1, // Infinite loop
       false,
     );
     scale.value = withRepeat(
@@ -60,7 +60,7 @@ function useFloatingIdle() {
         withTiming(1.03, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
         withTiming(1.0, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
       ),
-      -1,
+      -1, // Infinite loop
       false,
     );
   }, [translateY, scale]);
@@ -97,7 +97,7 @@ function useGlowPulse() {
         withTiming(1.15, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
         withTiming(1.0, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
       ),
-      -1,
+      -1, // Infinite loop
       false,
     );
     glowOpacity.value = withRepeat(
@@ -105,7 +105,7 @@ function useGlowPulse() {
         withTiming(0.6, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
         withTiming(0.25, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
       ),
-      -1,
+      -1, // Infinite loop
       false,
     );
   }, [glowScale, glowOpacity]);

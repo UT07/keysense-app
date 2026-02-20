@@ -76,7 +76,7 @@ Purrrfect Keys is a mobile-first piano learning application that combines Duolin
 | **UI Animation** | react-native-reanimated 3 | 60fps keyboard animations |
 | **Graphics** | @shopify/react-native-skia | Piano roll rendering |
 | **State** | Zustand v5 | Simple, performant, TypeScript-first |
-| **Local Storage** | AsyncStorage (@react-native-async-storage) | Expo Go compatible; migrate to MMKV for production builds |
+| **Local Storage** | MMKV (react-native-mmkv) | High-performance synchronous storage for Zustand persistence |
 | **Backend** | Firebase (Auth, Firestore, Functions) | Rapid development, generous free tier |
 | **AI Coaching** | Gemini 2.0 Flash | Cost-effective, fast responses |
 | **Analytics** | PostHog | Privacy-friendly, self-hostable |
@@ -734,19 +734,28 @@ interface SyncProgressResponse {
 
 > **Phase 4+ (Adaptive Learning + Gamification UI Overhaul) is COMPLETE** — 22/22 tasks delivered. See `docs/plans/2026-02-16-gamification-adaptive-design.md` for details.
 >
-> **Gameplay UX Rework is COMPLETE** — 10/10 tasks. Vertical falling notes, smart keyboard range (1-2 octaves), demo mode with ghost notes, ExerciseBuddy dialogue, speed selector, portrait layout. 46 test suites, 1,109 tests passing.
+> **Gameplay UX Rework is COMPLETE** — 10/10 tasks. Vertical falling notes, smart keyboard range (1-2 octaves), demo mode with ghost notes, ExerciseBuddy dialogue, speed selector, portrait layout.
+>
+> **QA Sprint is COMPLETE** — 18 new test suites, 6 bug fixes, 64 suites / 1488 tests passing.
+>
+> **Critical Bug Fix Sprint (Feb 17)** — 6 bugs found via screen recording analysis. Fixed: keyboard clipping, piano roll spacing, iOS audio session, demo mode frozen notes, note positioning during count-in, keyboard octave initialization. All fixes deployed.
 
-### Phase 4: Launch Prep (Weeks 11-12)
+### 16-Week Roadmap (Feb 17 → Jun 8, 2026)
 
-| Task | Deliverable | Success Criteria |
-|------|-------------|------------------|
-| Performance optimization | Profiling + fixes | All perf targets met |
-| App Store assets | Screenshots, descriptions | Approved by stores |
-| Analytics integration | PostHog events | Key funnels tracked |
-| Crash reporting | Sentry integration | <1% crash rate |
-| Beta testing | 50 external users | Critical bugs fixed |
+| Phase | Weeks | Status |
+|-------|-------|--------|
+| PH 5: Adaptive Learning Revamp | 1-3 | NEXT — 18 GitHub issues created |
+| PH 6: Avatar Evolution & Gamification | 4-6 | PLANNED |
+| PH 7: Game Feel & Polish | 7-8 | PLANNED |
+| PH 8: Audio Input / Microphone | 9-10 | PLANNED |
+| PH 9: Social & Leaderboards | 11-12 | PLANNED |
+| PH 10: QA + Launch | 13-16 | PLANNED |
+| Music Library (parallel) | 1-12 | PARALLEL |
+| Audio R&D (parallel) | 1-8 | PARALLEL |
 
-**Gate:** App Store approval
+**Current state:** 64 test suites, 1488 tests, 0 TypeScript errors. Launch target: 100% free, 3-tier freemium post-launch.
+
+**Gate:** App Store approval + 50 beta testers
 
 ---
 

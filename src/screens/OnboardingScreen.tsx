@@ -80,9 +80,11 @@ const STEP_CATS: Record<number, StepCatInfo> = {
 function AnimatedStepWrapper({
   direction,
   children,
+  testID,
 }: {
   direction: SlideDirection;
   children: React.ReactNode;
+  testID?: string;
 }): React.ReactElement {
   const opacity = useSharedValue(0);
   const translateX = useSharedValue(
@@ -111,7 +113,7 @@ function AnimatedStepWrapper({
   }));
 
   return (
-    <Animated.View style={[styles.stepContainer, animatedStyle]}>
+    <Animated.View testID={testID} style={[styles.stepContainer, animatedStyle]}>
       {children}
     </Animated.View>
   );
@@ -131,7 +133,7 @@ function WelcomeStep({
   const catInfo = STEP_CATS[1];
 
   return (
-    <AnimatedStepWrapper direction={direction}>
+    <AnimatedStepWrapper direction={direction} testID="onboarding-step-1">
       <View style={styles.iconContainer}>
         <CatAvatar catId={catInfo.catId} size="large" showTooltipOnTap={false} />
       </View>
@@ -145,7 +147,13 @@ function WelcomeStep({
         <FeatureItem icon="🎯" text="Personalized learning path" />
         <FeatureItem icon="🔥" text="Build daily practice habits" />
       </View>
-      <Button title="Get Started" onPress={onNext} size="large" style={styles.button} />
+      <Button
+        title="Get Started"
+        onPress={onNext}
+        size="large"
+        style={styles.button}
+        testID="onboarding-get-started"
+      />
     </AnimatedStepWrapper>
   );
 }
@@ -168,7 +176,7 @@ function ExperienceLevelStep({
   const catInfo = STEP_CATS[2];
 
   return (
-    <AnimatedStepWrapper direction={direction}>
+    <AnimatedStepWrapper direction={direction} testID="onboarding-step-2">
       <View style={styles.stepCatRow}>
         <CatAvatar catId={catInfo.catId} size="small" showTooltipOnTap={false} />
         <Text style={styles.catIntro}>{catInfo.subtitle}</Text>
@@ -185,6 +193,7 @@ function ExperienceLevelStep({
           description="Never touched a piano before"
           selected={value === 'beginner'}
           onPress={() => onValueChange('beginner')}
+          testID="onboarding-experience-beginner"
         />
         <OptionCard
           icon="📚"
@@ -192,6 +201,7 @@ function ExperienceLevelStep({
           description="Can play simple melodies"
           selected={value === 'intermediate'}
           onPress={() => onValueChange('intermediate')}
+          testID="onboarding-experience-intermediate"
         />
         <OptionCard
           icon="🎼"
@@ -199,6 +209,7 @@ function ExperienceLevelStep({
           description="Played before, want to restart"
           selected={value === 'returning'}
           onPress={() => onValueChange('returning')}
+          testID="onboarding-experience-returning"
         />
       </View>
 
@@ -208,6 +219,7 @@ function ExperienceLevelStep({
         disabled={!value}
         size="large"
         style={styles.button}
+        testID="onboarding-experience-next"
       />
     </AnimatedStepWrapper>
   );
@@ -231,7 +243,7 @@ function EquipmentCheckStep({
   const catInfo = STEP_CATS[3];
 
   return (
-    <AnimatedStepWrapper direction={direction}>
+    <AnimatedStepWrapper direction={direction} testID="onboarding-step-3">
       <View style={styles.stepCatRow}>
         <CatAvatar catId={catInfo.catId} size="small" showTooltipOnTap={false} />
         <Text style={styles.catIntro}>{catInfo.subtitle}</Text>
@@ -248,6 +260,7 @@ function EquipmentCheckStep({
           description="USB or Bluetooth connected device"
           selected={value === true}
           onPress={() => onValueChange(true)}
+          testID="onboarding-midi-yes"
         />
         <OptionCard
           icon="📱"
@@ -255,6 +268,7 @@ function EquipmentCheckStep({
           description="Great! You can start learning right away"
           selected={value === false}
           onPress={() => onValueChange(false)}
+          testID="onboarding-midi-no"
         />
       </View>
 
@@ -264,6 +278,7 @@ function EquipmentCheckStep({
         disabled={value === undefined}
         size="large"
         style={styles.button}
+        testID="onboarding-midi-next"
       />
     </AnimatedStepWrapper>
   );
@@ -287,7 +302,7 @@ function GoalSettingStep({
   const catInfo = STEP_CATS[4];
 
   return (
-    <AnimatedStepWrapper direction={direction}>
+    <AnimatedStepWrapper direction={direction} testID="onboarding-step-4">
       <View style={styles.stepCatRow}>
         <CatAvatar catId={catInfo.catId} size="small" showTooltipOnTap={false} />
         <Text style={styles.catIntro}>{catInfo.subtitle}</Text>
@@ -304,6 +319,7 @@ function GoalSettingStep({
           description="Learn recognizable melodies quickly"
           selected={value === 'songs'}
           onPress={() => onValueChange('songs')}
+          testID="onboarding-goal-songs"
         />
         <OptionCard
           icon="🎯"
@@ -311,6 +327,7 @@ function GoalSettingStep({
           description="Build solid fundamentals for long-term growth"
           selected={value === 'technique'}
           onPress={() => onValueChange('technique')}
+          testID="onboarding-goal-technique"
         />
         <OptionCard
           icon="🚀"
@@ -318,6 +335,7 @@ function GoalSettingStep({
           description="No pressure, let's experiment!"
           selected={value === 'exploration'}
           onPress={() => onValueChange('exploration')}
+          testID="onboarding-goal-exploration"
         />
       </View>
 
@@ -327,6 +345,7 @@ function GoalSettingStep({
         disabled={!value}
         size="large"
         style={styles.button}
+        testID="onboarding-finish"
       />
     </AnimatedStepWrapper>
   );
@@ -355,12 +374,14 @@ function OptionCard({
   description,
   selected,
   onPress,
+  testID,
 }: {
   icon: string;
   title: string;
   description: string;
   selected: boolean;
   onPress: () => void;
+  testID?: string;
 }): React.ReactElement {
   return (
     <Card
@@ -368,6 +389,7 @@ function OptionCard({
       style={[styles.optionCard, selected && styles.optionCardSelected]}
       elevated
       padding="medium"
+      testID={testID}
     >
       <View style={styles.optionContent}>
         <Text style={styles.optionIcon}>{icon}</Text>
@@ -419,7 +441,7 @@ function ProgressBar({ step }: { step: number }): React.ReactElement {
   });
 
   return (
-    <View style={styles.progressBarContainer}>
+    <View style={styles.progressBarContainer} testID="onboarding-progress">
       {/* Cat avatar walking along the bar */}
       <Animated.View style={[styles.catAvatarContainer, catStyle]}>
         <KeysieSvg
@@ -461,6 +483,7 @@ export function OnboardingScreen(): React.ReactElement {
   const setHasCompletedOnboarding = useSettingsStore((s) => s.setHasCompletedOnboarding);
   const setExperienceLevel = useSettingsStore((s) => s.setExperienceLevel);
   const setLearningGoal = useSettingsStore((s) => s.setLearningGoal);
+  const setPlaybackSpeed = useSettingsStore((s) => s.setPlaybackSpeed);
 
   // When returning from SkillAssessment, advance to step 3
   useFocusEffect(
@@ -491,6 +514,10 @@ export function OnboardingScreen(): React.ReactElement {
       setHasCompletedOnboarding(true);
       if (state.goal) {
         setLearningGoal(state.goal);
+      }
+      // Persist MIDI equipment answer from step 3
+      if (state.hasMidi != null) {
+        useSettingsStore.getState().updateMidiSettings({ autoConnectMidi: state.hasMidi });
       }
       // Dismiss the onboarding modal and return to MainTabs
       navigation.goBack();
@@ -534,9 +561,11 @@ export function OnboardingScreen(): React.ReactElement {
         return (
           <EquipmentCheckStep
             value={state.hasMidi}
-            onValueChange={(hasMidi) =>
-              setState((prev) => ({ ...prev, hasMidi }))
-            }
+            onValueChange={(hasMidi) => {
+              setState((prev) => ({ ...prev, hasMidi }));
+              // MIDI users can handle full speed; on-screen stays at 0.5x default
+              setPlaybackSpeed(hasMidi ? 1.0 : 0.5);
+            }}
             onNext={handleNext}
             direction={direction}
           />
@@ -558,7 +587,7 @@ export function OnboardingScreen(): React.ReactElement {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} testID="onboarding-screen">
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -579,6 +608,7 @@ export function OnboardingScreen(): React.ReactElement {
             variant="outline"
             size="medium"
             style={{ flex: 1 }}
+            testID="onboarding-back"
           />
         </View>
       )}

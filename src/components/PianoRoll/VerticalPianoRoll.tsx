@@ -11,6 +11,7 @@
 
 import React, { useMemo } from 'react';
 import { View, StyleSheet, Text } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { midiToNoteName } from '@/core/music/MusicTheory';
 import type { NoteEvent } from '@/core/exercises/types';
 
@@ -21,11 +22,11 @@ import type { NoteEvent } from '@/core/exercises/types';
 /** Default vertical pixels per beat (fallback when container size unavailable) */
 export const PIXELS_PER_BEAT = 100;
 
-/** Hit line position as a ratio of container height (0.85 = 85% from top) */
-export const HIT_LINE_RATIO = 0.85;
+/** Hit line position as a ratio of container height — near the keyboard edge */
+export const HIT_LINE_RATIO = 0.95;
 
 /** How many beats ahead of the hit line should be visible (Tetris-like cascade) */
-export const LOOK_AHEAD_BEATS = 8;
+export const LOOK_AHEAD_BEATS = 4;
 
 /** Black keys are 60% the width of white keys */
 export const BLACK_KEY_WIDTH_RATIO = 0.6;
@@ -43,8 +44,8 @@ const COLORS = {
   active: '#FF5252', // Bright red
   activeGlow: 'rgba(255, 82, 82, 0.3)',
   pastFaded: 'rgba(102, 187, 106, 0.4)',
-  marker: '#FF1744', // Hit line
-  markerGlow: 'rgba(255, 23, 68, 0.2)',
+  pressLine: '#40C4FF', // Key down line
+  pressLineGlow: 'rgba(64, 196, 255, 0.2)',
   beatLine: 'rgba(255, 255, 255, 0.08)',
   beatLineAccent: 'rgba(255, 255, 255, 0.2)',
   background: '#0D0D0D',
@@ -186,6 +187,7 @@ export interface VerticalPianoRollProps {
   midiMax: number;
   ghostNotes?: NoteEvent[];
   ghostBeatOffset?: number;
+  timingGracePeriodMs?: number;
   testID?: string;
 }
 
@@ -197,7 +199,7 @@ export const VerticalPianoRoll = React.memo(
   ({
     notes,
     currentBeat = 0,
-    tempo: _tempo = 120,
+    tempo = 120,
     timeSignature = [4, 4],
     containerWidth,
     containerHeight,
@@ -205,6 +207,7 @@ export const VerticalPianoRoll = React.memo(
     midiMax,
     ghostNotes,
     ghostBeatOffset = 2,
+    timingGracePeriodMs = 200,
     testID,
   }: VerticalPianoRollProps) => {
     const midiRange = midiMax - midiMin;
@@ -213,6 +216,13 @@ export const VerticalPianoRoll = React.memo(
     // Dynamic pixels-per-beat: fill the visible area above the hit line
     // with LOOK_AHEAD_BEATS worth of notes for a Tetris-like cascade.
     const pixelsPerBeat = Math.max(30, hitLineY / LOOK_AHEAD_BEATS);
+
+    // Timing zone: convert grace period from ms to pixels via beats.
+    // At 120 BPM with 200ms grace: 200 / 500 = 0.4 beats ≈ 40-50px per side.
+    const msPerBeat = 60000 / tempo;
+    const zoneHalfBeats = timingGracePeriodMs / msPerBeat;
+    const zoneHalfPx = zoneHalfBeats * pixelsPerBeat;
+    const releaseLineGapPx = Math.max(24, zoneHalfPx * 2);
 
     // translateY drives the scrolling. As currentBeat increases the content
     // layer shifts down so that notes at currentBeat align with the hit line.
@@ -248,9 +258,11 @@ export const VerticalPianoRoll = React.memo(
         );
         const noteHeight = Math.max(16, note.durationBeats * pixelsPerBeat);
 
-        // Position in the content layer (before translateY)
-        // Notes are placed relative to beat 0 at hitLineY
-        const topPosition = hitLineY - note.startBeat * pixelsPerBeat;
+        // Position in the content layer (before translateY).
+        // Bottom-edge alignment: the BOTTOM of the note block reaches the
+        // hit line at currentBeat === startBeat. This matches the Synthesia
+        // convention where the leading (bottom) edge is the attack point.
+        const topPosition = hitLineY - note.startBeat * pixelsPerBeat - noteHeight;
 
         const noteEnd = note.startBeat + note.durationBeats;
         // During countdown (currentBeat < 0), all notes are upcoming (none active/past)
@@ -298,9 +310,10 @@ export const VerticalPianoRoll = React.memo(
           midiRange,
         );
         const noteHeight = Math.max(16, note.durationBeats * pixelsPerBeat);
-        // Ghost notes are offset ahead by ghostBeatOffset beats
+        // Ghost notes are offset ahead by ghostBeatOffset beats.
+        // Same bottom-edge alignment as real notes.
         const topPosition =
-          hitLineY - (note.startBeat - ghostBeatOffset) * pixelsPerBeat;
+          hitLineY - (note.startBeat - ghostBeatOffset) * pixelsPerBeat - noteHeight;
         return { index, x, width, noteHeight, topPosition };
       });
     }, [ghostNotes, ghostBeatOffset, containerWidth, midiMin, midiRange, hitLineY, pixelsPerBeat]);
@@ -406,14 +419,24 @@ export const VerticalPianoRoll = React.memo(
           ))}
         </View>
 
-        {/* Fixed hit line with glow (does NOT move with content) */}
+        {/* Timing zone: gradient fade below press line */}
+        <LinearGradient
+          colors={['rgba(64, 196, 255, 0.15)', 'rgba(64, 196, 255, 0)']}
+          style={[styles.timingZoneFill, {
+            top: hitLineY,
+            height: releaseLineGapPx,
+          }]}
+          testID="timing-zone-fill"
+        />
+
+        {/* Press line (key down) */}
         <View
           style={[styles.hitLineGlow, { top: hitLineY - 8 }]}
           testID="hit-line-glow"
         />
         <View
           style={[styles.hitLine, { top: hitLineY - 1 }]}
-          testID="hit-line"
+          testID="press-line"
         />
 
         {/* Beat counter (bottom-right corner) */}
@@ -488,12 +511,18 @@ const styles = StyleSheet.create({
     fontSize: 8,
     marginTop: 2,
   },
+  timingZoneFill: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 16,
+  },
   hitLine: {
     position: 'absolute',
     left: 0,
     right: 0,
     height: 3,
-    backgroundColor: COLORS.marker,
+    backgroundColor: COLORS.pressLine,
     zIndex: 20,
   },
   hitLineGlow: {
@@ -501,7 +530,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 16,
-    backgroundColor: COLORS.markerGlow,
+    backgroundColor: COLORS.pressLineGlow,
     zIndex: 19,
   },
   beatCounter: {

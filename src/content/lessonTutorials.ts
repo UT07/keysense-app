@@ -20,7 +20,7 @@ const LESSON_TUTORIALS: Record<string, LessonTutorial> = {
     title: 'How This Works',
     steps: [
       { icon: 'piano', text: 'Tap the highlighted keys on the piano when they light up' },
-      { icon: 'music-note', text: 'Notes scroll from right to left — play them as they reach the line' },
+      { icon: 'music-note', text: 'Notes fall from top to bottom — play them as they reach the line' },
       { icon: 'timer-outline', text: 'Try to match the timing — earlier or later affects your score' },
       { icon: 'star-outline', text: 'Score 60% or higher to pass and move to the next exercise' },
     ],

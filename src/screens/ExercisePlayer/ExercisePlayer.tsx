@@ -99,6 +99,33 @@ function getFeedbackLabel(type: string | null): string {
   }
 }
 
+function computeInitialKeyboardRange(notes: Exercise['notes']): KeyboardRange {
+  if (notes.length === 0) {
+    return computeZoomedRange([]);
+  }
+
+  // Use ALL exercise notes to determine the full range needed — not just the
+  // first few. This ensures the keyboard covers the entire exercise from the
+  // start, avoiding mid-exercise range jumps.
+  const allMidi = notes.map((n) => n.note);
+  const uniqueMidi = [...new Set(allMidi)];
+  const minNote = Math.min(...uniqueMidi);
+  const maxNote = Math.max(...uniqueMidi);
+  const span = maxNote - minNote;
+
+  // Compute optimal octave count from the actual note span.
+  // Minimum 2 octaves so the target note(s) can be centered in the
+  // ScrollView — with only 1 octave the first/last key is at the edge
+  // and there's no scroll room to center it.
+  //   span 0-11   → 2 octaves (single-note or within-octave exercises)
+  //   span 12-23  → 2 octaves (notes cross one octave boundary)
+  //   span 24-35  → 3 octaves (two-handed exercises)
+  //   span 36+    → 4 octaves (full-range exercises)
+  const neededOctaves = Math.max(2, Math.ceil((span + 1) / 12));
+
+  return computeZoomedRange(uniqueMidi, neededOctaves);
+}
+
 // Fallback exercise used only when no exercise can be loaded from content
 const FALLBACK_EXERCISE: Exercise = {
   id: 'lesson-01-ex-01',
@@ -337,16 +364,17 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
 
   // Dynamic zoomed range — recomputes as playback advances
   const [keyboardRange, setKeyboardRange] = useState<KeyboardRange>(() => {
-    const firstNotes = exercise.notes.slice(0, 8).map(n => n.note);
-    return computeZoomedRange(firstNotes);
+    return computeInitialKeyboardRange(exercise.notes);
   });
+
+  // Reset zoom range when exercise changes so each level starts on the
+  // correct octave window instead of inheriting previous-session state.
+  useEffect(() => {
+    setKeyboardRange(computeInitialKeyboardRange(exercise.notes));
+  }, [exercise.id, exercise.notes]);
 
   // Auto-detect split keyboard mode for two-handed exercises
   const { keyboardMode, splitPoint } = useMemo(() => {
-    // Explicit hands declaration
-    if (exercise.hands === 'both') {
-      return { keyboardMode: 'split' as const, splitPoint: deriveSplitPoint(exercise.notes) };
-    }
     // Check if notes have both left and right hand annotations
     const hasLeft = exercise.notes.some(n => n.hand === 'left');
     const hasRight = exercise.notes.some(n => n.hand === 'right');
@@ -405,9 +433,11 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     setFinalScore(score);
 
     // Track consecutive fails for demo prompt
+    // Read ghostNotesEnabled from store directly (not from closure) to avoid stale state
+    const currentGhostNotes = useExerciseStore.getState().ghostNotesEnabled;
     if (score.isPassed) {
       useExerciseStore.getState().resetFailCount();
-      if (ghostNotesEnabled) {
+      if (currentGhostNotes) {
         useExerciseStore.getState().incrementGhostNotesSuccessCount();
       }
     } else {
@@ -419,6 +449,9 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     // Track whether this exercise completes the entire lesson
     let isLessonComplete = false;
     let needsMasteryTest = false;
+
+    // Capture level BEFORE any XP mutations so we can detect level-ups
+    const previousLevel = useProgressStore.getState().level;
 
     // Persist XP and daily goal progress
     const progressStore = useProgressStore.getState();
@@ -602,9 +635,8 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         setToastData({ type: 'star', value: firstAchievement.title });
       }
     } else if (score.xpEarned > 0) {
-      // Check if user leveled up
+      // Check if user leveled up (previousLevel captured before any XP mutations)
       const currentLevel = useProgressStore.getState().level;
-      const previousLevel = progressStore.level; // captured before we called addXp
       if (currentLevel > previousLevel) {
         setToastData({ type: 'level-up', value: `Level ${currentLevel}!` });
       } else {
@@ -649,6 +681,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   const {
     isPlaying,
     currentBeat,
+    realtimeBeatRef,
     startPlayback,
     resumePlayback,
     pausePlayback,
@@ -688,22 +721,29 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   const demoWatched = useExerciseStore(s => s.demoWatched);
   const failCount = useExerciseStore(s => s.failCount);
 
-  // Effective beat: during demo, use demo beat; otherwise use playback hook's beat
-  const effectiveBeat = isDemoPlaying ? demoBeat : currentBeat;
+  // Effective beat: during demo, use demo beat; otherwise use playback hook's beat.
+  // During count-in (negative beats), the piano roll stays frozen at beat 0
+  // so notes remain stationary until the countdown completes — then they start falling.
+  const rawBeat = isDemoPlaying ? demoBeat : currentBeat;
+  const effectiveBeat = rawBeat < 0 ? 0 : rawBeat;
 
-  // Update keyboard range based on active window (every beat change)
+  // Update keyboard range based on active window (sticky, low-jitter).
+  const effectiveBeatBucket = Math.floor(effectiveBeat * 2) / 2;
   useEffect(() => {
     const windowNotes = exercise.notes
-      .filter(n => n.startBeat >= effectiveBeat - 2 && n.startBeat <= effectiveBeat + 8)
+      .filter(n => n.startBeat >= effectiveBeatBucket - 2 && n.startBeat <= effectiveBeatBucket + 8)
       .map(n => n.note);
 
-    if (windowNotes.length > 0) {
-      const newRange = computeStickyRange(windowNotes, keyboardRange);
-      if (newRange.startNote !== keyboardRange.startNote || newRange.octaveCount !== keyboardRange.octaveCount) {
-        setKeyboardRange(newRange);
+    if (windowNotes.length === 0) return;
+
+    setKeyboardRange((prev) => {
+      const next = computeStickyRange(windowNotes, prev);
+      if (next.startNote === prev.startNote && next.octaveCount === prev.octaveCount) {
+        return prev;
       }
-    }
-  }, [Math.floor(effectiveBeat), keyboardRange]); // Include keyboardRange to avoid stale closure
+      return next;
+    });
+  }, [exercise.id, exercise.notes, effectiveBeatBucket]);
 
   const keyboardStartNote = keyboardRange.startNote;
   const keyboardOctaveCount = keyboardRange.octaveCount;
@@ -729,7 +769,6 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   // References
   const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const consumedNoteIndicesRef = useRef<Set<number>>(new Set());
-  const noteOnTimestamps = useRef<Map<number, number>>(new Map());
 
   // Animation values
   const comboScale = useRef(new Animated.Value(0)).current;
@@ -826,12 +865,28 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   // Force keyboard range update when the next expected note is outside the current range
   useEffect(() => {
     if (nextExpectedNote === undefined) return;
-    const rangeMin = keyboardRange.startNote;
-    const rangeMax = keyboardRange.startNote + keyboardRange.octaveCount * 12 - 1;
-    if (nextExpectedNote < rangeMin || nextExpectedNote > rangeMax) {
-      setKeyboardRange(computeZoomedRange([nextExpectedNote], keyboardRange.octaveCount));
-    }
-  }, [nextExpectedNote, keyboardRange]);
+
+    setKeyboardRange((prev) => {
+      const rangeMin = prev.startNote;
+      const rangeMax = prev.startNote + prev.octaveCount * 12 - 1;
+      if (nextExpectedNote >= rangeMin && nextExpectedNote <= rangeMax) {
+        return prev;
+      }
+
+      // Recenter from a small upcoming window to avoid snapping to a single note
+      // in the wrong octave at exercise start.
+      const anchorWindowNotes = exercise.notes
+        .filter((n) => n.startBeat >= effectiveBeat - 1 && n.startBeat <= effectiveBeat + 4)
+        .map((n) => n.note);
+      const notesForRange = anchorWindowNotes.length > 0 ? anchorWindowNotes : [nextExpectedNote];
+      const next = computeZoomedRange(notesForRange, prev.octaveCount);
+
+      if (next.startNote === prev.startNote && next.octaveCount === prev.octaveCount) {
+        return prev;
+      }
+      return next;
+    });
+  }, [nextExpectedNote, effectiveBeat, exercise.notes]);
 
   // Playback loop is now handled by useExercisePlayback hook
 
@@ -966,9 +1021,6 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       // Always play the note for audio feedback (playNote handles scoring guard internally)
       handleManualNoteOn(midiNote.note, midiNote.velocity / 127);
 
-      // Track note-on time for duration scoring
-      noteOnTimestamps.current.set(midiNote.note, Date.now());
-
       // Visual feedback
       setHighlightedKeys((prev) => new Set([...prev, midiNote.note]));
 
@@ -978,20 +1030,49 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       // Scoring feedback only during active playback
       if (!isPlaying || isPaused || !countInComplete) return;
 
-      // Nearest-note matching: find the closest unconsumed note with matching pitch
-      const MATCH_WINDOW_BEATS = 1.5; // Search within ±1.5 beats
-      let bestMatch: { index: number; beatDiff: number; startBeat: number } | null = null;
+      // Nearest-note matching: find the closest unconsumed note with matching pitch.
+      // Uses realtimeBeatRef (60fps) instead of currentBeat (throttled to 20fps)
+      // for accurate timing classification.
+      const realtimeBeat = realtimeBeatRef.current;
+      const msPerBeat = 60000 / exercise.settings.tempo;
+      const graceWindowBeats = exercise.scoring.timingGracePeriodMs / msPerBeat;
+      const toleranceWindowBeats = exercise.scoring.timingToleranceMs / msPerBeat;
+      const matchWindowBeats = Math.max(graceWindowBeats, toleranceWindowBeats) + 0.35;
+
+      let bestMatch:
+        | {
+            index: number;
+            beatDiffSigned: number;
+            startBeat: number;
+            matchScore: number;
+          }
+        | null = null;
 
       for (let i = 0; i < exercise.notes.length; i++) {
         const note = exercise.notes[i];
         if (consumedNoteIndicesRef.current.has(i)) continue; // Already matched
         if (note.note !== midiNote.note) continue; // Wrong pitch
 
-        const beatDiff = Math.abs(currentBeat - note.startBeat);
-        if (beatDiff > MATCH_WINDOW_BEATS) continue; // Too far away
+        // Negative = early, positive = late.
+        const beatDiffSigned = realtimeBeat - note.startBeat;
+        const beatDiffAbs = Math.abs(beatDiffSigned);
+        if (beatDiffAbs > matchWindowBeats) continue;
 
-        if (!bestMatch || beatDiff < bestMatch.beatDiff) {
-          bestMatch = { index: i, beatDiff, startBeat: note.startBeat };
+        // Small penalty for matching future notes first; this reduces
+        // "skip-a-note" misses in repeated-note patterns.
+        const matchScore = beatDiffAbs + (beatDiffSigned < 0 ? 0.1 : 0);
+
+        if (
+          !bestMatch ||
+          matchScore < bestMatch.matchScore ||
+          (matchScore === bestMatch.matchScore && note.startBeat < bestMatch.startBeat)
+        ) {
+          bestMatch = {
+            index: i,
+            beatDiffSigned,
+            startBeat: note.startBeat,
+            matchScore,
+          };
         }
       }
 
@@ -1000,7 +1081,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         consumedNoteIndicesRef.current.add(bestMatch.index);
 
         // Calculate timing offset in milliseconds
-        const beatDiffMs = bestMatch.beatDiff * (60000 / exercise.settings.tempo);
+        const beatDiffMs = Math.abs(bestMatch.beatDiffSigned) * msPerBeat;
 
         let feedbackType: FeedbackState['type'];
         if (beatDiffMs <= exercise.scoring.timingToleranceMs * 0.5) {
@@ -1008,7 +1089,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         } else if (beatDiffMs <= exercise.scoring.timingToleranceMs) {
           feedbackType = 'good';
         } else if (beatDiffMs <= exercise.scoring.timingGracePeriodMs) {
-          feedbackType = currentBeat < bestMatch.startBeat ? 'early' : 'late';
+          feedbackType = bestMatch.beatDiffSigned < 0 ? 'early' : 'late';
         } else {
           feedbackType = 'ok';
         }
@@ -1059,7 +1140,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       isPlaying,
       isPaused,
       countInComplete,
-      currentBeat,
+      realtimeBeatRef,
       exercise.notes,
       exercise.settings.tempo,
       exercise.scoring.timingToleranceMs,
@@ -1074,22 +1155,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
    */
   const handleKeyUp = useCallback(
     (midiNote: number) => {
-      // Compute hold duration and attach to the last noteOn for this pitch
-      const onTime = noteOnTimestamps.current.get(midiNote);
-      if (onTime) {
-        const durationMs = Date.now() - onTime;
-        noteOnTimestamps.current.delete(midiNote);
-        // Update the last played noteOn event for this pitch with duration
-        const playedNotes = useExerciseStore.getState().playedNotes;
-        for (let i = playedNotes.length - 1; i >= 0; i--) {
-          if (playedNotes[i].note === midiNote && playedNotes[i].type === 'noteOn' && !playedNotes[i].durationMs) {
-            playedNotes[i].durationMs = durationMs;
-            break;
-          }
-        }
-      }
-
-      // Release note (handled by useExercisePlayback)
+      // Release note + duration bookkeeping (handled by useExercisePlayback)
       handleManualNoteOff(midiNote);
 
       // Clear visual feedback
@@ -1291,18 +1357,16 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
             />
           </View>
 
-          {/* Speed pill — only shown when not 1x */}
-          {playbackSpeed < 1.0 && (
-            <TouchableOpacity
-              onPress={cycleSpeed}
-              style={[styles.speedPill, styles.speedPillActive]}
-              testID="speed-selector"
-            >
-              <Text style={[styles.speedPillText, styles.speedPillTextActive]}>
-                {`${playbackSpeed}x`}
-              </Text>
-            </TouchableOpacity>
-          )}
+          {/* Speed pill — always visible, active styling when slowed */}
+          <TouchableOpacity
+            onPress={cycleSpeed}
+            style={[styles.speedPill, playbackSpeed < 1.0 && styles.speedPillActive]}
+            testID="speed-selector"
+          >
+            <Text style={[styles.speedPillText, playbackSpeed < 1.0 && styles.speedPillTextActive]}>
+              {playbackSpeed === 1.0 ? '1x' : `${playbackSpeed}x`}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Secondary controls — visible when not playing or paused */}
@@ -1375,6 +1439,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
               midiMax={keyboardStartNote + keyboardOctaveCount * 12}
               ghostNotes={ghostNotesEnabled ? exercise.notes : undefined}
               ghostBeatOffset={2}
+              timingGracePeriodMs={exercise.scoring.timingGracePeriodMs}
               testID="exercise-piano-roll"
             />
           )}
@@ -1408,7 +1473,9 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         )}
 
         {/* Bottom: Full-width keyboard (split or normal) */}
-        <View style={[styles.keyboardContainer, { height: keyboardMode === 'split' ? singleKeyHeight * 2 + 4 : singleKeyHeight }]}>
+        <View
+          style={[styles.keyboardContainer, { height: keyboardMode === 'split' ? singleKeyHeight * 2 + 4 : singleKeyHeight }]}
+        >
           {keyboardMode === 'split' ? (
             <SplitKeyboard
               notes={exercise.notes}
@@ -1575,7 +1642,8 @@ const styles = StyleSheet.create({
   },
   pianoRollContainer: {
     flex: 1,
-    margin: 4,
+    marginTop: 4,
+    marginHorizontal: 4,
   },
   buddyOverlay: {
     position: 'absolute',

@@ -214,14 +214,14 @@ describe('VerticalPianoRoll rendering', () => {
 
   it('renders hit line', () => {
     const { getByTestId } = render(<VerticalPianoRoll {...defaultProps} />);
-    const hitLine = getByTestId('hit-line');
+    const hitLine = getByTestId('press-line');
     expect(hitLine).toBeTruthy();
   });
 
-  it('positions hit line at 80% from top', () => {
+  it('positions hit line near bottom of container (keyboard boundary)', () => {
     const { getByTestId } = render(<VerticalPianoRoll {...defaultProps} />);
-    const hitLine = getByTestId('hit-line');
-    // Hit line top should be containerHeight * 0.8 - 1 (for the 3px height centering)
+    const hitLine = getByTestId('press-line');
+    // Hit line top should be containerHeight * HIT_LINE_RATIO - 1 (for the 3px height centering)
     const expectedTop = defaultProps.containerHeight * HIT_LINE_RATIO - 1;
     expect(hitLine.props.style).toEqual(
       expect.arrayContaining([

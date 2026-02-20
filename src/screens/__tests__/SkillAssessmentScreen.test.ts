@@ -7,9 +7,22 @@
 import {
   determineStartLesson,
   scoreRound,
+  scoreRoundPressRelease,
+  calculateTimingScore01,
   ASSESSMENT_ROUNDS,
 } from '../SkillAssessmentScreen';
 import type { NoteEvent } from '../../core/exercises/types';
+
+jest.mock('../../audio/createAudioEngine', () => ({
+  createAudioEngine: jest.fn(() => ({
+    isReady: () => true,
+    initialize: jest.fn().mockResolvedValue(undefined),
+    playNote: jest.fn(() => ({ note: 60, startTime: 0, release: jest.fn() })),
+    releaseNote: jest.fn(),
+    releaseAllNotes: jest.fn(),
+  })),
+  ensureAudioModeConfigured: jest.fn().mockResolvedValue(undefined),
+}));
 
 // ---------------------------------------------------------------------------
 // determineStartLesson tests
@@ -210,6 +223,94 @@ describe('scoreRound', () => {
 
     const score = scoreRound(simpleNotes, playedNotes, 60, startTime);
     expect(score).toBeCloseTo(1.0, 2);
+  });
+});
+
+describe('calculateTimingScore01', () => {
+  it('returns 1 within tolerance', () => {
+    expect(calculateTimingScore01(30, 75, 220)).toBe(1);
+  });
+
+  it('returns 0 for very large offsets', () => {
+    expect(calculateTimingScore01(1000, 75, 220)).toBe(0);
+  });
+});
+
+describe('scoreRoundPressRelease', () => {
+  const expected: NoteEvent[] = [
+    { note: 60, startBeat: 0, durationBeats: 1 },
+  ];
+
+  it('scores high for correct pitch, press, and release', () => {
+    const score = scoreRoundPressRelease(
+      expected,
+      [
+        {
+          note: 60,
+          noteOnTimestamp: 0,
+          noteOffTimestamp: 1000,
+          durationMs: 1000,
+        },
+      ],
+      60,
+      0,
+    );
+
+    expect(score).toBeGreaterThan(0.95);
+  });
+
+  it('penalizes missing release', () => {
+    const score = scoreRoundPressRelease(
+      expected,
+      [
+        {
+          note: 60,
+          noteOnTimestamp: 0,
+          noteOffTimestamp: null,
+          durationMs: 0,
+        },
+      ],
+      60,
+      0,
+    );
+
+    expect(score).toBeLessThan(0.8);
+  });
+
+  it('penalizes wrong pitch even with good timing', () => {
+    const score = scoreRoundPressRelease(
+      expected,
+      [
+        {
+          note: 62,
+          noteOnTimestamp: 0,
+          noteOffTimestamp: 1000,
+          durationMs: 1000,
+        },
+      ],
+      60,
+      0,
+    );
+
+    expect(score).toBeLessThan(0.6);
+  });
+
+  it('penalizes late release', () => {
+    const score = scoreRoundPressRelease(
+      expected,
+      [
+        {
+          note: 60,
+          noteOnTimestamp: 0,
+          noteOffTimestamp: 1700,
+          durationMs: 1700,
+        },
+      ],
+      60,
+      0,
+    );
+
+    expect(score).toBeLessThan(0.9);
   });
 });
 

@@ -286,6 +286,21 @@ describe('Auth Store', () => {
       expect(state.user).toBeNull();
     });
 
+    it('should enter local guest mode when anonymous auth is unavailable', async () => {
+      const error = { code: 'auth/operation-not-allowed', message: 'Anonymous auth disabled' };
+      mockSignInAnonymously.mockRejectedValue(error);
+
+      await useAuthStore.getState().signInAnonymously();
+
+      const state = useAuthStore.getState();
+      expect(state.user).not.toBeNull();
+      expect(state.user?.uid).toContain('local-guest-');
+      expect(state.isAuthenticated).toBe(true);
+      expect(state.isAnonymous).toBe(true);
+      expect(state.error).toBeNull();
+      expect(state.isLoading).toBe(false);
+    });
+
     it('should set isLoading to true during sign-in', async () => {
       let resolveFn: (value: unknown) => void;
       const promise = new Promise(resolve => { resolveFn = resolve; });

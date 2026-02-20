@@ -54,7 +54,7 @@ export function StreakFlame({ streak, showCount = true, size }: StreakFlameProps
         withTiming(config.intensity, { duration: 400, easing: Easing.inOut(Easing.ease) }),
         withTiming(1, { duration: 400, easing: Easing.inOut(Easing.ease) }),
       ),
-      -1,
+      -1, // Infinite loop
       true,
     );
     opacity.value = withRepeat(
@@ -62,7 +62,7 @@ export function StreakFlame({ streak, showCount = true, size }: StreakFlameProps
         withTiming(1, { duration: 300, easing: Easing.inOut(Easing.ease) }),
         withTiming(0.7, { duration: 300, easing: Easing.inOut(Easing.ease) }),
       ),
-      -1,
+      -1, // Infinite loop
       true,
     );
   }, [scale, opacity, config.intensity]);

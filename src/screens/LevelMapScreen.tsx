@@ -179,11 +179,15 @@ function LessonNode({
   onPress: () => void;
 }) {
   const config = NODE_CONFIGS[data.state];
+  const nodeTestID = data.state === 'current'
+    ? 'lesson-node-current'
+    : `lesson-node-${data.lesson.id}`;
 
   return (
     <TouchableOpacity
       activeOpacity={data.state === 'locked' ? 1 : 0.7}
       onPress={onPress}
+      testID={nodeTestID}
       style={[styles.nodeWrapper, { left: x - NODE_SIZE / 2, top: y - NODE_SIZE / 2 }]}
     >
       {data.state === 'current' && <PulsingGlow />}
@@ -215,7 +219,7 @@ function LessonNode({
 
       {/* "START" text for current */}
       {data.state === 'current' && (
-        <View style={styles.startChip}>
+        <View style={styles.startChip} testID="lesson-node-start-chip">
           <Text style={styles.startChipText}>START</Text>
         </View>
       )}
@@ -341,7 +345,7 @@ export function LevelMapScreen() {
   const completedCount = nodes.filter((n) => n.state === 'completed').length;
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} testID="level-map-screen">
       <LinearGradient
         colors={[GRADIENTS.header[0], GRADIENTS.header[1], COLORS.background]}
         style={styles.header}
@@ -366,6 +370,7 @@ export function LevelMapScreen() {
         style={styles.scrollView}
         contentContainerStyle={{ height: contentHeight }}
         showsVerticalScrollIndicator={false}
+        testID="level-map-scroll"
       >
         {/* Decorative elements */}
         <DecorationLayer count={12} height={contentHeight} />

@@ -246,7 +246,7 @@ describe('AccountScreen', () => {
     it('navigates to EmailAuth when pressing "Link with Email"', () => {
       const { getByText } = render(<AccountScreen />);
       fireEvent.press(getByText('Link with Email'));
-      expect(mockNavigate).toHaveBeenCalledWith('EmailAuth');
+      expect(mockNavigate).toHaveBeenCalledWith('EmailAuth', { isLinking: true });
     });
 
     it('renders info about local progress', () => {

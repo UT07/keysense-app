@@ -26,7 +26,7 @@ const defaultSettings: SettingsData = {
   metronomeVolume: 0.5,
   keyboardVolume: 0.8,
   audioBufferSize: 4096,
-  playbackSpeed: 0.75 as const, // Default to 75% speed — more comfortable for touch keyboard
+  playbackSpeed: 0.5 as const, // Default to 50% speed — comfortable for on-screen keyboard beginners
 
   // Display settings
   showFingerNumbers: true,

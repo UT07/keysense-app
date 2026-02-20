@@ -19,10 +19,52 @@ import { levelFromXp } from './core/progression/XpSystem';
 import { syncManager } from './services/firebase/syncService';
 import { migrateLocalToCloud } from './services/firebase/dataMigration';
 
+// Configure Google Sign-In at module level (synchronous, must run before any signIn call)
+// iosClientId is passed explicitly so the native module doesn't need GoogleService-Info.plist
+// in the app bundle (avoids crash on dev client builds without the plist baked in).
+try {
+  const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+  const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+  if (webClientId) {
+    GoogleSignin.configure({
+      webClientId,
+      iosClientId: '619761780367-tqf3t4srqtkklkigep0clojvoailsteu.apps.googleusercontent.com',
+    });
+    console.log('[App] Google Sign-In configured');
+  } else {
+    console.warn('[App] EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID not set — Google Sign-In will not work');
+  }
+} catch {
+  // Package not available (e.g. Expo Go) — Google Sign-In button will show "Coming Soon"
+}
+
 // Keep splash screen visible while loading
 SplashScreen.preventAutoHideAsync().catch(() => {
   // Catching errors in case SplashScreen is not available
 });
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string,
+): Promise<T> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+          reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutHandle != null) {
+      clearTimeout(timeoutHandle);
+    }
+  }
+}
 
 export default function App(): React.ReactElement {
   const [appIsReady, setAppIsReady] = useState(false);
@@ -31,7 +73,21 @@ export default function App(): React.ReactElement {
     async function prepare(): Promise<void> {
       try {
         // Initialize Firebase Auth (resolves current user state)
-        await useAuthStore.getState().initAuth();
+        try {
+          await withTimeout(useAuthStore.getState().initAuth(), 8000, 'initAuth');
+        } catch (authInitError) {
+          console.warn(
+            '[App] Auth initialization did not resolve in time. Continuing with unauthenticated fallback.',
+            authInitError,
+          );
+          useAuthStore.setState({
+            user: null,
+            isAnonymous: false,
+            isAuthenticated: false,
+            isLoading: false,
+            error: null,
+          });
+        }
 
         // Hydrate progress state from AsyncStorage
         const savedProgress = await PersistenceManager.loadState(
@@ -125,11 +181,17 @@ export default function App(): React.ReactElement {
       }
     }
 
-    prepare();
+    // Failsafe: Force app ready after 5s if hydration hangs
+    const failsafeTimeout = setTimeout(() => {
+      console.warn('[App] Hydration took too long, forcing app ready');
+      setAppIsReady(true);
+    }, 5000);
+
+    prepare().then(() => clearTimeout(failsafeTimeout));
 
     // Lock all screens to portrait by default.
     // ExercisePlayer overrides to landscape on mount and restores portrait on unmount.
-    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => { });
   }, []);
 
   useEffect(() => {

@@ -184,7 +184,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const streak = streakData?.currentStreak ?? 0;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} testID="home-screen">
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -311,6 +311,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               }
             })}
             activeOpacity={0.7}
+            testID="home-continue-learning"
           >
             <LinearGradient
               colors={[COLORS.cardHighlight, COLORS.cardSurface]}

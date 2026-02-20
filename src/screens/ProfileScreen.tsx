@@ -15,7 +15,6 @@ import {
   Alert,
   TextInput,
   Modal,
-  FlatList,
   Animated as RNAnimated,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -29,8 +28,7 @@ import { useAchievementStore } from '../stores/achievementStore';
 import { ACHIEVEMENTS } from '../core/achievements/achievements';
 import type { Achievement } from '../core/achievements/achievements';
 import { CatAvatar } from '../components/Mascot/CatAvatar';
-import { CAT_CHARACTERS, getCatById, isCatUnlocked } from '../components/Mascot/catCharacters';
-import type { CatCharacter } from '../components/Mascot/catCharacters';
+import { CAT_CHARACTERS, getCatById } from '../components/Mascot/catCharacters';
 import { StreakFlame } from '../components/StreakFlame';
 import { getLevelProgress } from '../core/progression/XpSystem';
 import { COLORS, SPACING, BORDER_RADIUS } from '../theme/tokens';
@@ -86,11 +84,18 @@ function useCountUp(target: number, duration: number = 800): RNAnimated.Value {
 
   useEffect(() => {
     animValue.setValue(0);
-    RNAnimated.timing(animValue, {
+    const animation = RNAnimated.timing(animValue, {
       toValue: target,
       duration,
       useNativeDriver: false,
-    }).start();
+    });
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+      animValue.stopAnimation();
+    };
   }, [animValue, target, duration]);
 
   return animValue;
@@ -133,97 +138,6 @@ function useWeeklyPractice(): { day: string; minutes: number }[] {
     }
     return days;
   }, [dailyGoalData]);
-}
-
-/** Individual cat card in the picker grid */
-function CatPickerCard({
-  cat,
-  isSelected,
-  isUnlocked,
-  onSelect,
-  onShowBackstory,
-}: {
-  cat: CatCharacter;
-  isSelected: boolean;
-  isUnlocked: boolean;
-  onSelect: (id: string) => void;
-  onShowBackstory: (id: string) => void;
-}): React.ReactElement {
-  return (
-    <TouchableOpacity
-      style={[
-        catPickerStyles.card,
-        isSelected && { borderColor: COLORS.primary, borderWidth: 2 },
-        !isUnlocked && catPickerStyles.cardLocked,
-      ]}
-      onPress={() => {
-        if (isUnlocked) {
-          onSelect(cat.id);
-        }
-      }}
-      onLongPress={() => onShowBackstory(cat.id)}
-      activeOpacity={isUnlocked ? 0.7 : 1.0}
-    >
-      {/* Lock overlay for locked cats */}
-      {!isUnlocked && (
-        <View style={catPickerStyles.lockOverlay}>
-          <MaterialCommunityIcons name="lock" size={20} color="#888" />
-          <Text style={catPickerStyles.lockLevel}>Level {cat.unlockLevel}</Text>
-        </View>
-      )}
-
-      {/* Cat emoji */}
-      <View
-        style={[
-          catPickerStyles.emojiContainer,
-          { backgroundColor: isUnlocked ? cat.color + '22' : '#1A1A1A' },
-        ]}
-      >
-        <Text
-          style={[
-            catPickerStyles.emojiText,
-            !isUnlocked && { opacity: 0.3 },
-          ]}
-        >
-          {cat.emoji}
-        </Text>
-      </View>
-
-      {/* Cat info */}
-      <Text
-        style={[
-          catPickerStyles.catName,
-          !isUnlocked && { color: '#555' },
-        ]}
-      >
-        {cat.name}
-      </Text>
-      <Text
-        style={[
-          catPickerStyles.catSkill,
-          !isUnlocked && { color: '#444' },
-        ]}
-      >
-        {cat.musicSkill}
-      </Text>
-
-      {/* Personality badge */}
-      {isUnlocked && (
-        <View style={[catPickerStyles.personalityBadge, { backgroundColor: cat.color + '33' }]}>
-          <Text style={[catPickerStyles.personalityText, { color: cat.color }]}>
-            {cat.personality}
-          </Text>
-        </View>
-      )}
-
-      {/* Selected check */}
-      {isSelected && (
-        <View style={catPickerStyles.selectedCheck}>
-          <MaterialCommunityIcons name="check-circle" size={20} color={COLORS.primary} />
-        </View>
-      )}
-    </TouchableOpacity>
-  );
 }
 
 /** Achievements section as horizontal scroll with circular badges */
@@ -401,7 +315,7 @@ export function ProfileScreen(): React.ReactElement {
   const { totalXp, level, streakData, lessonProgress } = useProgressStore();
   const {
     dailyGoalMinutes, masterVolume, displayName, selectedCatId,
-    setDailyGoalMinutes, setMasterVolume, setDisplayName, setSelectedCatId,
+    setDailyGoalMinutes, setMasterVolume, setDisplayName,
   } = useSettingsStore();
   const weeklyPractice = useWeeklyPractice();
   const totalWeekMinutes = weeklyPractice.reduce((sum, d) => sum + d.minutes, 0);
@@ -410,8 +324,6 @@ export function ProfileScreen(): React.ReactElement {
   const [showGoalPicker, setShowGoalPicker] = useState(false);
   const [showVolumePicker, setShowVolumePicker] = useState(false);
   const [showNameEditor, setShowNameEditor] = useState(false);
-  const [showCatPicker, setShowCatPicker] = useState(false);
-  const [expandedCatId, setExpandedCatId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(displayName);
 
   const selectedCat = getCatById(selectedCatId) ?? CAT_CHARACTERS[0];
@@ -445,38 +357,12 @@ export function ProfileScreen(): React.ReactElement {
     setShowNameEditor(false);
   }, [editingName, setDisplayName]);
 
-  const handleSelectCat = useCallback((catId: string) => {
-    setSelectedCatId(catId);
-    const cat = getCatById(catId);
-    if (cat) {
-      useSettingsStore.getState().setAvatarEmoji(cat.emoji);
-    }
-  }, [setSelectedCatId]);
-
-  const handleToggleBackstory = useCallback((catId: string) => {
-    setExpandedCatId((prev) => (prev === catId ? null : catId));
-  }, []);
-
-  const renderCatItem = useCallback(({ item }: { item: CatCharacter }) => {
-    const unlocked = isCatUnlocked(item.id, level);
-    return (
-      <CatPickerCard
-        cat={item}
-        isSelected={selectedCatId === item.id}
-        isUnlocked={unlocked}
-        onSelect={handleSelectCat}
-        onShowBackstory={handleToggleBackstory}
-      />
-    );
-  }, [level, selectedCatId, handleSelectCat, handleToggleBackstory]);
-
-  const catKeyExtractor = useCallback((item: CatCharacter) => item.id, []);
-
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} testID="profile-screen">
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        testID="profile-scroll"
       >
         {/* Gradient Header with cat avatar and level progress ring */}
         <LinearGradient
@@ -487,6 +373,7 @@ export function ProfileScreen(): React.ReactElement {
             style={styles.avatarContainer}
             onPress={() => navigation.navigate('CatSwitch')}
             activeOpacity={0.7}
+            testID="profile-open-cat-switch"
           >
             <CatAvatar catId={selectedCatId} size="large" showTooltipOnTap={false} />
             <View style={styles.editBadge}>
@@ -659,7 +546,23 @@ export function ProfileScreen(): React.ReactElement {
             </View>
           )}
 
-          <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('MidiSetup')}>
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() => navigation.navigate('CatSwitch')}
+            testID="profile-open-cat-switch-row"
+          >
+            <View style={styles.settingLeft}>
+              <MaterialCommunityIcons name="cat" size={24} color="#B0B0B0" />
+              <Text style={styles.settingLabel}>Change Cat</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={24} color="#666" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() => navigation.navigate('MidiSetup')}
+            testID="profile-open-midi-setup"
+          >
             <View style={styles.settingLeft}>
               <MaterialCommunityIcons name="piano" size={24} color="#B0B0B0" />
               <Text style={styles.settingLabel}>MIDI Setup</Text>
@@ -667,7 +570,11 @@ export function ProfileScreen(): React.ReactElement {
             <MaterialCommunityIcons name="chevron-right" size={24} color="#666" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.settingItem} onPress={() => navigation.navigate('Account')}>
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() => navigation.navigate('Account')}
+            testID="profile-open-account"
+          >
             <View style={styles.settingLeft}>
               <MaterialCommunityIcons name="account-cog" size={24} color="#B0B0B0" />
               <Text style={styles.settingLabel}>Account</Text>
@@ -717,233 +624,9 @@ export function ProfileScreen(): React.ReactElement {
         </View>
       </Modal>
 
-      {/* Cat Character Picker Modal */}
-      <Modal visible={showCatPicker} transparent animationType="slide">
-        <View style={catPickerStyles.overlay}>
-          <View style={catPickerStyles.container}>
-            {/* Header */}
-            <View style={catPickerStyles.header}>
-              <Text style={catPickerStyles.title}>Choose Your Cat</Text>
-              <TouchableOpacity onPress={() => setShowCatPicker(false)}>
-                <MaterialCommunityIcons name="close" size={24} color="#888" />
-              </TouchableOpacity>
-            </View>
-            <Text style={catPickerStyles.subtitle}>
-              Tap to select, long-press for backstory
-            </Text>
-
-            {/* Cat grid */}
-            <FlatList
-              data={CAT_CHARACTERS}
-              renderItem={renderCatItem}
-              keyExtractor={catKeyExtractor}
-              numColumns={2}
-              columnWrapperStyle={catPickerStyles.row}
-              contentContainerStyle={catPickerStyles.listContent}
-              showsVerticalScrollIndicator={false}
-            />
-
-            {/* Expanded backstory panel */}
-            {expandedCatId && (() => {
-              const expandedCat = getCatById(expandedCatId);
-              if (!expandedCat) return null;
-              return (
-                <View style={[catPickerStyles.backstoryPanel, { borderColor: expandedCat.color + '66' }]}>
-                  <View style={catPickerStyles.backstoryHeader}>
-                    <Text style={catPickerStyles.backstoryEmoji}>{expandedCat.emoji}</Text>
-                    <View style={catPickerStyles.backstoryInfo}>
-                      <Text style={catPickerStyles.backstoryName}>{expandedCat.name}</Text>
-                      <Text style={[catPickerStyles.backstorySkill, { color: expandedCat.color }]}>
-                        {expandedCat.musicSkill}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={catPickerStyles.backstoryText}>{expandedCat.backstory}</Text>
-                  <TouchableOpacity
-                    style={catPickerStyles.backstoryClose}
-                    onPress={() => setExpandedCatId(null)}
-                  >
-                    <Text style={catPickerStyles.backstoryCloseText}>Close</Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            })()}
-
-            {/* Done button */}
-            <TouchableOpacity
-              style={catPickerStyles.doneButton}
-              onPress={() => setShowCatPicker(false)}
-            >
-              <Text style={catPickerStyles.doneButtonText}>Done</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
-
-const catPickerStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'flex-end',
-  },
-  container: {
-    backgroundColor: COLORS.background,
-    borderTopLeftRadius: BORDER_RADIUS.xl,
-    borderTopRightRadius: BORDER_RADIUS.xl,
-    paddingTop: 20,
-    paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.xl,
-    maxHeight: '85%',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.xs,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: '#888',
-    marginBottom: SPACING.md,
-  },
-  listContent: {
-    paddingBottom: SPACING.sm,
-  },
-  row: {
-    gap: SPACING.md - 4,
-    marginBottom: SPACING.md - 4,
-  },
-  card: {
-    flex: 1,
-    backgroundColor: '#1A1A1A',
-    borderRadius: BORDER_RADIUS.lg,
-    padding: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-    position: 'relative',
-    minHeight: 150,
-  },
-  cardLocked: {
-    opacity: 0.5,
-  },
-  lockOverlay: {
-    position: 'absolute',
-    top: SPACING.sm,
-    right: SPACING.sm,
-    alignItems: 'center',
-    zIndex: 2,
-  },
-  lockLevel: {
-    fontSize: 10,
-    color: '#888',
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  emojiContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
-  },
-  emojiText: {
-    fontSize: 28,
-  },
-  catName: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
-    marginBottom: 2,
-  },
-  catSkill: {
-    fontSize: 11,
-    color: '#B0B0B0',
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  personalityBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  personalityText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  selectedCheck: {
-    position: 'absolute',
-    top: SPACING.sm,
-    left: SPACING.sm,
-  },
-  backstoryPanel: {
-    backgroundColor: '#1A1A1A',
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.md,
-    marginTop: SPACING.sm,
-    marginBottom: SPACING.sm,
-    borderWidth: 1,
-  },
-  backstoryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-    gap: SPACING.md - 4,
-  },
-  backstoryEmoji: {
-    fontSize: 36,
-  },
-  backstoryInfo: {
-    flex: 1,
-  },
-  backstoryName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
-  },
-  backstorySkill: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  backstoryText: {
-    fontSize: 14,
-    color: '#CCCCCC',
-    lineHeight: 20,
-  },
-  backstoryClose: {
-    alignSelf: 'flex-end',
-    marginTop: SPACING.sm,
-    paddingHorizontal: SPACING.md - 4,
-    paddingVertical: SPACING.xs,
-  },
-  backstoryCloseText: {
-    fontSize: 13,
-    color: '#888',
-    fontWeight: '600',
-  },
-  doneButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: BORDER_RADIUS.md,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: SPACING.sm,
-  },
-  doneButtonText: {
-    color: COLORS.textPrimary,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-});
 
 const styles = StyleSheet.create({
   container: {

@@ -120,7 +120,7 @@ export const MidiSetupScreen: React.FC<MidiSetupScreenProps> = ({
     const timer = setTimeout(() => {
       setVerificationStatus('failed');
       unsubscribe();
-    }, 5000); // 5 second timeout
+    }, 15000); // 15 second timeout — first-time users need time to read instructions
 
     const unsubscribe = getMidiInput().onNoteEvent((event: MidiNoteEvent) => {
       if (event.type === 'noteOn' && event.velocity > 0) {
@@ -163,6 +163,7 @@ export const MidiSetupScreen: React.FC<MidiSetupScreenProps> = ({
     <ScrollView
       style={{ flex: 1, backgroundColor: '#f5f5f5' }}
       contentContainerStyle={{ paddingTop: insets.top }}
+      testID="midi-setup-screen"
     >
       <View style={{ padding: 20, paddingBottom: insets.bottom + 20 }}>
         {/* Header */}
@@ -277,6 +278,7 @@ const WelcomeStep: React.FC<{
             paddingVertical: 16,
             alignItems: 'center',
           }}
+          testID="midi-search-devices"
         >
           <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>
             🔍 Search for Devices
@@ -292,6 +294,7 @@ const WelcomeStep: React.FC<{
               paddingVertical: 16,
               alignItems: 'center',
             }}
+            testID="midi-cancel"
           >
             <Text style={{ color: '#333', fontSize: 16, fontWeight: '600' }}>
               Cancel

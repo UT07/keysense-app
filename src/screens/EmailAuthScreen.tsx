@@ -16,17 +16,21 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useAuthStore } from '../stores/authStore';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type Mode = 'signIn' | 'signUp';
 
 export function EmailAuthScreen(): React.ReactElement {
   const navigation = useNavigation();
+  const route = useRoute<RouteProp<RootStackParamList, 'EmailAuth'>>();
+  const isLinking = route.params?.isLinking ?? false;
   const isLoading = useAuthStore((s) => s.isLoading);
   const error = useAuthStore((s) => s.error);
   const signInWithEmail = useAuthStore((s) => s.signInWithEmail);
   const signUpWithEmail = useAuthStore((s) => s.signUpWithEmail);
+  const linkWithEmail = useAuthStore((s) => s.linkWithEmail);
   const sendPasswordReset = useAuthStore((s) => s.sendPasswordReset);
   const clearError = useAuthStore((s) => s.clearError);
 
@@ -58,12 +62,15 @@ export function EmailAuthScreen(): React.ReactElement {
     if (!validate()) return;
     clearError();
 
-    if (mode === 'signIn') {
+    if (isLinking) {
+      // Link anonymous account with email credentials (preserves progress)
+      await linkWithEmail(email, password);
+    } else if (mode === 'signIn') {
       await signInWithEmail(email, password);
     } else {
       await signUpWithEmail(email, password, displayName.trim());
     }
-  }, [mode, email, password, displayName, validate, clearError, signInWithEmail, signUpWithEmail]);
+  }, [mode, email, password, displayName, isLinking, validate, clearError, signInWithEmail, signUpWithEmail, linkWithEmail]);
 
   const handleForgotPassword = useCallback(async () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -72,7 +79,13 @@ export function EmailAuthScreen(): React.ReactElement {
       return;
     }
     await sendPasswordReset(email);
-    Alert.alert('Email Sent', 'Check your inbox for a password reset link.');
+    // Check if reset succeeded (sendPasswordReset sets error on failure)
+    const storeError = useAuthStore.getState().error;
+    if (storeError) {
+      Alert.alert('Reset Failed', storeError);
+    } else {
+      Alert.alert('Email Sent', 'Check your inbox for a password reset link.');
+    }
   }, [email, sendPasswordReset]);
 
   const switchMode = useCallback((newMode: Mode) => {
@@ -88,8 +101,16 @@ export function EmailAuthScreen(): React.ReactElement {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        testID="email-auth-screen"
+      >
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          testID="email-auth-back"
+        >
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
 

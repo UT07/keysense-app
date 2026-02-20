@@ -575,6 +575,18 @@ describe('ExercisePlayer', () => {
       expect(capturedPianoRollProps.currentBeat).toBe(3);
     });
 
+    it('should clamp negative beat to 0 during count-in (notes stay frozen until countdown ends)', () => {
+      mockPlaybackState.currentBeat = -2;
+      const { useExercisePlayback } = require('../../../hooks/useExercisePlayback');
+      useExercisePlayback.mockImplementation(() => mockPlaybackState);
+
+      render(<ExercisePlayer exercise={MOCK_EXERCISE} />);
+
+      // During count-in (negative beat), PianoRoll receives 0 so notes
+      // remain stationary. They only start falling when countdown completes (beat >= 0).
+      expect(capturedPianoRollProps.currentBeat).toBe(0);
+    });
+
     it('should pass tempo to VerticalPianoRoll (adjusted by playback speed)', () => {
       render(<ExercisePlayer exercise={MOCK_EXERCISE} />);
 
@@ -609,6 +621,20 @@ describe('ExercisePlayer', () => {
       render(<ExercisePlayer exercise={MOCK_EXERCISE} />);
 
       // computeZoomedRange mock returns { startNote: 48, octaveCount: 2 }
+      expect(capturedKeyboardProps.startNote).toBe(48);
+      expect(capturedKeyboardProps.octaveCount).toBe(2);
+    });
+
+    it('should center single-note drills on first render', () => {
+      const singleNoteExercise: Exercise = {
+        ...MOCK_EXERCISE,
+        notes: [
+          { note: 60, startBeat: 0, durationBeats: 1 },
+        ],
+      };
+
+      render(<ExercisePlayer exercise={singleNoteExercise} />);
+
       expect(capturedKeyboardProps.startNote).toBe(48);
       expect(capturedKeyboardProps.octaveCount).toBe(2);
     });
