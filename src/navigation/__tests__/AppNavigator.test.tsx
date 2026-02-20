@@ -111,6 +111,11 @@ jest.mock('../../screens/ExercisePlayer/ExercisePlayer', () => {
   return { ExercisePlayer: () => <View testID="exercise-player-screen"><Text>ExercisePlayer</Text></View> };
 });
 
+jest.mock('../../screens/DailySessionScreen', () => {
+  const { View, Text } = require('react-native');
+  return { DailySessionScreen: () => <View testID="daily-session-screen"><Text>DailySessionScreen</Text></View> };
+});
+
 // ---------------------------------------------------------------------------
 // Mock react-navigation
 // ---------------------------------------------------------------------------
@@ -388,8 +393,9 @@ describe('AppNavigator', () => {
     it('should have a Play tab', () => {
       const { getByTestId } = render(<AppNavigator />);
 
+      // Play tab exists but renders a placeholder — actual PlayScreen is a
+      // full-screen stack route (FreePlay) for proper landscape orientation
       expect(getByTestId('tab-Play')).toBeTruthy();
-      expect(getByTestId('play-screen')).toBeTruthy();
     });
 
     it('should have a Profile tab', () => {
@@ -460,6 +466,16 @@ describe('AppNavigator', () => {
     it('should have LessonIntro route available', () => {
       const { getByTestId } = render(<AppNavigator />);
       expect(getByTestId('screen-LessonIntro')).toBeTruthy();
+    });
+
+    it('should have DailySession route available', () => {
+      const { getByTestId } = render(<AppNavigator />);
+      expect(getByTestId('screen-DailySession')).toBeTruthy();
+    });
+
+    it('should have FreePlay route available', () => {
+      const { getByTestId } = render(<AppNavigator />);
+      expect(getByTestId('screen-FreePlay')).toBeTruthy();
     });
   });
 

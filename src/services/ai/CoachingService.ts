@@ -92,6 +92,27 @@ export class CoachingService {
       };
     }
   }
+
+  /**
+   * Generate a brief pre-exercise coaching tip based on the learner's profile.
+   */
+  async generatePreExerciseTip(
+    _exerciseTitle: string,
+    weakNotes: number[]
+  ): Promise<string> {
+    const tips = [
+      'Take a deep breath and relax your hands.',
+      'Focus on accuracy first, speed will come.',
+      'Keep your wrists relaxed and fingers curved.',
+      'Listen to the metronome and feel the rhythm.',
+    ];
+
+    if (weakNotes.length > 0) {
+      tips.push(`This exercise targets some notes you've been working on. Stay focused!`);
+    }
+
+    return tips[Math.floor(Math.random() * tips.length)];
+  }
 }
 
 export const coachingService = new CoachingService();

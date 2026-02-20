@@ -8,7 +8,7 @@ Built with React Native (Expo) + Firebase + Gemini AI.
 
 ## Current Sprint: 16-Week Roadmap (Feb 17 → Jun 8, 2026)
 
-**Codebase Health:** 68 test suites, 1,597 tests passing, 0 TypeScript errors
+**Codebase Health:** 75 test suites, 1,725 tests passing, 0 TypeScript errors
 
 Previous sprints all COMPLETE:
 - Phase 4+ (Gamification + Adaptive Learning + UI Overhaul): 22/22 tasks
@@ -16,18 +16,26 @@ Previous sprints all COMPLETE:
 - Gameplay UX Rework: 10/10 tasks
 - QA Sprint: 18 new test suites, 6 bug fixes
 - Bug Fix Sprint (Feb 19-20): 10+ issues closed, cross-device sync, Google Sign-In, Detox E2E
+- Phase 5 (Adaptive Learning Revamp): 18/18 tasks, ~150+ new tests
 
 **Recently Completed (Feb 20, 2026):**
-- Cross-device sync: Firestore pull + merge on app startup (highest-wins strategy)
-- Google Sign-In: URL scheme registered, native module working in dev build
-- Exercise completion: faster detection (0.5-beat buffer + early completion)
-- Detox E2E test suite: 15 suites covering full app (e2e/full-coverage.e2e.js)
-- Auth resilience: local guest mode fallback when Firebase unavailable
-- SkillAssessment rewrite: proper state machine with count-in and audio
-- Keyboard: delayed re-measure for screen transitions, stable audio engine ref
+- Phase 5 Adaptive Learning Revamp: all 18 tasks (5.1-5.18) across 7 batches complete
+- SkillTree data model: DAG of ~30 skill nodes with categories and prerequisites
+- CurriculumEngine: AI session planner (warm-up + lesson + challenge) using learner profile
+- AI exercise generation upgrade: skill-aware generation with warm-up/challenge convenience methods
+- DailySessionScreen: "Today's Practice" with AI-picked sessions, replaces static lesson list on Home
+- Voice coaching pipeline: VoiceCoachingService + TTSService (expo-speech) + per-cat voice configs
+- Offline coaching templates: 50+ pre-generated coaching strings for Gemini fallback
+- WeakSpotDetector: pattern-based detection (note/transition/timing/hand weaknesses)
+- DifficultyEngine: progressive difficulty adjustment (5 BPM per mastered exercise)
+- FreePlayAnalyzer: key/scale detection + drill generation from free play sessions
+- PlayScreen analysis card: post-play feedback after 2s silence with "Generate Drill" button
+- Cross-device sync improvements: sequential migration/pull, XP sync, createGamificationData guard
+- Piano roll Tetris cascade: notes fall from top during count-in (removed effectiveBeat clamp)
+- TTSService lazy loading: prevents crashes when expo-speech native module unavailable
 
 **Active Roadmap:**
-- Phase 5: Adaptive Learning Revamp (Weeks 1-3) — AI curriculum, voice coaching, free play
+- ~~Phase 5: Adaptive Learning Revamp (Weeks 1-3)~~ COMPLETE
 - Phase 6: Avatar Evolution & Gamification (Weeks 4-6) — Pokemon evolution, gems, abilities
 - Phase 7: Game Feel & Polish (Weeks 7-8) — micro-interactions, Rive, transitions
 - Phase 8: Audio Input (Weeks 9-10) — mic polyphonic detection (R&D parallel from Week 1)
@@ -81,6 +89,7 @@ src/
 │   └── catDialogue.ts   # Cat personality dialogue system (8 cats x 40 messages)
 ├── core/                 # Platform-agnostic business logic (NO React imports)
 │   ├── exercises/        # Exercise validation, scoring algorithms
+│   ├── curriculum/       # SkillTree, CurriculumEngine, WeakSpotDetector, DifficultyEngine
 │   ├── music/            # Music theory utilities (notes, scales, chords)
 │   ├── progression/      # XP calculation, level unlocks
 │   ├── analytics/        # Event tracking abstraction
@@ -116,9 +125,11 @@ src/
 ├── navigation/           # React Navigation setup
 ├── services/             # External integrations
 │   ├── firebase/         # Auth, Firestore, Functions
-│   ├── ai/               # Gemini AI coaching (GeminiCoach + CoachingService)
+│   ├── ai/               # Gemini AI coaching (GeminiCoach + CoachingService + VoiceCoachingService)
+│   ├── tts/              # TTSService (expo-speech wrapper) + catVoiceConfig (per-cat voice params)
 │   ├── analytics/        # PostHog
-│   └── geminiExerciseService.ts  # AI exercise generation via Gemini Flash
+│   ├── FreePlayAnalyzer.ts  # Free play analysis with key/scale detection
+│   └── geminiExerciseService.ts  # AI exercise generation via Gemini Flash (skill-aware)
 ├── theme/                # Design system
 │   └── tokens.ts  # Design tokens, colors, gradients, spacing
 └── utils/                # Shared utilities
@@ -150,7 +161,17 @@ src/
 | `src/components/PianoRoll/VerticalPianoRoll.tsx` | Falling-note display (top-to-bottom, Synthesia-style) |
 | `src/services/demoPlayback.ts` | Demo mode: visual-only note playback with cat dialogue |
 | `src/content/catDialogue.ts` | Cat personality dialogue (8 cats, ~320 messages, trigger-based) |
-| `src/stores/learnerProfileStore.ts` | Adaptive learning: per-note accuracy, skills, tempo range |
+| `src/core/curriculum/SkillTree.ts` | DAG of ~30 skill nodes: note-finding, intervals, scales, chords, rhythm, hand-independence, songs |
+| `src/core/curriculum/CurriculumEngine.ts` | AI session planner: generateSessionPlan() -> warm-up + lesson + challenge |
+| `src/core/curriculum/WeakSpotDetector.ts` | Pattern-based weak spot detection (note/transition/timing/hand) |
+| `src/core/curriculum/DifficultyEngine.ts` | Progressive difficulty adjustment (5 BPM per mastered exercise) |
+| `src/screens/DailySessionScreen.tsx` | "Today's Practice" screen with AI-picked warm-up/lesson/challenge sections |
+| `src/services/ai/VoiceCoachingService.ts` | Enhanced coaching with cat personality integration |
+| `src/services/tts/TTSService.ts` | expo-speech wrapper with lazy loading and graceful degradation |
+| `src/services/tts/catVoiceConfig.ts` | Per-cat voice parameters (8 cats x pitch/rate/language) |
+| `src/services/FreePlayAnalyzer.ts` | Free play analysis: key/scale detection, drill generation |
+| `src/content/offlineCoachingTemplates.ts` | 50+ pre-generated coaching strings for offline fallback |
+| `src/stores/learnerProfileStore.ts` | Adaptive learning: per-note accuracy, skills, tempo range, mastered skills |
 | `src/stores/authStore.ts` | Firebase Auth: anonymous, email, Google, Apple sign-in + linking |
 | `src/services/firebase/syncService.ts` | Cross-device sync: offline queue + Firestore pull/merge |
 | `src/services/firebase/dataMigration.ts` | One-time local→cloud migration on first sign-in |
@@ -214,7 +235,7 @@ onAudioBuffer((buffer: Float32Array) => {
 | E2E | Detox | `e2e/` |
 | Audio latency | Custom harness | `scripts/measure-latency.ts` |
 
-**1,597 tests, 68 suites.** Run tests before committing:
+**1,725 tests, 75 suites.** Run tests before committing:
 ```bash
 npm run typecheck && npm run test
 ```

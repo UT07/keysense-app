@@ -724,3 +724,72 @@
 #### Verification
 - TypeScript: 0 errors
 - Tests: 1,597/1,597 passed, 68 suites
+
+---
+
+### 40. Phase 5: Adaptive Learning Revamp (Feb 20, 2026)
+
+**Scope:** 18 tasks (5.1-5.18) across 7 batches. ~150+ new tests. All Phase 5 exit criteria met.
+
+**Batch 1: SkillTree Data Model (5.1)**
+- **Created** `src/core/curriculum/SkillTree.ts` — DAG of ~30 skill nodes with categories (note-finding, intervals, scales, chords, rhythm, hand-independence, songs)
+- Functions: `getAvailableSkills()`, `getSkillById()`, `getSkillsForExercise()`
+- Tests in `src/core/curriculum/__tests__/SkillTree.test.ts`
+
+**Batch 2: CurriculumEngine (5.2, 5.4)**
+- **Created** `src/core/curriculum/CurriculumEngine.ts` — AI session planner with `generateSessionPlan(profile, masteredSkills)` producing warm-up + lesson + challenge
+- **Modified** `src/stores/learnerProfileStore.ts` — added `masteredSkills: string[]`, `markSkillMastered()`
+- Tests in `src/core/curriculum/__tests__/CurriculumEngine.test.ts`
+
+**Batch 3: AI Exercise Generation Upgrade (5.3)**
+- **Modified** `src/services/geminiExerciseService.ts` — added `targetSkillId`, `skillContext`, `exerciseType` params
+- Added `generateWarmUp()`, `generateChallenge()` convenience methods
+
+**Batch 4: Daily Session Screen (5.5)**
+- **Created** `src/screens/DailySessionScreen.tsx` — "Today's Practice" with warm-up/lesson/challenge sections
+- Updated navigation: added `DailySession` to `RootStackParamList`
+- HomeScreen Learn button now navigates to DailySessionScreen
+
+**Batch 5: Voice Coaching Pipeline (5.7-5.12)**
+- **Created** `src/services/ai/VoiceCoachingService.ts` — enhanced coaching with cat personality
+- **Created** `src/services/tts/TTSService.ts` — expo-speech wrapper with lazy loading (graceful degradation when native module unavailable)
+- **Created** `src/services/tts/catVoiceConfig.ts` — per-cat voice parameters (8 cats x pitch/rate/language)
+- **Created** `src/content/offlineCoachingTemplates.ts` — 50+ pre-generated coaching strings for offline fallback
+
+**Batch 6: Weak Spot Drills + Free Play Analysis (5.13-5.17)**
+- **Created** `src/core/curriculum/WeakSpotDetector.ts` — pattern-based weak spot detection (note/transition/timing/hand)
+- **Created** `src/core/curriculum/DifficultyEngine.ts` — progressive difficulty adjustment (5 BPM per mastered exercise)
+- **Created** `src/services/FreePlayAnalyzer.ts` — free play analysis with key/scale detection
+- **Modified** `src/screens/PlayScreen.tsx` — analysis card after 2s silence, "Generate Drill" button
+- **Modified** `src/services/ai/GeminiCoach.ts` — uses offline templates for fallback
+
+**Batch 7: Integration Tests + Polish (5.18)**
+- **Created** `src/__tests__/integration/adaptiveLearning.test.ts` — 17 integration tests
+- **Created** `src/__tests__/integration/freePlayFlow.test.ts` — 15 integration tests
+- **Modified** `src/App.tsx` — hydrates `masteredSkills` from AsyncStorage
+
+**Additional fixes during Phase 5:**
+- PlayScreen moved from tab screen to full-screen stack route (`FreePlay`) for proper landscape orientation
+- Piano roll Tetris cascade: removed `effectiveBeat` clamp so notes fall from top during count-in
+- Cross-device sync: sequential migration→pull, XP sync to gamification doc, `createGamificationData` guard
+- TTSService: lazy-loads `expo-speech` to prevent crashes when native module unavailable
+
+**New files created:**
+- `src/core/curriculum/SkillTree.ts`
+- `src/core/curriculum/CurriculumEngine.ts`
+- `src/core/curriculum/WeakSpotDetector.ts`
+- `src/core/curriculum/DifficultyEngine.ts`
+- `src/core/curriculum/__tests__/SkillTree.test.ts`
+- `src/core/curriculum/__tests__/CurriculumEngine.test.ts`
+- `src/screens/DailySessionScreen.tsx`
+- `src/services/ai/VoiceCoachingService.ts`
+- `src/services/tts/TTSService.ts`
+- `src/services/tts/catVoiceConfig.ts`
+- `src/services/FreePlayAnalyzer.ts`
+- `src/content/offlineCoachingTemplates.ts`
+- `src/__tests__/integration/adaptiveLearning.test.ts`
+- `src/__tests__/integration/freePlayFlow.test.ts`
+
+#### Verification
+- TypeScript: 0 errors
+- Tests: 1,725/1,725 passed, 75 suites

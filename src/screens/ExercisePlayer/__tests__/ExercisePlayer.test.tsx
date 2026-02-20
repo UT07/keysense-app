@@ -575,16 +575,17 @@ describe('ExercisePlayer', () => {
       expect(capturedPianoRollProps.currentBeat).toBe(3);
     });
 
-    it('should clamp negative beat to 0 during count-in (notes stay frozen until countdown ends)', () => {
+    it('should pass negative beat through during count-in (enables Tetris-style cascade)', () => {
       mockPlaybackState.currentBeat = -2;
       const { useExercisePlayback } = require('../../../hooks/useExercisePlayback');
       useExercisePlayback.mockImplementation(() => mockPlaybackState);
 
       render(<ExercisePlayer exercise={MOCK_EXERCISE} />);
 
-      // During count-in (negative beat), PianoRoll receives 0 so notes
-      // remain stationary. They only start falling when countdown completes (beat >= 0).
-      expect(capturedPianoRollProps.currentBeat).toBe(0);
+      // During count-in, negative beats pass through to PianoRoll so notes
+      // cascade down from above (Tetris-style). VerticalPianoRoll handles
+      // the math: notes start above the visible area and fall into view.
+      expect(capturedPianoRollProps.currentBeat).toBe(-2);
     });
 
     it('should pass tempo to VerticalPianoRoll (adjusted by playback speed)', () => {

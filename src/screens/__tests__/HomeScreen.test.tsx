@@ -279,10 +279,10 @@ describe('HomeScreen', () => {
     expect(getByText('Settings')).toBeTruthy();
   });
 
-  it('navigates to MainTabs Learn when Learn action card is pressed', () => {
+  it('navigates to DailySession when Learn action card is pressed', () => {
     const { getByText } = render(<HomeScreen />);
     fireEvent.press(getByText('Learn'));
-    expect(mockNavigate).toHaveBeenCalledWith('MainTabs', { screen: 'Learn' });
+    expect(mockNavigate).toHaveBeenCalledWith('DailySession');
   });
 
   it('does not redirect to onboarding when already completed', () => {

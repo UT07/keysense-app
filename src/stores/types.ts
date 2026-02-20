@@ -206,12 +206,14 @@ export interface LearnerProfileState {
   totalExercisesCompleted: number;
   lastAssessmentDate: string;
   assessmentScore: number;
+  masteredSkills: string[];  // SkillTree node IDs the learner has mastered
 
   // Actions
   updateNoteAccuracy: (midiNote: number, accuracy: number) => void;
   updateSkill: (skill: keyof Skills, value: number) => void;
   recalculateWeakAreas: () => void;
   recordExerciseResult: (result: ExerciseResult) => void;
+  markSkillMastered: (skillId: string) => void;
   reset: () => void;
 }
 

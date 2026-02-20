@@ -722,13 +722,14 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   const failCount = useExerciseStore(s => s.failCount);
 
   // Effective beat: during demo, use demo beat; otherwise use playback hook's beat.
-  // During count-in (negative beats), the piano roll stays frozen at beat 0
-  // so notes remain stationary until the countdown completes — then they start falling.
+  // Negative beats (count-in) are passed through so VerticalPianoRoll can animate
+  // the Tetris-style cascade: notes start above the visible area and fall into view.
   const rawBeat = isDemoPlaying ? demoBeat : currentBeat;
-  const effectiveBeat = rawBeat < 0 ? 0 : rawBeat;
+  const effectiveBeat = rawBeat;
 
   // Update keyboard range based on active window (sticky, low-jitter).
-  const effectiveBeatBucket = Math.floor(effectiveBeat * 2) / 2;
+  // Clamp to 0 for keyboard range since exercise notes always have non-negative startBeat.
+  const effectiveBeatBucket = Math.floor(Math.max(0, effectiveBeat) * 2) / 2;
   useEffect(() => {
     const windowNotes = exercise.notes
       .filter(n => n.startBeat >= effectiveBeatBucket - 2 && n.startBeat <= effectiveBeatBucket + 8)

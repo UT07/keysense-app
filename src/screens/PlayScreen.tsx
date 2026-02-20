@@ -19,11 +19,14 @@ import {
 } from 'react-native';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Keyboard } from '../components/Keyboard/Keyboard';
 import { createAudioEngine } from '../audio/createAudioEngine';
 import type { NoteHandle } from '../audio/types';
 import type { MidiNoteEvent } from '../core/exercises/types';
+import { analyzeSession, type FreePlayAnalysis } from '../services/FreePlayAnalyzer';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 
 // ============================================================================
 // Helpers
@@ -57,7 +60,7 @@ const NOTE_AUTO_RELEASE_MS = 1500;
 // ============================================================================
 
 export function PlayScreen(): React.JSX.Element {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [isRecording, setIsRecording] = useState(false);
   const [recordedNotes, setRecordedNotes] = useState<RecordedNote[]>([]);
   const [highlightedNotes, setHighlightedNotes] = useState<Set<number>>(new Set());
@@ -66,6 +69,7 @@ export function PlayScreen(): React.JSX.Element {
   const [sessionNoteCount, setSessionNoteCount] = useState(0);
   const [showInstructions, setShowInstructions] = useState(true);
   const [isPlayingBack, setIsPlayingBack] = useState(false);
+  const [analysis, setAnalysis] = useState<FreePlayAnalysis | null>(null);
   const recordingStartRef = useRef(0);
   const audioEngineRef = useRef(createAudioEngine());
   const activeHandlesRef = useRef<Map<number, NoteHandle>>(new Map());
@@ -73,29 +77,25 @@ export function PlayScreen(): React.JSX.Element {
   const playbackCancelRef = useRef(false);
   const playbackHandlesRef = useRef<Map<number, NoteHandle>>(new Map());
   const playbackTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionNotesRef = useRef<Array<{ note: number; timestamp: number; velocity: number }>>([]);
 
   // --------------------------------------------------------------------------
-  // Landscape orientation lock — useFocusEffect so it restores on tab switch
-  // (useEffect cleanup only fires on unmount, but tab screens stay mounted)
+  // Landscape orientation lock — same pattern as ExercisePlayer.
+  // Now a full-screen stack screen (not a tab), so useEffect cleanup is reliable.
   // --------------------------------------------------------------------------
-  useFocusEffect(
-    useCallback(() => {
-      const timer = setTimeout(() => {
-        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE_LEFT)
-          .catch(() => {
-            return ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-          })
-          .catch((err) => console.warn('[PlayScreen] Landscape lock failed:', err));
-      }, 100);
+  useEffect(() => {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE_LEFT)
+      .catch(() => {
+        return ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      })
+      .catch((err) => console.warn('[PlayScreen] Landscape lock failed:', err));
 
-      return () => {
-        clearTimeout(timer);
-        // Restore portrait immediately on blur (tab switch or navigate away)
-        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)
-          .catch(() => {});
-      };
-    }, [])
-  );
+    return () => {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)
+        .catch(() => {});
+    };
+  }, []);
 
   // --------------------------------------------------------------------------
   // Audio engine initialization
@@ -127,6 +127,8 @@ export function PlayScreen(): React.JSX.Element {
       // Clear all auto-release timers
       for (const t of autoReleaseTimersRef.current.values()) clearTimeout(t);
       autoReleaseTimersRef.current.clear();
+      // Clear silence analysis timer
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     };
   }, []);
 
@@ -170,6 +172,22 @@ export function PlayScreen(): React.JSX.Element {
       setCurrentNoteName(midiToNoteName(midiNote.note));
       setSessionNoteCount((prev) => prev + 1);
       if (showInstructions) setShowInstructions(false);
+
+      // Track all session notes for analysis (regardless of recording state)
+      sessionNotesRef.current.push({
+        note: midiNote.note,
+        timestamp: Date.now(),
+        velocity: midiNote.velocity,
+      });
+
+      // Reset silence timer for auto-analysis
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      setAnalysis(null); // dismiss any existing analysis card while playing
+      silenceTimerRef.current = setTimeout(() => {
+        if (sessionNotesRef.current.length > 0) {
+          setAnalysis(analyzeSession(sessionNotesRef.current));
+        }
+      }, 2000);
 
       // Record if actively recording
       if (isRecording) {
@@ -334,6 +352,8 @@ export function PlayScreen(): React.JSX.Element {
   const clearRecording = useCallback(() => {
     stopPlayback();
     setRecordedNotes([]);
+    sessionNotesRef.current = [];
+    setAnalysis(null);
   }, [stopPlayback]);
 
   // --------------------------------------------------------------------------
@@ -461,6 +481,34 @@ export function PlayScreen(): React.JSX.Element {
           testID="freeplay-keyboard"
         />
       </View>
+
+      {/* Free play analysis card — appears after 2s of silence */}
+      {analysis && (
+        <View style={styles.analysisCard} testID="freeplay-analysis-card">
+          <View style={styles.analysisHeader}>
+            <MaterialCommunityIcons name="music-note-eighth" size={18} color="#2196F3" />
+            <Text style={styles.analysisTitle}>Free Play Analysis</Text>
+            <TouchableOpacity onPress={() => setAnalysis(null)}>
+              <MaterialCommunityIcons name="close" size={18} color="#666" />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.analysisSummary}>{analysis.summary}</Text>
+          {analysis.detectedKey && (
+            <Text style={styles.analysisDetail}>Detected key: {analysis.detectedKey}</Text>
+          )}
+          <TouchableOpacity
+            style={styles.generateDrillBtn}
+            onPress={() => {
+              navigation.navigate('Exercise', { exerciseId: 'ai-mode', aiMode: true });
+              setAnalysis(null);
+            }}
+            testID="freeplay-generate-drill"
+          >
+            <MaterialCommunityIcons name="lightning-bolt" size={16} color="#FFF" />
+            <Text style={styles.generateDrillText}>Generate Drill</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -581,5 +629,52 @@ const styles = StyleSheet.create({
     flex: 1,
     borderTopWidth: 1,
     borderTopColor: '#2A2A2A',
+  },
+  analysisCard: {
+    position: 'absolute',
+    bottom: 120,
+    left: 16,
+    right: 16,
+    backgroundColor: '#1A1A2E',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(33, 150, 243, 0.3)',
+  },
+  analysisHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  analysisTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    flex: 1,
+  },
+  analysisSummary: {
+    fontSize: 13,
+    color: '#AAAAAA',
+    marginBottom: 8,
+  },
+  analysisDetail: {
+    fontSize: 12,
+    color: '#2196F3',
+    marginBottom: 8,
+  },
+  generateDrillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#2196F3',
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  generateDrillText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

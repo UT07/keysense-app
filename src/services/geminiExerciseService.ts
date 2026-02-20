@@ -23,6 +23,9 @@ export interface GenerationParams {
     sightReadSpeed: number;
     chordRecognition: number;
   };
+  targetSkillId?: string;
+  skillContext?: string;
+  exerciseType?: 'warmup' | 'lesson' | 'challenge';
 }
 
 export interface AIExercise {
@@ -178,12 +181,28 @@ export function buildPrompt(params: GenerationParams): string {
   const tempo = calculateTempo(params);
   const keySignature = keySignatureForDifficulty(params.difficulty);
 
-  return `Generate a piano exercise as JSON for a student with this profile:
+  let prompt = `Generate a piano exercise as JSON for a student with this profile:
 - Weak notes (MIDI): ${JSON.stringify(params.weakNotes)} (focus extra repetitions on these)
 - Timing accuracy: ${Math.round(params.skills.timingAccuracy * 100)}%
 - Comfortable tempo: ${params.tempoRange.min}-${params.tempoRange.max} BPM
 - Difficulty: ${params.difficulty}/5
-- Target note count: ${params.noteCount}
+- Target note count: ${params.noteCount}`;
+
+  // Add skill context if provided (from CurriculumEngine)
+  if (params.skillContext) {
+    prompt += `\n- Skill focus: ${params.skillContext}`;
+  }
+
+  if (params.exerciseType) {
+    const typeDescriptions: Record<string, string> = {
+      warmup: 'This is a warm-up exercise. Keep it simple, focus on familiar patterns and weak areas.',
+      lesson: 'This is a lesson exercise. Introduce the target skill progressively with clear patterns.',
+      challenge: 'This is a challenge exercise. Push slightly beyond their comfort zone with faster tempo or wider intervals.',
+    };
+    prompt += `\n- Exercise purpose: ${typeDescriptions[params.exerciseType]}`;
+  }
+
+  prompt += `
 
 Requirements:
 - Tempo: ${tempo} BPM (middle of their range, scaled by difficulty)
@@ -194,6 +213,54 @@ Requirements:
 - Include at least 2 repetitions of each weak note
 
 Return JSON: { notes: [{note, startBeat, durationBeats, hand}], settings: {tempo, timeSignature, keySignature}, metadata: {title, difficulty, skills}, scoring: {passingScore, timingToleranceMs, starThresholds} }`;
+
+  return prompt;
+}
+
+/**
+ * Generate a warm-up exercise targeting the learner's weak areas.
+ */
+export async function generateWarmUp(profile: {
+  weakNotes: number[];
+  tempoRange: { min: number; max: number };
+  skills: GenerationParams['skills'];
+}): Promise<AIExercise | null> {
+  return generateExercise({
+    weakNotes: profile.weakNotes,
+    tempoRange: profile.tempoRange,
+    difficulty: 1,
+    noteCount: 8,
+    skills: profile.skills,
+    exerciseType: 'warmup',
+    skillContext: profile.weakNotes.length > 0
+      ? `Warm up with focus on weak notes: MIDI ${profile.weakNotes.slice(0, 3).join(', ')}`
+      : 'General warm-up with C major patterns',
+  });
+}
+
+/**
+ * Generate a challenge exercise that pushes the learner slightly above comfort zone.
+ */
+export async function generateChallenge(profile: {
+  weakNotes: number[];
+  tempoRange: { min: number; max: number };
+  skills: GenerationParams['skills'];
+  targetSkillId?: string;
+  skillContext?: string;
+}): Promise<AIExercise | null> {
+  return generateExercise({
+    weakNotes: profile.weakNotes,
+    tempoRange: {
+      min: profile.tempoRange.min + 5,
+      max: profile.tempoRange.max + 10,
+    },
+    difficulty: 3,
+    noteCount: 16,
+    skills: profile.skills,
+    exerciseType: 'challenge',
+    targetSkillId: profile.targetSkillId,
+    skillContext: profile.skillContext ?? 'Challenge: slightly faster tempo with more notes',
+  });
 }
 
 // ============================================================================

@@ -17,6 +17,7 @@ export interface CountInAnimationProps {
   countIn: number; // Number of beats in count-in
   tempo: number; // BPM
   elapsedTime: number; // Current elapsed time in ms
+  coachingTip?: string; // Brief pre-exercise coaching tip
   testID?: string;
 }
 
@@ -28,6 +29,7 @@ export const CountInAnimation: React.FC<CountInAnimationProps> = ({
   countIn,
   tempo,
   elapsedTime,
+  coachingTip,
   testID,
 }) => {
   const [currentBeat, setCurrentBeat] = useState(0);
@@ -92,6 +94,11 @@ export const CountInAnimation: React.FC<CountInAnimationProps> = ({
         </Text>
       </Animated.View>
 
+      {/* Coaching tip during count-in */}
+      {coachingTip && currentBeat < countIn - 1 && (
+        <Text style={styles.coachingTip}>{coachingTip}</Text>
+      )}
+
       {/* "Ready" text when count-in complete */}
       {currentBeat === countIn - 1 && (
         <Text style={styles.readyText}>Ready...</Text>
@@ -132,6 +139,16 @@ const styles = StyleSheet.create({
     fontSize: 56,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  coachingTip: {
+    position: 'absolute',
+    bottom: 140,
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#CCCCCC',
+    textAlign: 'center',
+    paddingHorizontal: 32,
+    maxWidth: 320,
   },
   readyText: {
     position: 'absolute',

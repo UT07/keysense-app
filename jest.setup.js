@@ -74,6 +74,14 @@ jest.mock('expo-av', () => ({
   },
 }));
 
+// Mock expo-speech (TTS)
+jest.mock('expo-speech', () => ({
+  speak: jest.fn(),
+  stop: jest.fn(),
+  isSpeakingAsync: jest.fn(() => Promise.resolve(false)),
+  getAvailableVoicesAsync: jest.fn(() => Promise.resolve([])),
+}));
+
 // Mock AsyncStorage (Expo Go compatible version)
 jest.mock('@react-native-async-storage/async-storage', () => {
   const storage = new Map();

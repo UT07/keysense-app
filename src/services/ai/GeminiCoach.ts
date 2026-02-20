@@ -5,6 +5,7 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getOfflineCoachingText } from '../../content/offlineCoachingTemplates';
 
 // ============================================================================
 // Type Definitions
@@ -294,28 +295,23 @@ export class GeminiCoach {
   }
 
   /**
-   * Fallback feedback when API is unavailable or fails
+   * Fallback feedback when API is unavailable or fails.
+   * Uses offline coaching templates for varied, context-aware responses.
    */
   private static getFallbackFeedback(request: CoachRequest): string {
     const { score, issues } = request;
+    const isPassed = score.overall >= 70;
+    const mainIssue: 'timing' | 'pitch' | 'general' =
+      issues.timingErrors.length > issues.pitchErrors.length ? 'timing'
+        : issues.pitchErrors.length > 0 ? 'pitch'
+        : 'general';
 
-    if (score.overall >= 90) {
-      return "Excellent work! You're really getting the hang of this. Ready for the next challenge?";
-    }
-
-    if (score.overall >= 80) {
-      return "Great effort! A little more practice and you'll have it mastered. Keep going!";
-    }
-
-    if (score.overall >= 70) {
-      return "Good progress! Focus on one measure at a time. You're learning the right notes!";
-    }
-
-    if (issues.timingErrors.length > issues.pitchErrors.length) {
-      return "Try counting along with the beat—timing takes practice. You're learning the right notes!";
-    }
-
-    return "Take it slow and focus on one measure at a time. You've got this!";
+    return getOfflineCoachingText(
+      score.overall,
+      isPassed,
+      request.context.attemptNumber,
+      mainIssue
+    );
   }
 
   /**

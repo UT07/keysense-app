@@ -29,6 +29,6 @@ module.exports = {
     '^.+\\.tsx?$': ['babel-jest', { configFile: './babel.config.js' }],
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(expo|expo-av|expo-router|expo-font|expo-screen-orientation|expo-haptics|expo-linear-gradient|@expo/vector-icons|@react-native|react-native|@react-native-community|@react-navigation|@shopify/react-native-skia|react-native-reanimated|react-native-gesture-handler|expo-modules-core)/)',
+    'node_modules/(?!(expo|expo-av|expo-router|expo-font|expo-screen-orientation|expo-haptics|expo-linear-gradient|expo-speech|@expo/vector-icons|@react-native|react-native|@react-native-community|@react-navigation|@shopify/react-native-skia|react-native-reanimated|react-native-gesture-handler|expo-modules-core)/)',
   ],
 };

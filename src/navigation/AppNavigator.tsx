@@ -5,6 +5,7 @@
  */
 
 import React from 'react';
+import { View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -24,6 +25,7 @@ import { AccountScreen } from '../screens/AccountScreen';
 import { LessonIntroScreen } from '../screens/LessonIntroScreen';
 import { CatSwitchScreen } from '../screens/CatSwitchScreen';
 import { SkillAssessmentScreen } from '../screens/SkillAssessmentScreen';
+import { DailySessionScreen } from '../screens/DailySessionScreen';
 
 // Stores
 import { useAuthStore } from '../stores/authStore';
@@ -37,6 +39,8 @@ export type RootStackParamList = {
   Exercise: { exerciseId: string; testMode?: boolean; aiMode?: boolean };
   LessonIntro: { lessonId: string };
   SkillAssessment: undefined;
+  DailySession: undefined;
+  FreePlay: undefined;
   MidiSetup: undefined;
   Account: undefined;
   CatSwitch: undefined;
@@ -51,6 +55,11 @@ export type MainTabParamList = {
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
+
+/** Placeholder for the Play tab — never actually rendered because tabPress is intercepted */
+function FreePlayPlaceholder() {
+  return <View style={{ flex: 1, backgroundColor: '#0D0D0D' }} />;
+}
 
 /**
  * Main tab navigator (Home, Learn, Play, Profile)
@@ -90,13 +99,24 @@ function MainTabs() {
       />
       <Tab.Screen
         name="Play"
-        component={PlayScreen}
+        component={FreePlayPlaceholder}
         options={{
           tabBarButtonTestID: 'tab-play',
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="piano" size={size} color={color} />
           ),
         }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            // Prevent default tab behavior — navigate to full-screen FreePlay
+            // so landscape orientation works without the tab bar interfering
+            e.preventDefault();
+            const parent = navigation.getParent();
+            if (parent) {
+              parent.navigate('FreePlay');
+            }
+          },
+        })}
       />
       <Tab.Screen
         name="Profile"
@@ -174,6 +194,16 @@ export function AppNavigator() {
               name="SkillAssessment"
               component={SkillAssessmentScreen}
               options={{ animation: 'slide_from_right' }}
+            />
+            <RootStack.Screen
+              name="DailySession"
+              component={DailySessionScreen}
+              options={{ animation: 'slide_from_right' }}
+            />
+            <RootStack.Screen
+              name="FreePlay"
+              component={PlayScreen}
+              options={{ animation: 'fade' }}
             />
             <RootStack.Screen
               name="CatSwitch"

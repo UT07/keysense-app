@@ -23,7 +23,7 @@ const INITIAL_SKILLS: Skills = {
 };
 
 /** Data-only shape of learner profile state (excludes actions) */
-type LearnerProfileData = Pick<
+export type LearnerProfileData = Pick<
   LearnerProfileState,
   | 'noteAccuracy'
   | 'noteAttempts'
@@ -34,6 +34,7 @@ type LearnerProfileData = Pick<
   | 'totalExercisesCompleted'
   | 'lastAssessmentDate'
   | 'assessmentScore'
+  | 'masteredSkills'
 >;
 
 const defaultData: LearnerProfileData = {
@@ -46,6 +47,7 @@ const defaultData: LearnerProfileData = {
   totalExercisesCompleted: 0,
   lastAssessmentDate: '',
   assessmentScore: 0,
+  masteredSkills: [],
 };
 
 // Create debounced save function
@@ -120,6 +122,13 @@ export const useLearnerProfileStore = create<LearnerProfileState>((set, get) => 
     get().recalculateWeakAreas();
   },
 
+  markSkillMastered: (skillId: string) => {
+    const { masteredSkills } = get();
+    if (masteredSkills.includes(skillId)) return;
+    set({ masteredSkills: [...masteredSkills, skillId] });
+    debouncedSave(get());
+  },
+
   reset: () => {
     set({
       noteAccuracy: {},
@@ -131,6 +140,7 @@ export const useLearnerProfileStore = create<LearnerProfileState>((set, get) => 
       totalExercisesCompleted: 0,
       lastAssessmentDate: '',
       assessmentScore: 0,
+      masteredSkills: [],
     });
     PersistenceManager.deleteState(STORAGE_KEYS.LEARNER_PROFILE);
   },

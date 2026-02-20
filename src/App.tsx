@@ -15,6 +15,7 @@ import { useProgressStore } from './stores/progressStore';
 import { useSettingsStore } from './stores/settingsStore';
 import { useAuthStore } from './stores/authStore';
 import { useAchievementStore } from './stores/achievementStore';
+import { useLearnerProfileStore } from './stores/learnerProfileStore';
 import { levelFromXp } from './core/progression/XpSystem';
 import { syncManager } from './services/firebase/syncService';
 import { migrateLocalToCloud } from './services/firebase/dataMigration';
@@ -159,6 +160,15 @@ export default function App(): React.ReactElement {
         await useAchievementStore.getState().hydrate();
         console.log('[App] Achievement state hydrated from storage');
 
+        // Hydrate learner profile state (masteredSkills for adaptive curriculum)
+        const learnerData = await PersistenceManager.loadState(STORAGE_KEYS.LEARNER_PROFILE, null);
+        if (learnerData && (learnerData as Record<string, unknown>).masteredSkills) {
+          useLearnerProfileStore.setState({
+            masteredSkills: (learnerData as Record<string, unknown>).masteredSkills as string[],
+          });
+          console.log('[App] Learner profile hydrated (masteredSkills:', ((learnerData as Record<string, unknown>).masteredSkills as string[]).length, ')');
+        }
+
         // Start periodic cloud sync (every 5 minutes) if user is authenticated
         const authState = useAuthStore.getState();
         if (authState.isAuthenticated) {
@@ -166,26 +176,32 @@ export default function App(): React.ReactElement {
           console.log('[App] Periodic sync started');
         }
 
-        // Migrate local progress to cloud on first non-anonymous sign-in
+        // Migrate local progress to cloud on first non-anonymous sign-in,
+        // then pull remote progress. Sequential order prevents the race where
+        // pull reads stale/empty Firestore data before migration writes complete.
         if (authState.isAuthenticated && !authState.isAnonymous) {
-          migrateLocalToCloud().then((result) => {
-            if (result.migrated) {
+          try {
+            const migrationResult = await migrateLocalToCloud();
+            if (migrationResult.migrated) {
               console.log('[App] Local data migrated to cloud');
             }
-          });
+          } catch (err) {
+            console.warn('[App] Migration failed:', err);
+          }
 
           // Pull remote progress from Firestore and merge with local state.
           // This enables cross-device sync: when the same account is used on
           // simulator and physical device, both get the latest progress.
-          syncManager.pullRemoteProgress().then((result) => {
-            if (result.merged) {
+          try {
+            const pullResult = await syncManager.pullRemoteProgress();
+            if (pullResult.merged) {
               console.log('[App] Remote progress merged into local state');
-            } else if (result.pulled) {
+            } else if (pullResult.pulled) {
               console.log('[App] Remote progress checked — no new data');
             }
-          }).catch((err) => {
+          } catch (err) {
             console.warn('[App] Remote progress pull failed:', err);
-          });
+          }
         }
       } catch (e) {
         console.warn('[App] Failed to hydrate progress state:', e);

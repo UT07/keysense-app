@@ -27,6 +27,7 @@ import { ConfettiEffect } from '../../components/transitions/ConfettiEffect';
 import { XpPopup } from '../../components/XpPopup';
 import { getRandomCatMessage } from '../../content/catDialogue';
 import { coachingService } from '../../services/ai/CoachingService';
+import { ttsService } from '../../services/tts/TTSService';
 import { useProgressStore } from '../../stores/progressStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { getLessonIdForExercise } from '../../content/ContentLoader';
@@ -344,6 +345,18 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
             <View style={styles.coachHeader}>
               <MaterialCommunityIcons name="robot-outline" size={18} color="#7C4DFF" />
               <Text style={styles.coachTitle}>Coach Feedback</Text>
+              {coachFeedback && !coachLoading && (
+                <TouchableOpacity
+                  style={styles.speakerBtn}
+                  onPress={() => {
+                    const catId = selectedCatId ?? 'mini-meowww';
+                    ttsService.speak(coachFeedback, { catId });
+                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <MaterialCommunityIcons name="volume-high" size={18} color="#7C4DFF" />
+                </TouchableOpacity>
+              )}
             </View>
             {coachLoading ? (
               <ActivityIndicator size="small" color="#7C4DFF" />
@@ -643,6 +656,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#B39DDB',
+    flex: 1,
+  },
+  speakerBtn: {
+    padding: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(124, 77, 255, 0.15)',
   },
   coachText: {
     fontSize: 13,

@@ -266,6 +266,12 @@ export async function createGamificationData(uid: string): Promise<void> {
     },
   };
 
+  // Use merge to avoid overwriting existing cloud data from another device
+  const existing = await getDoc(gamDoc);
+  if (existing.exists()) {
+    // Doc already exists — don't overwrite
+    return;
+  }
   await setDoc(gamDoc, defaultData);
 }
 

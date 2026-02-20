@@ -7,7 +7,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from './config';
-import { syncProgress, getAllLessonProgress, getGamificationData } from './firestore';
+import { syncProgress, getAllLessonProgress, getGamificationData, addXp, createGamificationData } from './firestore';
 import type { ProgressChange, LessonProgress as FirestoreLessonProgress } from './firestore';
 import { useProgressStore } from '../../stores/progressStore';
 import { levelFromXp } from '../../core/progression/XpSystem';
@@ -166,6 +166,20 @@ export class SyncManager {
         LAST_SYNC_KEY,
         String(response.newSyncTimestamp)
       );
+
+      // Also sync XP to gamification doc so pullRemoteProgress can read it
+      try {
+        const localXp = useProgressStore.getState().totalXp;
+        const remoteGam = await getGamificationData(uid);
+        if (!remoteGam) {
+          await createGamificationData(uid);
+          if (localXp > 0) await addXp(uid, localXp, 'sync');
+        } else if (localXp > remoteGam.xp) {
+          await addXp(uid, localXp - remoteGam.xp, 'sync');
+        }
+      } catch {
+        // Non-critical: XP sync failure doesn't block queue flush
+      }
     } catch {
       // Failure: increment retryCount on valid items
       const updatedQueue = validItems.map((item) => ({

@@ -355,7 +355,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               icon="book-open-outline"
               label="Learn"
               gradient={['#1A0A2E', '#2D1B4E']}
-              onPress={onNavigateToLesson ?? (() => navigation.navigate('MainTabs', { screen: 'Learn' } as any))}
+              onPress={onNavigateToLesson ?? (() => navigation.navigate('DailySession'))}
             />
             <ActionCard
               icon="music-box-multiple"
@@ -375,7 +375,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               icon="piano"
               label="Free Play"
               gradient={['#1A2E0A', '#2D4E1B']}
-              onPress={onNavigateToSongs ?? (() => navigation.navigate('MainTabs', { screen: 'Play' } as any))}
+              onPress={onNavigateToSongs ?? (() => navigation.navigate('FreePlay'))}
             />
             <ActionCard
               icon="tune-variant"

@@ -112,11 +112,15 @@ export function AuthScreen(): React.ReactElement {
     try {
       const { GoogleSignin } = require('@react-native-google-signin/google-signin');
       await GoogleSignin.hasPlayServices();
-      const userInfo = await GoogleSignin.signIn();
-      const idToken = userInfo.data?.idToken ?? userInfo.idToken;
-      if (idToken) {
-        await useAuthStore.getState().signInWithGoogle(idToken);
+      const response = await GoogleSignin.signIn();
+      // v16 returns { type: 'success' | 'cancelled', data } instead of throwing
+      if (response.type === 'cancelled') return;
+      const idToken = response.data?.idToken;
+      if (!idToken) {
+        Alert.alert('Sign-In Failed', 'No authentication token received. Please try again.');
+        return;
       }
+      await useAuthStore.getState().signInWithGoogle(idToken);
     } catch (err: unknown) {
       const errObj = err as { code?: string; message?: string };
       if (errObj.code === 'SIGN_IN_CANCELLED') return;
