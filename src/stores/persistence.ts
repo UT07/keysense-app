@@ -183,6 +183,19 @@ export function cancelAllPendingSaves(): void {
 }
 
 /**
+ * Immediate save helper
+ * Bypasses debouncing for critical state that must persist immediately
+ * (e.g., daily challenge completion, gem transactions)
+ */
+export function createImmediateSave<T>(key: string): (state: T) => void {
+  return (state: T) => {
+    PersistenceManager.saveState(key, state).catch(err =>
+      console.error('[PERSIST] Immediate save failed:', err)
+    );
+  };
+}
+
+/**
  * Debounced save helper
  * Prevents excessive writes to storage
  */

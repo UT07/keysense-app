@@ -23,6 +23,7 @@ jest.mock('../../stores/persistence', () => ({
     CAT_EVOLUTION: 'test_cat_evolution',
   },
   createDebouncedSave: () => jest.fn(),
+  createImmediateSave: () => jest.fn(),
 }));
 
 // Mock catCharacters for evolution store

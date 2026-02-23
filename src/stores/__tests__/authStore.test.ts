@@ -63,6 +63,7 @@ jest.mock('../persistence', () => ({
     CAT_EVOLUTION: 'keysense_cat_evolution',
   },
   createDebouncedSave: () => jest.fn(),
+  createImmediateSave: () => jest.fn(),
   cancelAllPendingSaves: jest.fn(),
 }));
 

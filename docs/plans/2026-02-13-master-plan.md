@@ -1,9 +1,9 @@
 # Purrrfect Keys — Master Plan
 
-**Last Updated:** February 22, 2026
+**Last Updated:** February 23, 2026
 **Goal:** Production-quality piano learning app on App Store & Play Store
 **Target Launch:** June 8, 2026 (16-week roadmap from Feb 17)
-**Codebase Health:** 0 TypeScript errors, 2,099 tests passing, 90 suites
+**Codebase Health:** 0 TypeScript errors, 2,135 tests passing, 90 suites
 
 > **This is the single source of truth.** All other plan files in `docs/plans/` are historical archives. Do not reference them for current status.
 
@@ -17,12 +17,14 @@
 | Phase 2 | Gamification & Polish | **COMPLETE** | LevelMap, theme, audio rewrite, mascot system, transitions |
 | Phase 3 | Firebase Auth + Sync | **COMPLETE** | Auth (4 providers), cloud sync, offline queue, cross-device |
 | Phase 4+ | Adaptive Learning + UI Overhaul | **COMPLETE** | Design tokens, learner profile, Gemini generation, SplitKeyboard, 32 achievements |
-| Phase 5 | Adaptive Learning Revamp | **OPEN** (~90%) | SkillTree (100 nodes), CurriculumEngine, voice coaching, weak spots, difficulty engine. Gaps: see below |
+| Phase 5 | Adaptive Learning Revamp | **COMPLETE** | SkillTree (100 nodes), CurriculumEngine, voice coaching, weak spots, difficulty engine |
 | Phase 5.2 | 365-Day Curriculum | **COMPLETE** | 15 tiers, skill decay, multi-session mastery, session types |
 | Phase 6 | Avatar Evolution & Gamification | **COMPLETE** | 4-stage evolution, gems, 12 abilities, cat collection, EvolutionReveal |
 | Phase 6.5 | AI Coach Fix + Wiring | **COMPLETE** | 10 coach bugs, FreePlay key detection, gamification wiring |
 | Phase 7 | UI Revamp + Game Feel | **COMPLETE** | Concert Hall palette, composable SVG cats, Salsa NPC, custom tab bar, micro-interactions |
-| Phase 7.5 | All-AI Exercise Generation | **IN PROGRESS** | Batches 1-2, 4 done; Batches 3, 5, 6 remaining |
+| Phase 7.5 | All-AI Exercise Generation | **COMPLETE** | All 6 batches done — skill-aware AI generation for all tiers |
+| — | Gem Bug Fix | **COMPLETE** | immediateSave, auto-claim, toast feedback, reward display |
+| — | Cat Gallery Redesign | **COMPLETE** | Unified swipeable gallery with abilities, buy flow, evolution data |
 | Phase 8 | Audio Input (Mic) | **UP NEXT** | Ship-blocker: pitch detection for 95%+ of users without MIDI |
 | — | Sound Design | **PLANNED** | UI sounds, celebrations, cat audio |
 | — | Rive Animations | **PLANNED** | .riv files (needs Rive editor guidance) |
@@ -49,12 +51,6 @@ Firebase Auth (Email, Google, Apple, Anonymous), SyncManager with offline queue 
 ### Phase 5 + 5.2: Adaptive Learning Revamp + 365-Day Curriculum (~90% + 100%)
 SkillTree DAG (100 nodes, 15 tiers, 12 categories), CurriculumEngine (4 session types), skill decay (14-day half-life), AI generation for tiers 7-15, DailySessionScreen, VoiceCoachingService + TTSService, WeakSpotDetector, DifficultyEngine, FreePlayAnalyzer, 150+ new tests.
 
-**Phase 5 Known Gaps (to be addressed alongside Phase 7.5):**
-- Free play coaching UI not fully wired (post-play feedback card + "Generate drill" CTA)
-- Voice coaching (TTS) not consistently triggered on all exercise completions
-- Pre-exercise coaching tips ("Focus on your left hand") not surfaced in ExercisePlayer UI
-- DifficultyEngine tempo progression not visible to user (no UI indicator)
-
 ### Phase 6 + 6.5: Avatar Evolution & Gamification + AI Coach Fix
 4-stage evolution (Baby/Teen/Adult/Master), gem currency, 12 abilities via AbilityEngine, CatCollectionScreen, EvolutionReveal animation, GemEarnPopup, onboarding cat selection. AI Coach: 10 bugs fixed (pitchErrors, missedCount, cache, temperature), FreePlay expanded to 48 scales, gamification fully wired.
 
@@ -63,40 +59,26 @@ Concert Hall palette (black + crimson), typography/shadow/animation/glow token s
 
 ---
 
-## Phase 7.5: All-AI Exercise Generation (IN PROGRESS)
+## Phase 7.5: All-AI Exercise Generation (COMPLETE)
 
 **Problem:** Only 36 static exercises (~45 min of gameplay). Daily players exhaust content in 2-3 days. Tiers 1-6 are hardwired to static JSON; only tiers 7-15 use AI.
 
 **Goal:** Every exercise from tier 1 onward is AI-generated. Static JSON becomes offline fallback only.
 
-**Core bugs being fixed:**
-1. AI exercises never award skill mastery (runtime IDs don't match SkillTree lookups)
-2. CurriculumEngine has a static-first gate blocking AI for tiers 1-6
-3. Exercise buffer is not skill-aware (pre-generates generic exercises)
+All 6 batches completed: skill mastery for AI exercises, GenerationHints for 100 SkillTree nodes, skill-aware buffer/generation pipeline, CurriculumEngine AI-first for all tiers, LevelMap/LessonIntro AI integration, offline bootstrap + template integration.
 
-### Batch Status
+---
 
-| Batch | Description | Status |
-|-------|-------------|--------|
-| 1 | Fix skill mastery for AI exercises (skillId route param fallback) | **DONE** |
-| 2 | Add GenerationHints to SkillTree (100 nodes with promptHint, targetMidi, hand) | **DONE** |
-| 3 | Skill-aware buffer + generation pipeline (geminiExerciseService + buffer) | **TODO** |
-| 4 | CurriculumEngine AI-first for all tiers (invert static-first gate) | **DONE** |
-| 5 | LevelMap + LessonIntro AI integration (navigate with aiMode) | **TODO** |
-| 6 | Offline bootstrap + template integration (first-time experience) | **TODO** |
+## Gem Bug Fix + Cat Gallery Redesign (COMPLETE — Feb 23)
 
-### Files Modified So Far
-- `ExercisePlayer.tsx` — skillIdParam extraction + fallback mastery logic
-- `ExercisePlayer.test.tsx` — updated mocks + AI mastery test
-- `SkillTree.ts` — GenerationHints interface + GENERATION_HINTS for all 100 nodes + getGenerationHints()
-- `SkillTree.test.ts` — 5 new GenerationHints validation tests
-- `CurriculumEngine.ts` — ExerciseRef gains `'ai-with-fallback'` source + `fallbackExerciseId` + `makeAIRef()` helper (generator inversion in progress)
+### Gem Redemption Bug Fix
+- **Root cause:** Race condition between `completeDailyChallenge()` and `claimDailyReward()` — 500ms debounced save loses `lastDailyChallengeDate`
+- **Fix:** `createImmediateSave` utility (0ms persistence), `completeDailyChallengeAndClaim()` atomic action, toast feedback on failed claims, reward display on DailyChallengeCard
 
-### Remaining Work (Batches 3-6)
-- **Batch 3:** `geminiExerciseService.ts` accepts GenerationHints in prompt, `exerciseBufferManager.ts` stores targetSkillId per exercise + `getNextExerciseForSkill()` + `fillBufferForSkills()`
-- **Batch 4 (in progress):** Invert `generateLesson()`, `generateWarmUp()`, `generateReviewLesson()`, `generateChallenge()` to AI-first. Update `DailySessionScreen.tsx` to handle `'ai-with-fallback'`. Update CurriculumEngine tests.
-- **Batch 5:** LevelMapScreen + LessonIntroScreen navigate with `aiMode: true` + skillId for all tiers
-- **Batch 6:** templateExercises.ts gains skillId + `getTemplateForSkill()`. Fallback chain: skill template → static JSON → generic template → hardcoded C-major. OnboardingScreen calls `prefillOnboardingBuffer()`.
+### Cat Gallery Redesign
+- **Unified gallery:** Merged `CatSwitchScreen` + `CatCollectionScreen` into single swipeable Subway Surfers-style gallery
+- **Features:** 88%-width cards with evolution stage badge, ability icons, buy flow modal, gem balance header
+- **Navigation:** `CatCollection` route now renders `CatSwitchScreen`; `CatCollectionScreen` deprecated
 
 ---
 
@@ -233,8 +215,9 @@ Hybrid approach: piano-derived sounds for gameplay feedback + cat sounds for mas
 ## Execution Priority
 
 ```
-[NOW]      Phase 7.5: All-AI Exercises     ← biggest content gap, in progress
-[NEXT]     Phase 8: Audio Input (Mic)      ← core ship-blocker, needs R&D
+[DONE]     Phase 7.5: All-AI Exercises     ✓
+[DONE]     Gem Bug Fix + Cat Gallery       ✓
+[NOW]      Phase 8: Audio Input (Mic)      ← core ship-blocker, needs R&D
 [NEXT]     Sound Design                    ← can prototype alongside audio work
 [LATER]    Music Library                   ← content pipeline can run in parallel
 [LATER]    Rive Animations                 ← nice-to-have, SVG system is functional
@@ -252,15 +235,16 @@ WEEK  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16
 PH5   ████████████                 DONE
 PH6            ████████████        DONE
 PH7                     ████████   DONE
-PH7.5                      ██     ← NOW (Week 5)
-PH8                        ████████     Audio Input
+PH7.5                      ██     DONE
+GEMS+CAT                     █     DONE
+PH8                        ████████     ← NOW  Audio Input
 SOUND                         ████      Sound Design
 MUSIC ░░░░░░░░░░░░░░░░░░░░░░░░░░░░████  Pipeline → UI
 PH9                                  ████████  Social
 PH10                                       ████████  Launch
 ```
 
-We are currently in **Week 5** (Feb 22). Phase 7.5 is partially done (Batches 1-2 complete, Batch 4 in progress).
+We are currently in **Week 5** (Feb 23). Phase 7.5 complete, gem bug fixed, cat gallery redesigned. Phase 8 (Audio Input) is next.
 
 ---
 
@@ -270,7 +254,7 @@ We are currently in **Week 5** (Feb 22). Phase 7.5 is partially done (Batches 1-
 2. **Native MIDI module** not installed (needs RN 0.77+). VMPK + IAC Driver ready for testing
 3. **Native audio engine** (react-native-audio-api) requires RN 0.77+ for codegen. ExpoAudioEngine is primary
 4. **Jest worker teardown warning** — timer leak, non-blocking
-5. **~53 open GitHub issues** — to be triaged during QA sprint
+5. **~45 open GitHub issues** — to be triaged during QA sprint
 
 ---
 

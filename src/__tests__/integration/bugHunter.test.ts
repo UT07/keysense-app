@@ -90,6 +90,7 @@ jest.mock('../../stores/persistence', () => ({
     CAT_EVOLUTION: 'purrrfect_cat_evolution_state',
   },
   createDebouncedSave: jest.fn(() => jest.fn()),
+  createImmediateSave: jest.fn(() => jest.fn()),
   cancelAllPendingSaves: jest.fn(),
 }));
 

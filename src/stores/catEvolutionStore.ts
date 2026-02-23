@@ -16,7 +16,7 @@
 import { create } from 'zustand';
 import type { EvolutionStage, CatEvolutionData, DailyRewardDay } from './types';
 import { EVOLUTION_XP_THRESHOLDS } from './types';
-import { PersistenceManager, STORAGE_KEYS, createDebouncedSave } from './persistence';
+import { PersistenceManager, STORAGE_KEYS, createDebouncedSave, createImmediateSave } from './persistence';
 import { CAT_CHARACTERS } from '@/components/Mascot/catCharacters';
 
 /** Calculate evolution stage from accumulated XP */
@@ -87,6 +87,9 @@ export interface CatEvolutionStoreState {
   advanceDailyRewardDate: () => void;
   /** Mark today's daily challenge as completed */
   completeDailyChallenge: () => void;
+  /** Mark today's challenge as completed AND auto-claim today's reward.
+   *  Returns the reward if successfully claimed, or null. */
+  completeDailyChallengeAndClaim: () => DailyRewardDay['reward'] | null;
   /** Check if today's daily challenge has been completed */
   isDailyChallengeCompleted: () => boolean;
   checkChonkyEligibility: (streakDays: number, skillsMastered: number) => boolean;
@@ -117,6 +120,7 @@ const defaultData: EvolutionData = {
 };
 
 const debouncedSave = createDebouncedSave<EvolutionData>(STORAGE_KEYS.CAT_EVOLUTION, 500);
+const immediateSave = createImmediateSave<EvolutionData>(STORAGE_KEYS.CAT_EVOLUTION);
 
 /** Get today's ISO date string */
 function todayISO(): string {
@@ -301,7 +305,39 @@ export const useCatEvolutionStore = create<CatEvolutionStoreState>((set, get) =>
 
   completeDailyChallenge: () => {
     set({ lastDailyChallengeDate: todayISO() });
-    debouncedSave(get());
+    // Critical: save immediately so the date isn't lost if user navigates away
+    immediateSave(get());
+  },
+
+  completeDailyChallengeAndClaim: () => {
+    // 1. Mark challenge as completed
+    set({ lastDailyChallengeDate: todayISO() });
+
+    // 2. Auto-claim today's reward
+    const state = get();
+    const actualDay = calcCurrentDay(state.dailyRewards.weekStartDate);
+    if (actualDay === 0) {
+      immediateSave(state);
+      return null;
+    }
+
+    const dayData = state.dailyRewards.days.find(d => d.day === actualDay);
+    if (!dayData || dayData.claimed) {
+      immediateSave(state);
+      return dayData?.claimed ? dayData.reward : null;
+    }
+
+    set((prev) => ({
+      dailyRewards: {
+        ...prev.dailyRewards,
+        days: prev.dailyRewards.days.map(d =>
+          d.day === actualDay ? { ...d, claimed: true } : d,
+        ),
+        currentDay: actualDay,
+      },
+    }));
+    immediateSave(get());
+    return dayData.reward;
   },
 
   isDailyChallengeCompleted: () => {

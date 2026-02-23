@@ -1,10 +1,15 @@
 /**
- * CatSwitchScreen - Subway Surfers-inspired character gallery
- * Full-screen character showcase with color-matched backgrounds, stage platform,
- * animated transitions, and burst selection effects.
+ * CatSwitchScreen - Unified Cat Gallery (Subway Surfers-inspired)
+ *
+ * Merges CatSwitchScreen + CatCollectionScreen into a single swipeable gallery.
+ * Each card shows: large avatar, evolution stage, name/personality, music skill,
+ * evolution progress bar, ability icons, and action button (select/buy/locked).
+ *
+ * Cards are ~88% screen width for a prominent Subway Surfers feel with subtle
+ * adjacent card peeks.
  */
 
-import React, { useCallback, useRef, useMemo, useEffect } from 'react';
+import React, { useCallback, useRef, useMemo, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -13,6 +18,7 @@ import {
   FlatList,
   TouchableOpacity,
   Dimensions,
+  Modal,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -20,9 +26,7 @@ import { useNavigation } from '@react-navigation/native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
   withTiming,
-  withSequence,
   Easing,
   FadeIn,
   FadeInDown,
@@ -35,13 +39,34 @@ import { KeysieSvg } from '../components/Mascot/KeysieSvg';
 import { CAT_CHARACTERS, isCatOwned, getCatById } from '../components/Mascot/catCharacters';
 import type { CatCharacter } from '../components/Mascot/catCharacters';
 import { useSettingsStore } from '../stores/settingsStore';
-import { useCatEvolutionStore } from '../stores/catEvolutionStore';
-import { COLORS, SPACING, BORDER_RADIUS } from '../theme/tokens';
+import { useCatEvolutionStore, stageFromXp, xpToNextStage } from '../stores/catEvolutionStore';
+import { useGemStore } from '../stores/gemStore';
+import { EVOLUTION_XP_THRESHOLDS } from '../stores/types';
+import type { EvolutionStage, CatAbility } from '../stores/types';
+import { COLORS, SPACING, BORDER_RADIUS, SHADOWS, glowColor } from '../theme/tokens';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = SCREEN_WIDTH * 0.78;
-const CARD_SPACING = 16;
+const CARD_WIDTH = SCREEN_WIDTH * 0.88;
+const CARD_SPACING = 12;
 const SNAP_INTERVAL = CARD_WIDTH + CARD_SPACING;
+
+const STAGE_LABELS: Record<EvolutionStage, string> = {
+  baby: 'Baby',
+  teen: 'Teen',
+  adult: 'Adult',
+  master: 'Master',
+};
+
+const STAGE_COLORS: Record<EvolutionStage, string> = {
+  baby: '#81D4FA',
+  teen: COLORS.success,
+  adult: COLORS.starGold,
+  master: COLORS.starGold,
+};
+
+// ───────────────────────────────────────────────────────
+// Sub-components
+// ───────────────────────────────────────────────────────
 
 /** Animated burst particles on character select */
 function SelectBurst({ color, active }: { color: string; active: boolean }): React.ReactElement | null {
@@ -49,7 +74,6 @@ function SelectBurst({ color, active }: { color: string; active: boolean }): Rea
     Array.from({ length: 8 }, (_, i) => ({
       id: i,
       angle: (i * 45) * (Math.PI / 180),
-      delay: i * 40,
     })),
     [],
   );
@@ -102,96 +126,198 @@ function BurstParticle({ angle, color, progress }: {
 function StagePlatform({ color }: { color: string }): React.ReactElement {
   return (
     <View style={styles.stageContainer}>
-      {/* Main platform ellipse */}
       <View style={[styles.stagePlatform, { backgroundColor: color + '25' }]} />
-      {/* Platform shadow */}
       <View style={[styles.stageShadow, { backgroundColor: color + '12' }]} />
-      {/* Shine line */}
       <View style={[styles.stageShine, { backgroundColor: color + '40' }]} />
     </View>
   );
 }
 
-/** Animated "Select" button with spring */
-function SelectButton({ isSelected, isUnlocked, onPress, color, testID }: {
-  isSelected: boolean;
-  isUnlocked: boolean;
-  onPress: () => void;
-  color: string;
-  testID?: string;
+/** Ability icon row — 4 circular icons with stage-based unlock indicators */
+function AbilityIconRow({ abilities, unlockedAbilities, catColor, onTap }: {
+  abilities: CatAbility[];
+  unlockedAbilities: string[];
+  catColor: string;
+  onTap: (ability: CatAbility) => void;
 }): React.ReactElement {
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const handlePress = useCallback(() => {
-    scale.value = withSequence(
-      withTiming(0.88, { duration: 80 }),
-      withSpring(1, { damping: 8, stiffness: 200 }),
-    );
-    onPress();
-  }, [scale, onPress]);
-
-  if (!isUnlocked) {
-    return (
-      <View style={[styles.selectButton, styles.selectButtonLocked]}>
-        <MaterialCommunityIcons name="lock" size={18} color={COLORS.textMuted} />
-        <Text style={styles.selectButtonLockedText}>Locked</Text>
-      </View>
-    );
-  }
-
-  if (isSelected) {
-    return (
-      <Animated.View entering={FadeIn.duration(200)}>
-        <View style={[styles.selectButton, styles.selectButtonSelected, { borderColor: color }]}>
-          <MaterialCommunityIcons name="check-circle" size={18} color={color} />
-          <Text style={[styles.selectButtonSelectedText, { color }]}>Selected</Text>
-        </View>
-      </Animated.View>
-    );
-  }
-
   return (
-    <Animated.View style={animatedStyle}>
-      <TouchableOpacity
-        style={[styles.selectButton, { backgroundColor: color }]}
-        onPress={handlePress}
-        activeOpacity={0.85}
-        testID={testID}
-      >
-        <Text style={styles.selectButtonText}>Select</Text>
-      </TouchableOpacity>
+    <View style={styles.abilityRow}>
+      {abilities.map((ability) => {
+        const isUnlocked = unlockedAbilities.includes(ability.id);
+        return (
+          <TouchableOpacity
+            key={ability.id}
+            style={[
+              styles.abilityIcon,
+              {
+                backgroundColor: isUnlocked ? catColor + '30' : COLORS.surface,
+                borderColor: isUnlocked ? catColor + '60' : COLORS.cardBorder,
+              },
+            ]}
+            onPress={() => onTap(ability)}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons
+              name={ability.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+              size={18}
+              color={isUnlocked ? catColor : COLORS.textMuted}
+            />
+            {!isUnlocked && (
+              <View style={styles.abilityLockBadge}>
+                <MaterialCommunityIcons name="lock" size={8} color={COLORS.textMuted} />
+              </View>
+            )}
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Inline ability detail that expands below the icon row */
+function AbilityDetail({ ability, catColor, isUnlocked }: {
+  ability: CatAbility;
+  catColor: string;
+  isUnlocked: boolean;
+}): React.ReactElement {
+  return (
+    <Animated.View
+      entering={FadeIn.duration(200)}
+      style={[styles.abilityDetail, { borderColor: isUnlocked ? catColor + '40' : COLORS.cardBorder }]}
+    >
+      <MaterialCommunityIcons
+        name={ability.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+        size={20}
+        color={isUnlocked ? catColor : COLORS.textMuted}
+      />
+      <View style={styles.abilityDetailText}>
+        <Text style={[styles.abilityDetailName, { color: isUnlocked ? COLORS.textPrimary : COLORS.textMuted }]}>
+          {ability.name}
+        </Text>
+        <Text style={[styles.abilityDetailDesc, { color: isUnlocked ? COLORS.textSecondary : COLORS.cardBorder }]}>
+          {ability.description}
+        </Text>
+        <Text style={[styles.abilityDetailStage, { color: STAGE_COLORS[ability.unlockedAtStage] }]}>
+          Unlocks at {STAGE_LABELS[ability.unlockedAtStage]}
+        </Text>
+      </View>
     </Animated.View>
   );
 }
 
-/** Character card with full visual identity */
-function CatCard({ cat, isSelected, isUnlocked, onSelect, index }: {
+/** Styled buy modal (replaces Alert.alert) */
+function BuyModal({ visible, cat, gems, onConfirm, onCancel }: {
+  visible: boolean;
+  cat: CatCharacter | null;
+  gems: number;
+  onConfirm: () => void;
+  onCancel: () => void;
+}): React.ReactElement | null {
+  if (!cat) return null;
+  const cost = cat.gemCost ?? 500;
+  const canAfford = gems >= cost;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalCard}>
+          <LinearGradient
+            colors={[cat.color + '20', 'transparent']}
+            style={StyleSheet.absoluteFill}
+          />
+          <KeysieSvg mood="happy" size="medium" accentColor={cat.color} pixelSize={100} visuals={cat.visuals} />
+          <Text style={styles.modalTitle}>Unlock {cat.name}?</Text>
+          <View style={styles.modalCostRow}>
+            <MaterialCommunityIcons name="diamond-stone" size={18} color={COLORS.gemGold} />
+            <Text style={styles.modalCostText}>{cost}</Text>
+          </View>
+          <Text style={styles.modalBalance}>
+            Your balance: {gems} gems
+            {!canAfford && ` (need ${cost - gems} more)`}
+          </Text>
+          <View style={styles.modalButtons}>
+            <TouchableOpacity style={styles.modalCancelBtn} onPress={onCancel}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            {canAfford ? (
+              <TouchableOpacity
+                style={[styles.modalConfirmBtn, { backgroundColor: cat.color }]}
+                onPress={onConfirm}
+              >
+                <MaterialCommunityIcons name="diamond-stone" size={16} color="#FFF" />
+                <Text style={styles.modalConfirmText}>Unlock</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={[styles.modalConfirmBtn, { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.cardBorder }]}>
+                <Text style={[styles.modalConfirmText, { color: COLORS.textMuted }]}>Not enough gems</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ───────────────────────────────────────────────────────
+// Cat Card — full gallery card
+// ───────────────────────────────────────────────────────
+
+function CatCard({ cat, isSelected, isOwned, evolutionXp, stage, unlockedAbilities, onSelect, onBuy, index }: {
   cat: CatCharacter;
   isSelected: boolean;
-  isUnlocked: boolean;
+  isOwned: boolean;
+  evolutionXp: number;
+  stage: EvolutionStage;
+  unlockedAbilities: string[];
   onSelect: (id: string) => void;
+  onBuy: (cat: CatCharacter) => void;
   index: number;
 }): React.ReactElement {
-  const [showBurst, setShowBurst] = React.useState(false);
+  const [showBurst, setShowBurst] = useState(false);
+  const [expandedAbility, setExpandedAbility] = useState<CatAbility | null>(null);
+
+  // Evolution progress
+  const nextInfo = xpToNextStage(evolutionXp);
+  const currentThreshold = EVOLUTION_XP_THRESHOLDS[stage];
+  const nextThreshold = nextInfo
+    ? EVOLUTION_XP_THRESHOLDS[nextInfo.nextStage]
+    : EVOLUTION_XP_THRESHOLDS.master;
+  const progressInStage = evolutionXp - currentThreshold;
+  const stageRange = nextThreshold - currentThreshold;
+  const progressRatio = stageRange > 0 ? Math.min(1, progressInStage / stageRange) : 1;
 
   const handleSelect = useCallback(() => {
-    if (!isUnlocked) return;
+    if (!isOwned) {
+      onBuy(cat);
+      return;
+    }
     setShowBurst(true);
     onSelect(cat.id);
     setTimeout(() => setShowBurst(false), 700);
-  }, [cat.id, isUnlocked, onSelect]);
+  }, [cat, isOwned, onSelect, onBuy]);
+
+  const handleAbilityTap = useCallback((ability: CatAbility) => {
+    setExpandedAbility(prev => prev?.id === ability.id ? null : ability);
+  }, []);
+
+  // Action button label/state
+  const actionButton = useMemo(() => {
+    if (!isOwned) {
+      if (cat.legendary) return { label: 'Legendary', type: 'legendary' as const };
+      return { label: `Unlock for ${cat.gemCost ?? 500} gems`, type: 'buy' as const };
+    }
+    if (isSelected) return { label: 'Selected', type: 'selected' as const };
+    return { label: 'Select', type: 'select' as const };
+  }, [isOwned, isSelected, cat.legendary, cat.gemCost]);
 
   return (
     <Animated.View
-      entering={FadeInDown.delay(index * 60).springify().damping(14)}
+      entering={FadeInDown.delay(index * 50).springify().damping(14)}
       style={[
         styles.card,
         isSelected && { borderColor: cat.color + '80', borderWidth: 2 },
-        !isUnlocked && styles.cardLocked,
+        !isOwned && styles.cardLocked,
       ]}
     >
       {/* Background gradient tinted to cat's color */}
@@ -204,7 +330,7 @@ function CatCard({ cat, isSelected, isUnlocked, onSelect, index }: {
 
       {/* Character showcase area */}
       <View style={styles.showcaseArea}>
-        {isUnlocked ? (
+        {isOwned ? (
           <View style={styles.characterDisplay}>
             <SelectBurst color={cat.color} active={showBurst} />
             <KeysieSvg
@@ -220,51 +346,108 @@ function CatCard({ cat, isSelected, isUnlocked, onSelect, index }: {
             <View style={[styles.lockedSilhouette, { backgroundColor: cat.color + '10' }]}>
               <MaterialCommunityIcons name="lock-outline" size={48} color={COLORS.textMuted} />
             </View>
-            <View style={[styles.unlockBadge, { backgroundColor: cat.color + '30' }]}>
-              <MaterialCommunityIcons name="diamond-stone" size={12} color={cat.color} />
-              <Text style={[styles.unlockBadgeText, { color: cat.color }]}>
-                {cat.legendary ? 'Legendary' : cat.gemCost ? `${cat.gemCost} gems` : `Level ${cat.unlockLevel}`}
-              </Text>
-            </View>
           </View>
         )}
-
-        {/* Stage platform */}
-        <StagePlatform color={isUnlocked ? cat.color : COLORS.textMuted} />
+        <StagePlatform color={isOwned ? cat.color : COLORS.textMuted} />
       </View>
+
+      {/* Evolution stage badge */}
+      {isOwned && (
+        <View style={[styles.evolutionBadge, { backgroundColor: STAGE_COLORS[stage] + '25' }]}>
+          <Text style={[styles.evolutionBadgeText, { color: STAGE_COLORS[stage] }]}>
+            {STAGE_LABELS[stage]}
+          </Text>
+        </View>
+      )}
 
       {/* Cat info */}
       <View style={styles.infoSection}>
-        <Text style={[styles.catName, !isUnlocked && { color: COLORS.textMuted }]}>
+        <Text style={[styles.catName, !isOwned && { color: COLORS.textMuted }]}>
           {cat.name}
         </Text>
 
-        <View style={[styles.personalityBadge, { backgroundColor: isUnlocked ? cat.color + '25' : COLORS.surface }]}>
-          <Text style={[styles.personalityText, { color: isUnlocked ? cat.color : COLORS.textMuted }]}>
+        <View style={[styles.personalityBadge, { backgroundColor: isOwned ? cat.color + '25' : COLORS.surface }]}>
+          <Text style={[styles.personalityText, { color: isOwned ? cat.color : COLORS.textMuted }]}>
             {cat.personality}
           </Text>
         </View>
 
-        <Text style={[styles.musicSkill, !isUnlocked && { color: COLORS.cardBorder }]}>
+        <Text style={[styles.musicSkill, !isOwned && { color: COLORS.cardBorder }]}>
           {cat.musicSkill}
         </Text>
 
-        <Text
-          style={[styles.backstory, !isUnlocked && { color: COLORS.cardBorder }]}
-          numberOfLines={3}
-        >
-          {cat.backstory}
-        </Text>
+        {/* Evolution progress bar (only for owned cats) */}
+        {isOwned && (
+          <View style={styles.evolutionRow}>
+            <View style={styles.progressBarTrack}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  {
+                    width: `${progressRatio * 100}%`,
+                    backgroundColor: cat.color,
+                  },
+                ]}
+              />
+            </View>
+            {nextInfo ? (
+              <Text style={styles.evolutionXpText}>
+                {nextInfo.xpNeeded} XP to {STAGE_LABELS[nextInfo.nextStage]}
+              </Text>
+            ) : (
+              <Text style={[styles.evolutionXpText, { color: STAGE_COLORS.master }]}>MAX</Text>
+            )}
+          </View>
+        )}
+
+        {/* Ability icons */}
+        <AbilityIconRow
+          abilities={cat.abilities}
+          unlockedAbilities={unlockedAbilities}
+          catColor={cat.color}
+          onTap={handleAbilityTap}
+        />
+
+        {/* Expanded ability detail */}
+        {expandedAbility && (
+          <AbilityDetail
+            ability={expandedAbility}
+            catColor={cat.color}
+            isUnlocked={unlockedAbilities.includes(expandedAbility.id)}
+          />
+        )}
       </View>
 
-      {/* Select button */}
-      <SelectButton
-        isSelected={isSelected}
-        isUnlocked={isUnlocked}
+      {/* Action button */}
+      <TouchableOpacity
+        style={[
+          styles.actionButton,
+          actionButton.type === 'selected' && { backgroundColor: 'transparent', borderWidth: 2, borderColor: cat.color },
+          actionButton.type === 'select' && { backgroundColor: cat.color },
+          actionButton.type === 'buy' && { backgroundColor: cat.color },
+          actionButton.type === 'legendary' && { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.warning + '60' },
+        ]}
         onPress={handleSelect}
-        color={cat.color}
+        activeOpacity={0.85}
         testID={`cat-switch-select-${cat.id}`}
-      />
+      >
+        {actionButton.type === 'selected' && (
+          <MaterialCommunityIcons name="check-circle" size={18} color={cat.color} />
+        )}
+        {actionButton.type === 'buy' && (
+          <MaterialCommunityIcons name="diamond-stone" size={16} color="#FFF" />
+        )}
+        {actionButton.type === 'legendary' && (
+          <MaterialCommunityIcons name="star-four-points" size={16} color={COLORS.warning} />
+        )}
+        <Text style={[
+          styles.actionButtonText,
+          actionButton.type === 'selected' && { color: cat.color },
+          actionButton.type === 'legendary' && { color: COLORS.warning },
+        ]}>
+          {actionButton.label}
+        </Text>
+      </TouchableOpacity>
     </Animated.View>
   );
 }
@@ -293,13 +476,28 @@ function PaginationDots({ total, currentIndex, cats }: {
   );
 }
 
+// ───────────────────────────────────────────────────────
+// Main Screen
+// ───────────────────────────────────────────────────────
+
 export function CatSwitchScreen(): React.ReactElement {
   const navigation = useNavigation();
   const selectedCatId = useSettingsStore((s) => s.selectedCatId);
   const setSelectedCatId = useSettingsStore((s) => s.setSelectedCatId);
+  const setAvatarEmoji = useSettingsStore((s) => s.setAvatarEmoji);
+
   const ownedCats = useCatEvolutionStore((s) => s.ownedCats);
+  const evolutionData = useCatEvolutionStore((s) => s.evolutionData);
+  const selectCat = useCatEvolutionStore((s) => s.selectCat);
+  const unlockCat = useCatEvolutionStore((s) => s.unlockCat);
+
+  const gems = useGemStore((s) => s.gems);
+  const canAfford = useGemStore((s) => s.canAfford);
+  const spendGems = useGemStore((s) => s.spendGems);
+
   const flatListRef = useRef<FlatList>(null);
-  const [currentIndex, setCurrentIndex] = React.useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [buyModalCat, setBuyModalCat] = useState<CatCharacter | null>(null);
 
   const initialIndex = useMemo(
     () => Math.max(0, CAT_CHARACTERS.findIndex((c) => c.id === selectedCatId)),
@@ -313,14 +511,34 @@ export function CatSwitchScreen(): React.ReactElement {
   const handleSelect = useCallback((catId: string) => {
     if (!isCatOwned(catId, ownedCats)) return;
     setSelectedCatId(catId);
-    // Sync catEvolutionStore to keep selectedCatId in both stores aligned
-    useCatEvolutionStore.getState().selectCat(catId);
+    selectCat(catId);
     const cat = getCatById(catId);
     if (cat) {
-      useSettingsStore.getState().setAvatarEmoji(cat.emoji);
+      setAvatarEmoji(cat.emoji);
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  }, [ownedCats, setSelectedCatId]);
+  }, [ownedCats, setSelectedCatId, selectCat, setAvatarEmoji]);
+
+  const handleBuy = useCallback((cat: CatCharacter) => {
+    if (cat.legendary) {
+      // Legendary cats can't be bought — just show info via the modal
+      setBuyModalCat(cat);
+      return;
+    }
+    setBuyModalCat(cat);
+  }, []);
+
+  const handleConfirmBuy = useCallback(() => {
+    if (!buyModalCat) return;
+    const cost = buyModalCat.gemCost ?? 500;
+    if (!canAfford(cost)) return;
+    const success = spendGems(cost, `unlock-cat-${buyModalCat.id}`);
+    if (success) {
+      unlockCat(buyModalCat.id);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+    setBuyModalCat(null);
+  }, [buyModalCat, canAfford, spendGems, unlockCat]);
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
     if (viewableItems.length > 0 && viewableItems[0].index != null) {
@@ -330,15 +548,27 @@ export function CatSwitchScreen(): React.ReactElement {
 
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
 
-  const renderItem = useCallback(({ item, index }: { item: CatCharacter; index: number }) => (
-    <CatCard
-      cat={item}
-      isSelected={selectedCatId === item.id}
-      isUnlocked={isCatOwned(item.id, ownedCats)}
-      onSelect={handleSelect}
-      index={index}
-    />
-  ), [selectedCatId, ownedCats, handleSelect]);
+  const renderItem = useCallback(({ item, index }: { item: CatCharacter; index: number }) => {
+    const isOwned = isCatOwned(item.id, ownedCats);
+    const catEvolution = evolutionData[item.id];
+    const catStage: EvolutionStage = catEvolution ? stageFromXp(catEvolution.xpAccumulated) : 'baby';
+    const catXp = catEvolution?.xpAccumulated ?? 0;
+    const catAbilities = catEvolution?.abilitiesUnlocked ?? [];
+
+    return (
+      <CatCard
+        cat={item}
+        isSelected={selectedCatId === item.id}
+        isOwned={isOwned}
+        evolutionXp={catXp}
+        stage={catStage}
+        unlockedAbilities={catAbilities}
+        onSelect={handleSelect}
+        onBuy={handleBuy}
+        index={index}
+      />
+    );
+  }, [selectedCatId, ownedCats, evolutionData, handleSelect, handleBuy]);
 
   const keyExtractor = useCallback((item: CatCharacter) => item.id, []);
 
@@ -365,13 +595,17 @@ export function CatSwitchScreen(): React.ReactElement {
           >
             <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textPrimary} />
           </TouchableOpacity>
-          <View>
-            <Text style={styles.headerTitle}>Choose Your Cat</Text>
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>Cat Gallery</Text>
             <Text style={styles.headerSubtitle}>
               {CAT_CHARACTERS.filter((c) => isCatOwned(c.id, ownedCats)).length} of {CAT_CHARACTERS.length} unlocked
             </Text>
           </View>
-          <View style={styles.headerSpacer} />
+          {/* Gem balance pill */}
+          <View style={styles.gemPill}>
+            <MaterialCommunityIcons name="diamond-stone" size={16} color={COLORS.gemGold} />
+            <Text style={styles.gemPillText}>{gems}</Text>
+          </View>
         </Animated.View>
 
         {/* Character gallery */}
@@ -405,9 +639,22 @@ export function CatSwitchScreen(): React.ReactElement {
           />
         </Animated.View>
       </SafeAreaView>
+
+      {/* Buy modal */}
+      <BuyModal
+        visible={buyModalCat !== null}
+        cat={buyModalCat}
+        gems={gems}
+        onConfirm={handleConfirmBuy}
+        onCancel={() => setBuyModalCat(null)}
+      />
     </View>
   );
 }
+
+// ───────────────────────────────────────────────────────
+// Styles
+// ───────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
@@ -432,6 +679,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  headerCenter: {
+    flex: 1,
+  },
   headerTitle: {
     fontSize: 22,
     fontWeight: 'bold',
@@ -442,9 +692,23 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: 1,
   },
-  headerSpacer: {
-    flex: 1,
+  gemPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: glowColor(COLORS.starGold, 0.1),
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+    borderColor: glowColor(COLORS.starGold, 0.25),
   },
+  gemPillText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.gemGold,
+  },
+
   listContent: {
     paddingHorizontal: (SCREEN_WIDTH - CARD_WIDTH) / 2,
     gap: CARD_SPACING,
@@ -460,14 +724,14 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.lg,
   },
   cardLocked: {
-    opacity: 0.65,
+    opacity: 0.7,
   },
 
   // Character showcase
   showcaseArea: {
     alignItems: 'center',
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING.sm,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.xs,
   },
   characterDisplay: {
     alignItems: 'center',
@@ -486,19 +750,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: COLORS.cardBorder,
     borderStyle: 'dashed',
-  },
-  unlockBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.sm,
-    marginTop: SPACING.sm,
-  },
-  unlockBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
   },
 
   // Stage platform
@@ -537,6 +788,19 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
 
+  // Evolution badge
+  evolutionBadge: {
+    alignSelf: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 3,
+    borderRadius: BORDER_RADIUS.full,
+    marginTop: SPACING.xs,
+  },
+  evolutionBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
   // Info section
   infoSection: {
     alignItems: 'center',
@@ -564,49 +828,110 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginBottom: SPACING.sm,
   },
-  backstory: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    lineHeight: 19,
-    textAlign: 'center',
+
+  // Evolution progress bar
+  evolutionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    width: '100%',
     marginBottom: SPACING.md,
-    paddingHorizontal: SPACING.sm,
+  },
+  progressBarTrack: {
+    flex: 1,
+    height: 8,
+    backgroundColor: COLORS.surface,
+    borderRadius: 4,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  evolutionXpText: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    minWidth: 80,
+    textAlign: 'right',
   },
 
-  // Select button
-  selectButton: {
+  // Ability icons
+  abilityRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
+  abilityIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  abilityLockBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Ability detail
+  abilityDetail: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.sm,
+    width: '100%',
+    padding: SPACING.sm,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    marginBottom: SPACING.sm,
+  },
+  abilityDetailText: {
+    flex: 1,
+  },
+  abilityDetailName: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  abilityDetailDesc: {
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  abilityDetailStage: {
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+
+  // Action button
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 12,
-    paddingHorizontal: 36,
+    paddingHorizontal: 28,
     borderRadius: BORDER_RADIUS.md,
-    minWidth: 150,
+    minWidth: 180,
     alignSelf: 'center',
+    marginTop: SPACING.xs,
   },
-  selectButtonText: {
+  actionButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#FFFFFF',
-  },
-  selectButtonSelected: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-  },
-  selectButtonSelectedText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  selectButtonLocked: {
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-  },
-  selectButtonLockedText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.textMuted,
   },
 
   // Pagination
@@ -620,5 +945,80 @@ const styles = StyleSheet.create({
   paginationDot: {
     height: 8,
     borderRadius: 4,
+  },
+
+  // Buy modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+  },
+  modalCard: {
+    width: '90%',
+    maxWidth: 340,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.lg,
+    alignItems: 'center',
+    overflow: 'hidden',
+    ...SHADOWS.md,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: COLORS.textPrimary,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  modalCostRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: SPACING.xs,
+  },
+  modalCostText: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.gemGold,
+  },
+  modalBalance: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.lg,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    width: '100%',
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  modalConfirmBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    paddingVertical: 12,
+    borderRadius: BORDER_RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  modalConfirmText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

@@ -22,7 +22,8 @@ import { EmailAuthScreen } from '../screens/EmailAuthScreen';
 import { AccountScreen } from '../screens/AccountScreen';
 import { LessonIntroScreen } from '../screens/LessonIntroScreen';
 import { CatSwitchScreen } from '../screens/CatSwitchScreen';
-import { CatCollectionScreen } from '../screens/CatCollectionScreen';
+// CatCollectionScreen is deprecated — CatSwitchScreen serves as the unified gallery
+// import { CatCollectionScreen } from '../screens/CatCollectionScreen';
 import { SkillAssessmentScreen } from '../screens/SkillAssessmentScreen';
 import { DailySessionScreen } from '../screens/DailySessionScreen';
 
@@ -50,7 +51,7 @@ export type RootStackParamList = {
       weakNotes: number[];
     };
   };
-  LessonIntro: { lessonId: string };
+  LessonIntro: { lessonId: string; locked?: boolean };
   SkillAssessment: undefined;
   DailySession: undefined;
   LevelMap: undefined;
@@ -207,7 +208,7 @@ export function AppNavigator() {
             />
             <RootStack.Screen
               name="CatCollection"
-              component={CatCollectionScreen}
+              component={CatSwitchScreen}
               options={{ animation: 'slide_from_right' }}
             />
           </>

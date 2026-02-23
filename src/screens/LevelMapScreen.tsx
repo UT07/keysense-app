@@ -1,7 +1,7 @@
 /**
- * LevelMapScreen - Duolingo-style vertical scrolling level map
- * Winding path with 80px nodes, gold/crimson/grey states,
- * Bezier curve connectors, decorative elements, parallax scroll.
+ * LevelMapScreen - Vertical level progression map
+ * Clean card-based layout with vertical spine, section headers,
+ * and state-driven node styling (completed/current/locked).
  *
  * Shows 15 tier nodes: tiers 1-6 map to static lessons, tiers 7-15
  * are AI-generated skill groups from the SkillTree.
@@ -17,7 +17,6 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -33,11 +32,10 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
-const NODE_SIZE = 80;
-const NODE_SPACING_Y = 140;
-const ZIGZAG_OFFSET = SCREEN_WIDTH * 0.2;
+
+// Icon size for the node indicator circle
+const INDICATOR_SIZE = 48;
 
 /** Metadata for each tier — title and icon shown on the level map */
 const TIER_META: Record<number, { title: string; icon: string }> = {
@@ -58,7 +56,7 @@ const TIER_META: Record<number, { title: string; icon: string }> = {
   15: { title: 'Performance', icon: 'trophy' },
 };
 
-/** Section divider labels between groups of tiers */
+/** Section labels — keyed by first tier index (0-based) in the section */
 const TIER_SECTIONS: Record<number, string> = {
   0: 'Beginner',
   4: 'Fundamentals',
@@ -120,7 +118,6 @@ function useTierNodes(): TierNodeData[] {
       masteredCount: number;
       totalSkills: number;
       isComplete: boolean;
-      /** Passable = unlocks the next tier (all skills mastered OR lesson completed) */
       isPassable: boolean;
       lessonId: string | null;
       firstUnmasteredSkillId: string | null;
@@ -136,7 +133,6 @@ function useTierNodes(): TierNodeData[] {
       const lessonId = TIER_TO_LESSON[tier] ?? null;
       const lesson = lessonId ? lessons.find((l) => l.id === lessonId) ?? null : null;
 
-      // A tier is "passable" (unlocks next) if ALL skills mastered OR lesson completed
       const isPassable = isComplete || (lesson != null && lessonProgress[lesson.id]?.status === 'completed');
 
       const firstUnmastered = skills.find((s) => !masteredSet.has(s.id));
@@ -154,8 +150,7 @@ function useTierNodes(): TierNodeData[] {
       };
     });
 
-    // Pass 2: determine accessibility — each tier is accessible if it's the first
-    // or the previous tier is passable
+    // Pass 2: determine accessibility
     const accessible: boolean[] = rawTiers.map((_, i) =>
       i === 0 || rawTiers[i - 1].isPassable,
     );
@@ -177,7 +172,6 @@ function useTierNodes(): TierNodeData[] {
       } else if (accessible[i] && i === currentIndex) {
         state = 'current';
       } else if (accessible[i]) {
-        // Accessible but not the highest — lesson done, skills not all mastered
         state = 'passed';
       } else {
         state = 'locked';
@@ -199,34 +193,17 @@ function useTierNodes(): TierNodeData[] {
   }, [lessons, lessonProgress, masteredSkills]);
 }
 
-function getNodeX(index: number): number {
-  const center = SCREEN_WIDTH / 2;
-  const offset = ZIGZAG_OFFSET * Math.sin((index * Math.PI) / 2);
-  return center + offset;
-}
-
-function getNodeY(index: number, totalNodes: number): number {
-  const reverseIndex = totalNodes - 1 - index;
-  return 100 + reverseIndex * NODE_SPACING_Y;
-}
-
-function getConnectorPath(fromX: number, fromY: number, toX: number, toY: number): string {
-  const midY = (fromY + toY) / 2;
-  const controlOffset = Math.abs(toX - fromX) * 0.3;
-  return `M ${fromX} ${fromY} C ${fromX + controlOffset} ${midY - 20}, ${toX - controlOffset} ${midY + 20}, ${toX} ${toY}`;
-}
-
-/** Animated pulsing glow ring for current node */
+/** Animated pulsing glow ring for current node indicator */
 function PulsingGlow() {
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const opacityAnim = useRef(new Animated.Value(0.5)).current;
+  const opacityAnim = useRef(new Animated.Value(0.4)).current;
 
   useEffect(() => {
     const pulse = Animated.loop(
       Animated.sequence([
         Animated.parallel([
           Animated.timing(scaleAnim, {
-            toValue: 1.5,
+            toValue: 1.6,
             duration: 1500,
             useNativeDriver: true,
           }),
@@ -238,7 +215,7 @@ function PulsingGlow() {
         ]),
         Animated.parallel([
           Animated.timing(scaleAnim, { toValue: 1, duration: 0, useNativeDriver: true }),
-          Animated.timing(opacityAnim, { toValue: 0.5, duration: 0, useNativeDriver: true }),
+          Animated.timing(opacityAnim, { toValue: 0.4, duration: 0, useNativeDriver: true }),
         ]),
       ])
     );
@@ -259,122 +236,186 @@ function PulsingGlow() {
   );
 }
 
-/** Individual tier node */
-function TierNode({
+/** Get colors/config for node state */
+function getNodeConfig(state: NodeState) {
+  switch (state) {
+    case 'completed':
+      return {
+        indicatorBg: COLORS.starGold,
+        indicatorBorder: COLORS.starGold,
+        iconColor: '#1A1400',
+        iconName: 'check-bold' as const,
+        titleColor: COLORS.textPrimary,
+        subtitleColor: COLORS.starGold,
+        cardBorder: 'rgba(255, 215, 0, 0.2)',
+        cardBg: 'rgba(255, 215, 0, 0.05)',
+        spineDotColor: COLORS.starGold,
+      };
+    case 'passed':
+      return {
+        indicatorBg: COLORS.success,
+        indicatorBorder: COLORS.success,
+        iconColor: '#FFFFFF',
+        iconName: 'check' as const,
+        titleColor: COLORS.textPrimary,
+        subtitleColor: COLORS.success,
+        cardBorder: 'rgba(76, 175, 80, 0.2)',
+        cardBg: 'rgba(76, 175, 80, 0.05)',
+        spineDotColor: COLORS.success,
+      };
+    case 'current':
+      return {
+        indicatorBg: COLORS.primary,
+        indicatorBorder: COLORS.primaryLight,
+        iconColor: '#FFFFFF',
+        iconName: 'play' as const,
+        titleColor: COLORS.textPrimary,
+        subtitleColor: COLORS.primaryLight,
+        cardBorder: 'rgba(220, 20, 60, 0.3)',
+        cardBg: 'rgba(220, 20, 60, 0.08)',
+        spineDotColor: COLORS.primary,
+      };
+    case 'locked':
+    default:
+      return {
+        indicatorBg: COLORS.cardSurface,
+        indicatorBorder: COLORS.cardBorder,
+        iconColor: COLORS.textMuted,
+        iconName: 'lock' as const,
+        titleColor: COLORS.textMuted,
+        subtitleColor: COLORS.textMuted,
+        cardBorder: COLORS.cardBorder,
+        cardBg: 'transparent',
+        spineDotColor: COLORS.cardBorder,
+      };
+  }
+}
+
+/** Single tier row — indicator dot on spine + card with title, icon, progress */
+function TierRow({
   data,
-  x,
-  y,
   onPress,
+  isLast,
 }: {
   data: TierNodeData;
-  x: number;
-  y: number;
   onPress: () => void;
+  isLast: boolean;
 }) {
-  const config = NODE_CONFIGS[data.state];
+  const config = getNodeConfig(data.state);
   const nodeTestID = data.state === 'current'
     ? 'lesson-node-current'
     : `tier-node-${data.tier}`;
 
   return (
     <TouchableOpacity
-      activeOpacity={data.state === 'locked' ? 1 : 0.7}
+      activeOpacity={0.7}
       onPress={onPress}
       testID={nodeTestID}
-      style={[styles.nodeWrapper, { left: x - NODE_SIZE / 2, top: y - NODE_SIZE / 2 }]}
+      style={styles.rowContainer}
     >
-      {data.state === 'current' && <PulsingGlow />}
-
-      <View style={[styles.nodeCircle, config.circleStyle]}>
-        {data.state === 'completed' && (
-          <MaterialCommunityIcons name="check-bold" size={32} color={COLORS.textPrimary} />
-        )}
-        {data.state === 'passed' && (
-          <MaterialCommunityIcons name="check" size={28} color={COLORS.textPrimary} />
-        )}
-        {data.state === 'current' && (
-          <View style={styles.startBtnInner}>
-            <MaterialCommunityIcons name="play" size={28} color={COLORS.textPrimary} />
+      {/* Spine line segment (hidden on last item) */}
+      <View style={styles.spineColumn}>
+        {/* Indicator circle */}
+        <View style={styles.indicatorWrapper}>
+          {data.state === 'current' && <PulsingGlow />}
+          <View style={[
+            styles.indicator,
+            {
+              backgroundColor: config.indicatorBg,
+              borderColor: config.indicatorBorder,
+            },
+            data.state === 'current' && styles.indicatorCurrent,
+          ]}>
+            <MaterialCommunityIcons
+              name={config.iconName}
+              size={data.state === 'current' ? 22 : 20}
+              color={config.iconColor}
+            />
           </View>
-        )}
-        {data.state === 'locked' && (
-          <MaterialCommunityIcons name="lock" size={24} color={COLORS.textMuted} />
+        </View>
+        {/* Spine line below */}
+        {!isLast && (
+          <View style={[
+            styles.spineLine,
+            {
+              backgroundColor: data.state === 'completed' || data.state === 'passed'
+                ? 'rgba(255, 255, 255, 0.1)'
+                : 'rgba(255, 255, 255, 0.04)',
+            },
+          ]} />
         )}
       </View>
 
-      {/* Label below node */}
-      <Text style={[styles.nodeLabel, config.labelStyle]} numberOfLines={2}>
-        {data.title}
-      </Text>
+      {/* Card content */}
+      <View style={[
+        styles.card,
+        {
+          borderColor: config.cardBorder,
+          backgroundColor: config.cardBg,
+        },
+        data.state === 'current' && styles.cardCurrent,
+      ]}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardTitleRow}>
+            <Text style={[styles.tierNumber, { color: config.subtitleColor }]}>
+              {data.tier}
+            </Text>
+            <View style={styles.cardTitleGroup}>
+              <Text
+                style={[styles.cardTitle, { color: config.titleColor }]}
+                numberOfLines={1}
+              >
+                {data.title}
+              </Text>
+              {/* Progress or locked hint */}
+              {data.state === 'locked' ? (
+                <Text style={styles.lockedHint}>Complete previous</Text>
+              ) : (
+                <Text style={[styles.progressText, { color: config.subtitleColor }]}>
+                  {data.masteredCount}/{data.totalSkills} skills
+                </Text>
+              )}
+            </View>
+          </View>
 
-      {/* Progress for completed, passed, or current */}
-      {(data.state === 'completed' || data.state === 'passed' || data.state === 'current') && (
-        <Text style={[
-          styles.nodeProgress,
-          data.state === 'completed' ? { color: COLORS.starGold } : null,
-          data.state === 'passed' ? { color: COLORS.success } : null,
-        ]}>
-          {data.masteredCount}/{data.totalSkills} skills
-        </Text>
-      )}
-
-      {/* "START" text for current */}
-      {data.state === 'current' && (
-        <View style={styles.startChip} testID="lesson-node-start-chip">
-          <Text style={styles.startChipText}>START</Text>
+          {/* Right side icon */}
+          <View style={[styles.cardIcon, { opacity: data.state === 'locked' ? 0.3 : 0.6 }]}>
+            <MaterialCommunityIcons
+              name={data.icon as any}
+              size={24}
+              color={data.state === 'locked' ? COLORS.textMuted : config.subtitleColor}
+            />
+          </View>
         </View>
-      )}
 
-      {/* Level requirement for locked */}
-      {data.state === 'locked' && (
-        <Text style={styles.lockedHint}>Complete previous</Text>
-      )}
+        {/* Progress bar for non-locked nodes */}
+        {data.state !== 'locked' && data.totalSkills > 0 && (
+          <View style={styles.progressBarContainer}>
+            <View style={styles.progressBarBg}>
+              <View style={[
+                styles.progressBarFill,
+                {
+                  width: `${Math.round((data.masteredCount / data.totalSkills) * 100)}%`,
+                  backgroundColor: data.state === 'completed'
+                    ? COLORS.starGold
+                    : data.state === 'passed'
+                      ? COLORS.success
+                      : COLORS.primary,
+                },
+              ]} />
+            </View>
+          </View>
+        )}
+
+        {/* START chip for current */}
+        {data.state === 'current' && (
+          <View style={styles.startChip} testID="lesson-node-start-chip">
+            <Text style={styles.startChipText}>START</Text>
+            <MaterialCommunityIcons name="chevron-right" size={14} color={COLORS.textPrimary} />
+          </View>
+        )}
+      </View>
     </TouchableOpacity>
-  );
-}
-
-/** Decorative floating music notes on the path */
-function DecorationLayer({ count, height }: { count: number; height: number }) {
-  // Use a seeded hash to generate stable positions (avoids jumps on height changes)
-  const decorationsRef = useRef<{ x: number; y: number; char: string; opacity: number }[]>([]);
-  const decorations = useMemo(() => {
-    // Only regenerate if count changed; height changes just re-use existing positions
-    if (decorationsRef.current.length === count && height > 0) {
-      return decorationsRef.current;
-    }
-    const items: { x: number; y: number; char: string; opacity: number }[] = [];
-    const chars = ['\u266A', '\u266B', '\u2669', '\u{1F3B5}'];
-    // Simple seeded pseudo-random (deterministic per index)
-    const seeded = (i: number, salt: number) => {
-      const x = Math.sin(i * 9301 + salt * 49297) * 49979;
-      return x - Math.floor(x);
-    };
-    for (let i = 0; i < count; i++) {
-      items.push({
-        x: 20 + seeded(i, 1) * (SCREEN_WIDTH - 40),
-        y: 80 + seeded(i, 2) * Math.max(1, height - 160),
-        char: chars[i % chars.length],
-        opacity: 0.06 + seeded(i, 3) * 0.06,
-      });
-    }
-    decorationsRef.current = items;
-    return items;
-  }, [count, height]);
-
-  return (
-    <>
-      {decorations.map((d, i) => (
-        <Text
-          key={`deco-${i}`}
-          style={[
-            styles.decoration,
-            { left: d.x, top: d.y, opacity: d.opacity },
-          ]}
-        >
-          {d.char}
-        </Text>
-      ))}
-    </>
   );
 }
 
@@ -384,11 +425,12 @@ export function LevelMapScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const gems = useGemStore((s) => s.gems);
 
+  // Auto-scroll to current node
   useEffect(() => {
     const currentIndex = nodes.findIndex((n) => n.state === 'current');
     if (currentIndex >= 0 && scrollRef.current) {
-      const y = getNodeY(currentIndex, nodes.length);
-      const scrollTarget = Math.max(0, y - SCREEN_HEIGHT / 2 + NODE_SIZE);
+      // Approximate row height: ~100px per row
+      const scrollTarget = Math.max(0, currentIndex * 100 - SCREEN_HEIGHT / 3);
       setTimeout(() => {
         scrollRef.current?.scrollTo({ y: scrollTarget, animated: true });
       }, 300);
@@ -397,9 +439,19 @@ export function LevelMapScreen() {
 
   const handleNodePress = useCallback(
     (data: TierNodeData) => {
+      // Tiers with static lessons (1-6): always open LessonIntroScreen
+      if (data.lessonId) {
+        navigation.navigate('LessonIntro', {
+          lessonId: data.lessonId,
+          locked: data.state === 'locked',
+        });
+        return;
+      }
+
+      // Tiers 7+: locked nodes do nothing
       if (data.state === 'locked') return;
 
-      // All tiers with unmastered skills: navigate directly to AI exercise
+      // Tiers 7+ with unmastered skills: navigate to AI exercise
       if (data.firstUnmasteredSkillId) {
         const skill = getSkillById(data.firstUnmasteredSkillId);
         const fallback = skill?.targetExerciseIds.find((id) => getExercise(id));
@@ -408,12 +460,6 @@ export function LevelMapScreen() {
           aiMode: true,
           skillId: data.firstUnmasteredSkillId,
         });
-        return;
-      }
-
-      // Completed tiers with static lessons: LessonIntro for review
-      if (data.lessonId) {
-        navigation.navigate('LessonIntro', { lessonId: data.lessonId });
       }
     },
     [navigation]
@@ -423,59 +469,24 @@ export function LevelMapScreen() {
     navigation.goBack();
   }, [navigation]);
 
-  const contentHeight = 100 + nodes.length * NODE_SPACING_Y + 80;
-
-  const connectors = useMemo(() => {
-    const paths: React.ReactElement[] = [];
-    for (let i = 0; i < nodes.length - 1; i++) {
-      const fromX = getNodeX(i);
-      const fromY = getNodeY(i, nodes.length);
-      const toX = getNodeX(i + 1);
-      const toY = getNodeY(i + 1, nodes.length);
-
-      const fromState = nodes[i].state;
-      const toState = nodes[i + 1].state;
-      const isFromDone = fromState === 'completed' || fromState === 'passed';
-      const isToAvailable = toState !== 'locked';
-
-      let pathColor: string;
-      let pathWidth: number;
-      let dashArray: string | undefined;
-
-      if (fromState === 'completed' && isToAvailable) {
-        pathColor = COLORS.starGold;
-        pathWidth = 3;
-        dashArray = undefined;
-      } else if (isFromDone && isToAvailable) {
-        pathColor = COLORS.success;
-        pathWidth = 3;
-        dashArray = undefined;
-      } else if (isFromDone) {
-        pathColor = COLORS.success;
-        pathWidth = 2;
-        dashArray = undefined;
-      } else {
-        pathColor = COLORS.cardBorder;
-        pathWidth = 2;
-        dashArray = '10,8';
-      }
-
-      paths.push(
-        <Path
-          key={`path-${i}`}
-          d={getConnectorPath(fromX, fromY, toX, toY)}
-          stroke={pathColor}
-          strokeWidth={pathWidth}
-          fill="none"
-          strokeDasharray={dashArray}
-          strokeLinecap="round"
-        />
-      );
-    }
-    return paths;
-  }, [nodes]);
-
   const completedCount = nodes.filter((n) => n.state === 'completed').length;
+
+  // Build flat list with section headers injected
+  const listItems: Array<
+    | { type: 'section'; label: string; key: string }
+    | { type: 'node'; data: TierNodeData; index: number; key: string }
+  > = useMemo(() => {
+    const items: typeof listItems = [];
+    nodes.forEach((data, index) => {
+      // Insert section header if this index has one
+      const sectionLabel = TIER_SECTIONS[index];
+      if (sectionLabel) {
+        items.push({ type: 'section', label: sectionLabel, key: `section-${index}` });
+      }
+      items.push({ type: 'node', data, index, key: `node-${data.tier}` });
+    });
+    return items;
+  }, [nodes]);
 
   return (
     <View style={styles.container} testID="level-map-screen">
@@ -515,48 +526,31 @@ export function LevelMapScreen() {
       <ScrollView
         ref={scrollRef}
         style={styles.scrollView}
-        contentContainerStyle={{ height: contentHeight }}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         testID="level-map-scroll"
       >
-        {/* Decorative elements */}
-        <DecorationLayer count={12} height={contentHeight} />
-
-        {/* SVG Connectors */}
-        <Svg
-          width={SCREEN_WIDTH}
-          height={contentHeight}
-          style={StyleSheet.absoluteFill}
-        >
-          {connectors}
-        </Svg>
-
-        {/* Tier section headers */}
-        {Object.entries(TIER_SECTIONS).map(([indexStr, label]) => {
-          const idx = Number(indexStr);
-          if (idx >= nodes.length) return null;
-          const y = getNodeY(idx, nodes.length) - NODE_SPACING_Y / 2 - 10;
+        {listItems.map((item) => {
+          if (item.type === 'section') {
+            return (
+              <View key={item.key} style={styles.sectionHeader}>
+                <View style={styles.sectionLine} />
+                <Text style={styles.sectionLabel}>{item.label}</Text>
+                <View style={styles.sectionLine} />
+              </View>
+            );
+          }
           return (
-            <View key={`tier-${idx}`} style={[styles.tierHeader, { top: y }]}>
-              <View style={styles.tierLine} />
-              <Text style={styles.tierLabel}>{label}</Text>
-              <View style={styles.tierLine} />
-            </View>
+            <TierRow
+              key={item.key}
+              data={item.data}
+              onPress={() => handleNodePress(item.data)}
+              isLast={item.index === nodes.length - 1}
+            />
           );
         })}
 
-        {/* Nodes */}
-        {nodes.map((data, index) => (
-          <TierNode
-            key={`tier-${data.tier}`}
-            data={data}
-            x={getNodeX(index)}
-            y={getNodeY(index, nodes.length)}
-            onPress={() => handleNodePress(data)}
-          />
-        ))}
-
-        {/* Salsa cheering at journey start (bottom) */}
+        {/* Salsa at journey start (bottom) */}
         <View style={styles.salsaFooter}>
           <SalsaCoach mood="encouraging" size="small" showCatchphrase />
         </View>
@@ -565,57 +559,14 @@ export function LevelMapScreen() {
   );
 }
 
-const NODE_CONFIGS = {
-  completed: {
-    circleStyle: {
-      backgroundColor: COLORS.starGold,
-      borderColor: COLORS.starGold,
-      ...SHADOWS.md,
-      shadowColor: COLORS.starGold,
-    } as const,
-    labelStyle: { color: COLORS.textSecondary } as const,
-  },
-  passed: {
-    circleStyle: {
-      backgroundColor: COLORS.success,
-      borderColor: COLORS.success,
-      ...SHADOWS.sm,
-      shadowColor: COLORS.success,
-    } as const,
-    labelStyle: { color: COLORS.success } as const,
-  },
-  current: {
-    circleStyle: {
-      backgroundColor: COLORS.primary,
-      borderColor: COLORS.primaryDark,
-      ...SHADOWS.lg,
-      shadowColor: COLORS.primary,
-    } as const,
-    labelStyle: { color: COLORS.primary, fontWeight: '700' as const } as const,
-  },
-  locked: {
-    circleStyle: {
-      backgroundColor: COLORS.cardSurface,
-      borderColor: COLORS.cardBorder,
-    } as const,
-    labelStyle: { color: COLORS.textMuted } as const,
-  },
-};
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  salsaFooter: {
-    position: 'absolute',
-    bottom: SPACING.lg,
-    left: SPACING.md,
-    right: SPACING.md,
-  },
   header: {
     paddingTop: 60,
-    paddingBottom: 20,
+    paddingBottom: 16,
     paddingHorizontal: SPACING.lg,
   },
   headerTopRow: {
@@ -658,56 +609,157 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  // Nodes
-  nodeWrapper: {
-    position: 'absolute',
-    width: NODE_SIZE + 80,
+  scrollContent: {
+    paddingTop: SPACING.md,
+    paddingBottom: 120,
+    paddingHorizontal: SPACING.md,
+  },
+
+  // Section headers
+  sectionHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.md,
+    paddingLeft: INDICATOR_SIZE + SPACING.md + 4, // align with card area
+    paddingRight: SPACING.sm,
+  },
+  sectionLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  sectionLabel: {
+    ...TYPOGRAPHY.caption.lg,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
+
+  // Row
+  rowContainer: {
+    flexDirection: 'row',
+    minHeight: 80,
+  },
+  spineColumn: {
+    width: INDICATOR_SIZE + SPACING.md,
+    alignItems: 'center',
+  },
+  indicatorWrapper: {
+    width: INDICATOR_SIZE,
+    height: INDICATOR_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
+  },
+  indicator: {
+    width: INDICATOR_SIZE,
+    height: INDICATOR_SIZE,
+    borderRadius: INDICATOR_SIZE / 2,
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  indicatorCurrent: {
+    width: INDICATOR_SIZE + 4,
+    height: INDICATOR_SIZE + 4,
+    borderRadius: (INDICATOR_SIZE + 4) / 2,
+    borderWidth: 3,
   },
   pulsingGlow: {
     position: 'absolute',
-    width: NODE_SIZE + 24,
-    height: NODE_SIZE + 24,
-    borderRadius: (NODE_SIZE + 24) / 2,
+    width: INDICATOR_SIZE + 16,
+    height: INDICATOR_SIZE + 16,
+    borderRadius: (INDICATOR_SIZE + 16) / 2,
     backgroundColor: COLORS.primary,
-    top: -12,
   },
-  nodeCircle: {
-    width: NODE_SIZE,
-    height: NODE_SIZE,
-    borderRadius: NODE_SIZE / 2,
-    borderWidth: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-  },
-  startBtnInner: {
-    width: NODE_SIZE - 12,
-    height: NODE_SIZE - 12,
-    borderRadius: (NODE_SIZE - 12) / 2,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nodeLabel: {
-    marginTop: 8,
-    ...TYPOGRAPHY.body.sm,
-    fontWeight: '600',
-    textAlign: 'center',
-    maxWidth: NODE_SIZE + 60,
-  },
-  nodeProgress: {
-    ...TYPOGRAPHY.caption.md,
-    fontWeight: '700',
-    color: COLORS.primary,
-    marginTop: 2,
-  },
-  startChip: {
+  spineLine: {
+    width: 2,
+    flex: 1,
     marginTop: 4,
+    marginBottom: -4,
+    borderRadius: 1,
+  },
+
+  // Card
+  card: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 12,
+    marginBottom: SPACING.sm,
+    marginLeft: 4,
+  },
+  cardCurrent: {
+    ...SHADOWS.md,
+    shadowColor: COLORS.primary,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  tierNumber: {
+    ...TYPOGRAPHY.display.sm,
+    fontWeight: '800',
+    width: 32,
+    textAlign: 'center',
+  },
+  cardTitleGroup: {
+    flex: 1,
+  },
+  cardTitle: {
+    ...TYPOGRAPHY.heading.sm,
+    fontWeight: '600',
+  },
+  progressText: {
+    ...TYPOGRAPHY.caption.md,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  lockedHint: {
+    ...TYPOGRAPHY.caption.md,
+    fontWeight: '500',
+    color: COLORS.textMuted,
+    marginTop: 1,
+  },
+  cardIcon: {
+    marginLeft: SPACING.sm,
+  },
+
+  // Progress bar
+  progressBarContainer: {
+    marginTop: 8,
+  },
+  progressBarBg: {
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: 3,
+    borderRadius: 2,
+  },
+
+  // Start chip
+  startChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 2,
+    marginTop: 8,
     backgroundColor: COLORS.primary,
     paddingHorizontal: 12,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: BORDER_RADIUS.full,
   },
   startChipText: {
@@ -716,39 +768,11 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     letterSpacing: 1,
   },
-  lockedHint: {
-    ...TYPOGRAPHY.caption.sm,
-    fontWeight: '500',
-    color: COLORS.textMuted,
-    marginTop: 2,
-  },
-  // Tier headers
-  tierHeader: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
+
+  // Salsa footer
+  salsaFooter: {
+    marginTop: SPACING.xl,
     paddingHorizontal: SPACING.md,
-    gap: SPACING.sm,
-  },
-  tierLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: COLORS.cardBorder,
-  },
-  tierLabel: {
-    ...TYPOGRAPHY.caption.lg,
-    fontWeight: '600',
-    color: COLORS.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  // Decorations
-  decoration: {
-    position: 'absolute',
-    fontSize: 24,
-    color: COLORS.textMuted,
   },
 });
 

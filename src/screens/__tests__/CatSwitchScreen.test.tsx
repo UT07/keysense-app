@@ -102,12 +102,28 @@ let mockEvolutionState: any = {
   ownedCats: ['mini-meowww', 'jazzy', 'luna'],
   evolutionData: {},
   selectCat: jest.fn(),
+  unlockCat: jest.fn(),
 };
 
 jest.mock('../../stores/catEvolutionStore', () => ({
   useCatEvolutionStore: Object.assign(
     (sel?: any) => (sel ? sel(mockEvolutionState) : mockEvolutionState),
     { getState: () => mockEvolutionState },
+  ),
+  stageFromXp: () => 'baby',
+  xpToNextStage: () => ({ nextStage: 'teen', xpNeeded: 500 }),
+}));
+
+let mockGemState: any = {
+  gems: 1000,
+  canAfford: jest.fn(() => true),
+  spendGems: jest.fn(() => true),
+};
+
+jest.mock('../../stores/gemStore', () => ({
+  useGemStore: Object.assign(
+    (sel?: any) => (sel ? sel(mockGemState) : mockGemState),
+    { getState: () => mockGemState },
   ),
 }));
 
@@ -128,15 +144,18 @@ describe('CatSwitchScreen', () => {
     mockProgressState.level = 5;
     mockSettingsState.selectedCatId = 'mini-meowww';
     mockEvolutionState.ownedCats = ['mini-meowww', 'jazzy', 'luna'];
+    mockGemState.gems = 1000;
+    mockGemState.canAfford = jest.fn(() => true);
+    mockGemState.spendGems = jest.fn(() => true);
   });
 
   // =========================================================================
   // Rendering
   // =========================================================================
 
-  it('renders header title "Choose Your Cat"', () => {
+  it('renders header title "Cat Gallery"', () => {
     const { getByText } = render(<CatSwitchScreen />);
-    expect(getByText('Choose Your Cat')).toBeTruthy();
+    expect(getByText('Cat Gallery')).toBeTruthy();
   });
 
   it('shows unlock count in header subtitle', () => {
@@ -225,7 +244,7 @@ describe('CatSwitchScreen', () => {
 
   it('renders pagination dots (component renders without crash)', () => {
     const { getByText } = render(<CatSwitchScreen />);
-    expect(getByText('Choose Your Cat')).toBeTruthy();
+    expect(getByText('Cat Gallery')).toBeTruthy();
   });
 
   // =========================================================================

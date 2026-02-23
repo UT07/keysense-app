@@ -169,9 +169,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Gem earn popup state
   const [gemPopup, setGemPopup] = useState<{ amount: number; key: number } | null>(null);
 
+  // Toast state for failed claims
+  const [claimToast, setClaimToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!claimToast) return;
+    const t = setTimeout(() => setClaimToast(null), 2500);
+    return () => clearTimeout(t);
+  }, [claimToast]);
+
   const handleClaimReward = useCallback((day: number) => {
     const reward = claimDailyReward(day);
-    if (!reward) return;
+    if (!reward) {
+      setClaimToast("Complete today's challenge first!");
+      return;
+    }
     if (reward.type === 'gems' || reward.type === 'chest') {
       earnGems(reward.amount, 'daily-reward');
       setGemPopup({ amount: reward.amount, key: Date.now() });
@@ -361,6 +373,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onComplete={() => setGemPopup(null)}
                 offsetY={-10}
               />
+            )}
+            {claimToast && (
+              <View style={styles.claimToast}>
+                <MaterialCommunityIcons name="information-outline" size={14} color={COLORS.warning} />
+                <Text style={styles.claimToastText}>{claimToast}</Text>
+              </View>
             )}
           </View>
         </Animated.View>
@@ -660,6 +678,24 @@ const styles = StyleSheet.create({
   // Daily reward wrapper
   dailyRewardWrapper: {
     position: 'relative' as const,
+  },
+  claimToast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 6,
+    marginTop: SPACING.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: glowColor(COLORS.warning, 0.12),
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+    borderColor: glowColor(COLORS.warning, 0.25),
+  },
+  claimToastText: {
+    ...TYPOGRAPHY.caption.lg,
+    fontWeight: '600' as const,
+    color: COLORS.warning,
   },
   // Sections
   section: {

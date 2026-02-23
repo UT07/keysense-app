@@ -14,6 +14,7 @@ jest.mock('../../../stores/persistence', () => ({
   PersistenceManager: { saveState: jest.fn(), loadState: jest.fn(), deleteState: jest.fn() },
   STORAGE_KEYS: { LEARNER_PROFILE: 'learnerProfile' },
   createDebouncedSave: () => jest.fn(),
+  createImmediateSave: () => jest.fn(),
 }));
 
 describe('SkillDecay', () => {

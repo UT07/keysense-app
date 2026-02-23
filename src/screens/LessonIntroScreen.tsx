@@ -26,7 +26,7 @@ import { getFactForLesson } from '../content/funFactSelector';
 import { useProgressStore } from '../stores/progressStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { getLesson } from '../content/ContentLoader';
-import { getSkillsForExercise } from '../core/curriculum/SkillTree';
+
 import { getLessonTutorial } from '../content/lessonTutorials';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS, GRADIENTS } from '../theme/tokens';
 import type { RootStackParamList } from '../navigation/AppNavigator';
@@ -227,7 +227,7 @@ function TutorialSection({
 export function LessonIntroScreen(): React.ReactElement {
   const navigation = useNavigation<NavProp>();
   const route = useRoute<LessonIntroRouteProp>();
-  const { lessonId } = route.params;
+  const { lessonId, locked = false } = route.params;
 
   const lessonProgress = useProgressStore((s) => s.lessonProgress);
   const showTutorials = useSettingsStore((s) => s.showTutorials);
@@ -285,20 +285,10 @@ export function LessonIntroScreen(): React.ReactElement {
 
   const handleStartLesson = useCallback(() => {
     if (firstUncompletedExerciseId) {
-      // Find the skill this exercise targets for AI-first navigation
-      const skills = getSkillsForExercise(firstUncompletedExerciseId);
-      if (skills.length > 0) {
-        navigation.navigate('Exercise', {
-          exerciseId: firstUncompletedExerciseId,
-          aiMode: true,
-          skillId: skills[0].id,
-        });
-      } else {
-        // No skill mapping — navigate with static exercise directly
-        navigation.navigate('Exercise', {
-          exerciseId: firstUncompletedExerciseId,
-        });
-      }
+      // Navigate with the static exercise ID so completion records against the lesson
+      navigation.navigate('Exercise', {
+        exerciseId: firstUncompletedExerciseId,
+      });
     }
   }, [navigation, firstUncompletedExerciseId]);
 
@@ -486,24 +476,25 @@ export function LessonIntroScreen(): React.ReactElement {
       {/* Start Lesson button (fixed at bottom) */}
       <SafeAreaView style={styles.bottomBar}>
         <TouchableOpacity
-          onPress={handleStartLesson}
-          style={styles.startButton}
-          activeOpacity={0.8}
+          onPress={locked ? undefined : handleStartLesson}
+          style={[styles.startButton, locked && styles.startButtonLocked]}
+          activeOpacity={locked ? 1 : 0.8}
           testID="lesson-intro-start"
+          disabled={locked}
         >
           <LinearGradient
-            colors={GRADIENTS.crimson}
+            colors={locked ? ['#3A3A3A', '#2A2A2A'] : GRADIENTS.crimson}
             style={styles.startButtonGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
             <MaterialCommunityIcons
-              name={isAllCompleted ? 'replay' : 'play'}
+              name={locked ? 'lock' : isAllCompleted ? 'replay' : 'play'}
               size={22}
-              color={COLORS.textPrimary}
+              color={locked ? COLORS.textMuted : COLORS.textPrimary}
             />
-            <Text style={styles.startButtonText}>
-              {isAllCompleted ? 'Replay Lesson' : 'Start Lesson'}
+            <Text style={[styles.startButtonText, locked && { color: COLORS.textMuted }]}>
+              {locked ? 'Complete Previous Lesson' : isAllCompleted ? 'Replay Lesson' : 'Start Lesson'}
             </Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -834,6 +825,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...SHADOWS.md,
     shadowColor: COLORS.primary,
+  },
+  startButtonLocked: {
+    opacity: 0.7,
+    shadowColor: 'transparent',
   },
   startButtonGradient: {
     flexDirection: 'row',

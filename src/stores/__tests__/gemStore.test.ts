@@ -18,6 +18,7 @@ jest.mock('../persistence', () => ({
     GEMS: 'test_gems',
   },
   createDebouncedSave: () => jest.fn(),
+  createImmediateSave: () => jest.fn(),
 }));
 
 describe('gemStore', () => {

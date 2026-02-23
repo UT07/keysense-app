@@ -1,15 +1,15 @@
 # Purrrfect Keys Stabilization Report
 
-**Date:** February 2026 (last updated Feb 21)
-**Scope:** Codebase stabilization — tests, types, navigation, UI, adaptive learning, gamification, Phase 7 UI revamp
+**Date:** February 2026 (last updated Feb 23)
+**Scope:** Codebase stabilization — tests, types, navigation, UI, adaptive learning, gamification, Phase 7 UI revamp, gem bug fix, cat gallery redesign
 **Full history:** See `docs/stabilization-report-archive.md` for detailed change narratives.
 
 ## Final State
 
 | Metric | Before | After |
 |--------|--------|-------|
-| Test Suites | 18 (many failing) | 88 passed |
-| Tests | ~393 passing, 40+ failing | 2,064 passed, 0 failing |
+| Test Suites | 18 (many failing) | 90 passed |
+| Tests | ~393 passing, 40+ failing | 2,135 passed, 0 failing |
 | TypeScript Errors | 144+ | 0 |
 | Skill Nodes | 0 | 100 (15 tiers, DAG-validated) |
 | Session Types | 1 (new-material only) | 4 (new-material, review, challenge, mixed) |
@@ -180,6 +180,27 @@
 
 - **Tests:** 88 suites, 2,064 tests, 0 failures
 
+### Gem Bug Fix + Cat Gallery Redesign (Feb 23)
+
+#### Gem Redemption Bug Fix (Workstream 1)
+- **Root cause:** Race condition between `completeDailyChallenge()` and `claimDailyReward()` — 500ms debounced save could lose `lastDailyChallengeDate` before HomeScreen reads it
+- **`createImmediateSave`:** New persistence utility in `persistence.ts` — same API as `createDebouncedSave` but with 0ms delay for critical state
+- **`completeDailyChallenge()` fix:** Now uses `immediateSave(get())` instead of `debouncedSave(get())` ensuring `lastDailyChallengeDate` persists before user leaves ExercisePlayer
+- **`completeDailyChallengeAndClaim()`:** New combined action that marks challenge complete + auto-claims today's reward in one atomic operation, removing friction of finding the DailyRewardCalendar cell manually
+- **Claim failure toast:** HomeScreen shows "Complete today's challenge first!" when manual claim fails (auto-dismiss 2.5s)
+- **DailyChallengeCard reward display:** Shows "+X gems claimed!" when reward has been collected (instead of just "Completed!")
+
+#### Cat Gallery Redesign (Workstream 2)
+- **Unified gallery:** Merged `CatSwitchScreen` + `CatCollectionScreen` into single swipeable gallery (`CatSwitchScreen.tsx`)
+- **Card layout:** 88% screen width (up from 78%) — large KeysieSvg avatar (140px), evolution stage badge, name/personality, music skill, evolution progress bar (XP to next stage), 4 ability icons, action button
+- **Ability display:** `AbilityIconRow` with stage-based lock badges; tappable to expand inline `AbilityDetail` (name + description + unlock stage)
+- **Buy flow modal:** Styled `BuyModal` replacing `Alert.alert` — shows cat preview, gem cost, balance, confirm/cancel with haptic feedback
+- **Action button states:** "Select" (owned), "Selected" (current), "Unlock for X gems" (purchasable), "Legendary" (Chonky Monké)
+- **Navigation consolidation:** `CatCollection` route now renders `CatSwitchScreen`; `CatCollectionScreen.tsx` deprecated
+- **Gem balance header:** Shows current gem count in gallery header
+
+- **Tests:** 90 suites, 2,135 tests, 0 failures
+
 ---
 
 ## Known Remaining Items
@@ -187,7 +208,7 @@
 1. **Worker teardown warning**: Jest reports "worker process has failed to exit gracefully" (timer leak, non-blocking)
 2. **Native audio engine**: ExpoAudioEngine primary; react-native-audio-api requires RN 0.77+ for codegen
 3. **Native MIDI module**: `react-native-midi` not installed yet (needs RN 0.77+). VMPK + IAC Driver ready
-4. **Open bugs on GitHub**: ~53 remaining open issues
+4. **Open bugs on GitHub**: ~45 remaining open issues
 5. **Rive animation files**: .riv files not created (need Rive editor design work) — SVG composable system is working alternative
 6. **Phase 7 Batches 7-10 remaining**: Remaining screen redesigns (AuthScreen, LevelMapScreen, OnboardingScreen), micro-interactions (PressableScale upgrade, animated progress bars, loading skeletons, celebration upgrades), Detox visual audit
 7. **Phase 8+**: Audio input (mic polyphonic detection), Social & Leaderboards, QA + Launch

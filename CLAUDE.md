@@ -8,7 +8,7 @@ Built with React Native (Expo) + Firebase + Gemini AI.
 
 ## Current Sprint (Feb 23, 2026)
 
-**Codebase Health:** 90 test suites, 2,129 tests passing, 0 TypeScript errors
+**Codebase Health:** 90 test suites, 2,135 tests passing, 0 TypeScript errors
 
 **Phases 1-7.5 COMPLETE** (Core Loop, Gamification, Auth, Adaptive Learning, Evolution, UI Revamp, All-AI Exercises)
 
@@ -85,11 +85,12 @@ src/
 │   ├── MidiInput.ts      # MIDI device handling
 │   └── PitchDetector.ts  # Microphone fallback (TurboModule wrapper)
 ├── stores/               # Zustand stores (12 stores)
+│   ├── persistence.ts    # AsyncStorage persistence (debounced + immediate save)
 │   ├── exerciseStore.ts  # Current exercise state
 │   ├── progressStore.ts  # User progress, XP, streaks, lesson progress
 │   ├── settingsStore.ts  # User preferences, selected cat
 │   ├── learnerProfileStore.ts  # Adaptive learning: per-note accuracy, skills, tempo range
-│   ├── catEvolutionStore.ts  # Cat evolution stages, XP per cat, abilities
+│   ├── catEvolutionStore.ts  # Cat evolution stages, XP per cat, abilities, daily challenges + auto-claim
 │   ├── gemStore.ts       # Gem balance, earn/spend transactions
 │   ├── achievementStore.ts  # Achievement tracking, unlock checking
 │   └── authStore.ts      # Firebase auth state
@@ -169,7 +170,7 @@ src/
 | `src/services/firebase/dataMigration.ts` | One-time local→cloud migration on first sign-in |
 | `src/components/transitions/EvolutionReveal.tsx` | Full-screen Pokemon-style cat evolution animation |
 | `src/components/GemEarnPopup.tsx` | Gem reward animation popup |
-| `src/screens/CatCollectionScreen.tsx` | Cat gallery with evolution progress, ability codex, gem unlocking |
+| `src/screens/CatSwitchScreen.tsx` | Unified cat gallery: swipeable cards, evolution progress, abilities, gem buy flow |
 | `src/screens/ExercisePlayer/ExerciseLoadingScreen.tsx` | Salsa interstitial shown while AI exercises load |
 | `src/content/loadingTips.ts` | 20 practice tips for loading screen |
 | `src/navigation/CustomTabBar.tsx` | Custom bottom tab bar with animated icons |
@@ -236,7 +237,7 @@ onAudioBuffer((buffer: Float32Array) => {
 | E2E | Detox | `e2e/` |
 | Audio latency | Custom harness | `scripts/measure-latency.ts` |
 
-**1,991 tests, 84 suites.** Run tests before committing:
+**2,135 tests, 90 suites.** Run tests before committing:
 ```bash
 npm run typecheck && npm run test
 ```

@@ -142,17 +142,16 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
     return () => { cancelled = true; };
   }, [exercise.id, exercise.metadata.title, exercise.metadata.difficulty, score]);
 
-  // Auto-play coach feedback via TTS when it arrives
+  // Auto-play coach feedback via TTS when it arrives (Salsa's voice)
   useEffect(() => {
     if (!coachFeedback || coachLoading || hasAutoPlayed.current) return;
     hasAutoPlayed.current = true;
-    const catId = selectedCatId ?? 'mini-meowww';
     // Small delay to let the score animation finish
     const timer = setTimeout(() => {
-      ttsService.speak(coachFeedback, { catId });
+      ttsService.speak(coachFeedback, { catId: 'salsa' });
     }, 800);
     return () => clearTimeout(timer);
-  }, [coachFeedback, coachLoading, selectedCatId]);
+  }, [coachFeedback, coachLoading]);
 
   // Main animation sequence
   useEffect(() => {
@@ -407,8 +406,7 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
                 <TouchableOpacity
                   style={styles.speakerBtn}
                   onPress={() => {
-                    const catId = selectedCatId ?? 'mini-meowww';
-                    ttsService.speak(coachFeedback, { catId });
+                    ttsService.speak(coachFeedback, { catId: 'salsa' });
                   }}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >

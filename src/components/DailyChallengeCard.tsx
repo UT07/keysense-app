@@ -17,6 +17,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useProgressStore } from '../stores/progressStore';
+import { useCatEvolutionStore } from '../stores/catEvolutionStore';
 import { COLORS, SPACING, BORDER_RADIUS } from '../theme/tokens';
 
 const MOTIVATIONAL_TEXTS = [
@@ -55,9 +56,23 @@ interface DailyChallengeCardProps {
 
 export function DailyChallengeCard({ onPress }: DailyChallengeCardProps): React.ReactElement | null {
   const { dailyGoalData } = useProgressStore();
+  const dailyRewards = useCatEvolutionStore((s) => s.dailyRewards);
+  const isDailyChallengeCompleted = useCatEvolutionStore((s) => s.isDailyChallengeCompleted);
 
   const today = new Date().toISOString().split('T')[0];
   const isCompleted = (dailyGoalData[today]?.exercisesCompleted ?? 0) > 0;
+
+  // Check if today's reward has been claimed
+  const challengeDone = isDailyChallengeCompleted();
+  const todayDayNum = (() => {
+    const start = new Date(dailyRewards.weekStartDate + 'T00:00:00');
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - start.getTime()) / 86400000);
+    if (diff < 0 || diff >= 7) return 0;
+    return diff + 1;
+  })();
+  const todayReward = dailyRewards.days.find(d => d.day === todayDayNum);
+  const rewardClaimed = challengeDone && todayReward?.claimed;
 
   // Countdown timer
   const [timeRemaining, setTimeRemaining] = useState<number>(getTimeUntilMidnight());
@@ -115,7 +130,11 @@ export function DailyChallengeCard({ onPress }: DailyChallengeCardProps): React.
           {isCompleted ? (
             <View style={styles.completedRow}>
               <MaterialCommunityIcons name="check-circle" size={20} color={COLORS.success} />
-              <Text style={styles.completedText}>Completed!</Text>
+              <Text style={styles.completedText}>
+                {rewardClaimed && todayReward
+                  ? `+${todayReward.reward.amount} ${todayReward.reward.type === 'gems' ? 'gems' : todayReward.reward.type} claimed!`
+                  : 'Completed!'}
+              </Text>
             </View>
           ) : (
             <View style={styles.timerRow}>

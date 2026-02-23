@@ -1,9 +1,9 @@
 /**
  * LevelMapScreen UI Tests
  *
- * Tests the Duolingo-style vertical level map: tier node rendering,
- * state-driven styling (completed / current / locked), navigation on tap,
- * header stats display, back button, and tier progression from SkillTree.
+ * Tests the vertical level map: tier card rendering, state-driven styling
+ * (completed / current / locked), navigation on tap, header stats display,
+ * back button, section headers, and tier progression from SkillTree.
  */
 
 import React from 'react';
@@ -29,23 +29,6 @@ jest.mock('@react-navigation/native', () => ({
   useRoute: () => ({ params: {} }),
   NavigationContainer: ({ children }: any) => children,
 }));
-
-// ---------------------------------------------------------------------------
-// react-native-svg mock (LevelMapScreen uses Svg + Path for connectors)
-// ---------------------------------------------------------------------------
-
-jest.mock('react-native-svg', () => {
-  const mockReact = require('react');
-  const RN = require('react-native');
-
-  const Svg = ({ children, ...props }: any) =>
-    mockReact.createElement(RN.View, { ...props, testID: 'svg-container' }, children);
-
-  const Path = (props: any) =>
-    mockReact.createElement(RN.View, { ...props, testID: `svg-path-${props.stroke || 'default'}` });
-
-  return { __esModule: true, default: Svg, Svg, Path };
-});
 
 // ---------------------------------------------------------------------------
 // expo-linear-gradient mock
@@ -111,6 +94,15 @@ jest.mock('../../stores/learnerProfileStore', () => ({
   ),
 }));
 
+const mockGemState = { gems: 50, earnGems: jest.fn(), spendGems: jest.fn() };
+
+jest.mock('../../stores/gemStore', () => ({
+  useGemStore: Object.assign(
+    (sel?: any) => (sel ? sel(mockGemState) : mockGemState),
+    { getState: () => mockGemState },
+  ),
+}));
+
 // ---------------------------------------------------------------------------
 // ContentLoader mock — 3 lessons (for tiers 1-3)
 // ---------------------------------------------------------------------------
@@ -163,7 +155,6 @@ jest.mock('../../content/ContentLoader', () => ({
     return map[id] ?? [];
   },
   getExercise: (id: string) => {
-    // Return a truthy stub for known static exercise IDs so fallback resolution works
     const knownIds = [
       'lesson-01-ex-01', 'lesson-01-ex-02',
       'lesson-02-ex-01',
@@ -211,7 +202,6 @@ describe('LevelMapScreen', () => {
 
   it('renders tier node titles', () => {
     const { getByText } = render(<LevelMapScreen />);
-    // Tier 1 and some later tiers should be present
     expect(getByText('Note Finding')).toBeTruthy();
     expect(getByText('Black Keys')).toBeTruthy();
     expect(getByText('Performance')).toBeTruthy();
@@ -224,12 +214,19 @@ describe('LevelMapScreen', () => {
 
   it('renders 15 tier nodes', () => {
     const { getByText } = render(<LevelMapScreen />);
-    // Spot-check several tiers
     expect(getByText('Note Finding')).toBeTruthy();
     expect(getByText('Right Hand Melodies')).toBeTruthy();
     expect(getByText('Left Hand Basics')).toBeTruthy();
     expect(getByText('Chord Progressions')).toBeTruthy();
     expect(getByText('Sight Reading')).toBeTruthy();
+  });
+
+  it('renders section headers', () => {
+    const { getByText } = render(<LevelMapScreen />);
+    expect(getByText('Beginner')).toBeTruthy();
+    expect(getByText('Intermediate')).toBeTruthy();
+    expect(getByText('Advanced')).toBeTruthy();
+    expect(getByText('Mastery')).toBeTruthy();
   });
 
   // =========================================================================
@@ -303,28 +300,23 @@ describe('LevelMapScreen', () => {
   // =========================================================================
 
   describe('navigation', () => {
-    it('navigates to Exercise with aiMode for tier with unmastered skills', () => {
-      // Fresh user: tier 1 has unmastered skills → AI exercise
+    it('navigates to LessonIntro for tier with lessonId (even with unmastered skills)', () => {
       const { getByText } = render(<LevelMapScreen />);
       fireEvent.press(getByText('Note Finding'));
-      expect(mockNavigate).toHaveBeenCalledWith('Exercise', expect.objectContaining({
-        aiMode: true,
-        skillId: expect.any(String),
+      expect(mockNavigate).toHaveBeenCalledWith('LessonIntro', expect.objectContaining({
+        lessonId: 'lesson-01',
       }));
     });
 
-    it('uses static exercise ID as fallback when available', () => {
+    it('navigates to LessonIntro for current tier with lessonId', () => {
       const { getByText } = render(<LevelMapScreen />);
       fireEvent.press(getByText('Note Finding'));
-      // find-middle-c has targetExerciseIds: ['lesson-01-ex-01'] which exists in mock
-      expect(mockNavigate).toHaveBeenCalledWith('Exercise', expect.objectContaining({
-        exerciseId: 'lesson-01-ex-01',
-        aiMode: true,
+      expect(mockNavigate).toHaveBeenCalledWith('LessonIntro', expect.objectContaining({
+        lessonId: 'lesson-01',
       }));
     });
 
     it('navigates to LessonIntro for completed tier (review)', () => {
-      // Tier 1 completed (all skills mastered) → LessonIntro for review
       mockMasteredSkills = ['find-middle-c', 'keyboard-geography', 'white-keys'];
       mockProgressState.lessonProgress = {
         'lesson-01': {
@@ -337,23 +329,20 @@ describe('LevelMapScreen', () => {
       };
       const { getByText } = render(<LevelMapScreen />);
       fireEvent.press(getByText('Note Finding'));
-      expect(mockNavigate).toHaveBeenCalledWith('LessonIntro', { lessonId: 'lesson-01' });
+      expect(mockNavigate).toHaveBeenCalledWith('LessonIntro', { lessonId: 'lesson-01', locked: false });
     });
 
-    it('does NOT navigate when tapping a locked tier', () => {
+    it('navigates to LessonIntro with locked=true for locked tier with lessonId', () => {
+      const { getByText } = render(<LevelMapScreen />);
+      fireEvent.press(getByText('Left Hand Basics'));
+      expect(mockNavigate).toHaveBeenCalledWith('LessonIntro', { lessonId: 'lesson-03', locked: true });
+    });
+
+    it('does NOT navigate when tapping a locked tier without lessonId', () => {
       const { getByText } = render(<LevelMapScreen />);
       fireEvent.press(getByText('Black Keys'));
       expect(mockNavigate).not.toHaveBeenCalled();
     });
-  });
-
-  // =========================================================================
-  // SVG connectors
-  // =========================================================================
-
-  it('renders SVG connector paths between nodes', () => {
-    const { getByTestId } = render(<LevelMapScreen />);
-    expect(getByTestId('svg-container')).toBeTruthy();
   });
 
   // =========================================================================
@@ -362,7 +351,6 @@ describe('LevelMapScreen', () => {
 
   it('displays completed tier count and total skills in header', () => {
     const { getByText } = render(<LevelMapScreen />);
-    // Fresh user: 0/15 tiers, 0 skills
     expect(getByText('0/15')).toBeTruthy();
     expect(getByText('0 skills')).toBeTruthy();
   });

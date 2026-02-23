@@ -212,8 +212,8 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   // (critical for AI mode where exercise loads asynchronously)
   const exerciseRef = useRef<Exercise>(FALLBACK_EXERCISE);
 
-  // Loading screen state — shown while AI exercise loads
-  const [showLoadingScreen, setShowLoadingScreen] = useState(true);
+  // Loading screen state — only shown for AI-generated exercises
+  const [showLoadingScreen, setShowLoadingScreen] = useState(aiMode);
 
   // AI mode: exercise loaded asynchronously from buffer
   const [aiExercise, setAiExercise] = useState<Exercise | null>(null);
