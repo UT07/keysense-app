@@ -4,7 +4,7 @@
  * Tests the root navigation structure:
  * - Auth-conditional routing (authenticated vs unauthenticated)
  * - Loading state (renders null while auth initializing)
- * - Tab navigator structure (4 tabs: Home, Learn, Play, Profile)
+ * - Tab navigator structure (5 tabs: Home, Learn, Songs, Play, Profile)
  * - Auth stack has EmailAuth route
  */
 
@@ -114,6 +114,16 @@ jest.mock('../../screens/ExercisePlayer/ExercisePlayer', () => {
 jest.mock('../../screens/DailySessionScreen', () => {
   const { View, Text } = require('react-native');
   return { DailySessionScreen: () => <View testID="daily-session-screen"><Text>DailySessionScreen</Text></View> };
+});
+
+jest.mock('../../screens/SongLibraryScreen', () => {
+  const { View, Text } = require('react-native');
+  return { SongLibraryScreen: () => <View testID="song-library-screen"><Text>SongLibraryScreen</Text></View> };
+});
+
+jest.mock('../../screens/SongPlayerScreen', () => {
+  const { View, Text } = require('react-native');
+  return { SongPlayerScreen: () => <View testID="song-player-screen"><Text>SongPlayerScreen</Text></View> };
 });
 
 // ---------------------------------------------------------------------------
@@ -390,6 +400,13 @@ describe('AppNavigator', () => {
       expect(getByTestId('level-map-screen')).toBeTruthy();
     });
 
+    it('should have a Songs tab', () => {
+      const { getByTestId } = render(<AppNavigator />);
+
+      expect(getByTestId('tab-Songs')).toBeTruthy();
+      expect(getByTestId('song-library-screen')).toBeTruthy();
+    });
+
     it('should have a Play tab', () => {
       const { getByTestId } = render(<AppNavigator />);
 
@@ -405,11 +422,12 @@ describe('AppNavigator', () => {
       expect(getByTestId('profile-screen')).toBeTruthy();
     });
 
-    it('should have exactly 4 tabs (no unexpected extras)', () => {
+    it('should have exactly 5 tabs: Home, Learn, Songs, Play, Profile', () => {
       const { getByTestId, queryByTestId } = render(<AppNavigator />);
 
       expect(getByTestId('tab-Home')).toBeTruthy();
       expect(getByTestId('tab-Learn')).toBeTruthy();
+      expect(getByTestId('tab-Songs')).toBeTruthy();
       expect(getByTestId('tab-Play')).toBeTruthy();
       expect(getByTestId('tab-Profile')).toBeTruthy();
 
@@ -476,6 +494,11 @@ describe('AppNavigator', () => {
     it('should have FreePlay route available', () => {
       const { getByTestId } = render(<AppNavigator />);
       expect(getByTestId('screen-FreePlay')).toBeTruthy();
+    });
+
+    it('should have SongPlayer route available', () => {
+      const { getByTestId } = render(<AppNavigator />);
+      expect(getByTestId('screen-SongPlayer')).toBeTruthy();
     });
   });
 
