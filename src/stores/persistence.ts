@@ -55,6 +55,7 @@ export const STORAGE_KEYS = {
   CLOUD_MIGRATION: 'purrrfect_keys_migrated',
   GEMS: 'purrrfect_gems_state',
   CAT_EVOLUTION: 'purrrfect_cat_evolution_state',
+  SONGS: 'purrrfect_songs_state',
 } as const;
 
 /**
