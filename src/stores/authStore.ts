@@ -35,6 +35,7 @@ import { useSettingsStore } from './settingsStore';
 import { useExerciseStore } from './exerciseStore';
 import { useCatEvolutionStore } from './catEvolutionStore';
 import { useGemStore } from './gemStore';
+import { useSongStore } from './songStore';
 import { useAchievementStore } from './achievementStore';
 import { useLearnerProfileStore } from './learnerProfileStore';
 
@@ -82,6 +83,7 @@ function resetAllStores(): void {
     { name: 'gems', reset: () => useGemStore.getState().reset() },
     { name: 'achievements', reset: () => useAchievementStore.getState().reset() },
     { name: 'learnerProfile', reset: () => useLearnerProfileStore.getState().reset() },
+    { name: 'songs', reset: () => useSongStore.getState().reset() },
   ];
 
   for (const { name, reset } of stores) {

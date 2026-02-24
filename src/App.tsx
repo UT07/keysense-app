@@ -21,6 +21,7 @@ import { syncManager } from './services/firebase/syncService';
 import { migrateLocalToCloud } from './services/firebase/dataMigration';
 import { hydrateGemStore } from './stores/gemStore';
 import { hydrateCatEvolutionStore } from './stores/catEvolutionStore';
+import { hydrateSongStore } from './stores/songStore';
 
 // Configure Google Sign-In at module level (synchronous, must run before any signIn call)
 // iosClientId is passed explicitly so the native module doesn't need GoogleService-Info.plist
@@ -168,6 +169,10 @@ export default function App(): React.ReactElement {
         // Hydrate cat evolution store (owned cats, evolution data, daily rewards)
         await hydrateCatEvolutionStore();
         console.log('[App] Cat evolution store hydrated');
+
+        // Hydrate song store (mastery, recent songs, request counter)
+        await hydrateSongStore();
+        console.log('[App] Song store hydrated');
 
         // ── Phase 2: Firebase Auth (network, may be slow) ──────────────
         try {

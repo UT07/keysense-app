@@ -9,6 +9,7 @@ export { useProgressStore } from './progressStore';
 export { useSettingsStore } from './settingsStore';
 export { useAchievementStore } from './achievementStore';
 export { useLearnerProfileStore } from './learnerProfileStore';
+export { useSongStore, hydrateSongStore } from './songStore';
 
 // Store types
 export type { ExerciseSessionState } from './types';
