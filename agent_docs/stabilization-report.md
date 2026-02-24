@@ -1,7 +1,7 @@
 # Purrrfect Keys Stabilization Report
 
-**Date:** February 2026 (last updated Feb 23)
-**Scope:** Codebase stabilization — tests, types, navigation, UI, adaptive learning, gamification, Phase 7 UI revamp, gem bug fix, cat gallery redesign
+**Date:** February 2026 (last updated Feb 24)
+**Scope:** Codebase stabilization — tests, types, navigation, UI, adaptive learning, gamification, Phase 7 UI revamp, gem bug fix, cat gallery redesign, Phase 9 Music Library
 **Full history:** See `docs/stabilization-report-archive.md` for detailed change narratives.
 
 ## Final State
@@ -201,6 +201,77 @@
 
 - **Tests:** 90 suites, 2,135 tests, 0 failures
 
+### Phase 9: Music Library (Feb 24)
+
+Full song library feature — 120+ songs from 3 sources (classical datasets, folk APIs, AI generation), Firebase Firestore catalogue, browse/search UI, section-based playback, mastery tiers, user song requests, and 6 song achievements.
+
+#### Batch 1: Song Types + ABC Parser
+- **songTypes.ts:** Song, SongSection, SongSummary, SongFilter, SongMastery, MasteryTier, SongRequestParams types
+- **abcParser.ts:** ABC notation → NoteEvent[] converter using `abcjs.parseOnly()`. Handles key signatures, accidentals, octave modifiers, ties, chords, tuplets, rests
+- **20 tests** for parser edge cases (keys, accidentals, octaves, durations, ties, chords, error handling)
+
+#### Batch 2: Song Mastery Calculation
+- **songMastery.ts:** `computeMasteryTier()`, `updateSongMastery()` (best-wins merge), `isBetterTier()`, `gemRewardForTier()`, `masteryLabel()`, `masteryColor()`
+- **Tier ladder:** none → bronze (70+/melody) → silver (80+/melody) → gold (90+/full) → platinum (95+/full)
+- **Gem rewards:** bronze=10, silver=20, gold=40, platinum=75
+- **15 tests** for tier computation, best-score merge, gem rewards, ordering
+
+#### Batch 3: Firestore Song Service
+- **songService.ts:** Global `songs/{songId}` collection + per-user `users/{uid}/songMastery/{songId}` subcollection
+- Functions: `getSong()`, `getSongSummaries()` (paginated, filtered), `searchSongs()`, `saveSongToFirestore()`, `getUserSongMastery()`, `saveUserSongMastery()`, rate limiting via `users/{uid}/songRequests/{date}`
+- **12 tests** with Firestore mocks
+
+#### Batch 4: Song Generation Service (Gemini)
+- **songGenerationService.ts:** Gemini 2.0 Flash generates simplified piano arrangements from song title
+- Prompt returns JSON with per-section ABC notation; parsed via `abcParser`; assembled into Song
+- Rate limited to 5 requests/user/day
+- **10 tests** for validation, prompt building, assembly, rate limiting
+
+#### Batch 5: Song Store (Zustand)
+- **songStore.ts:** Persisted mastery + recent songs + request count; transient summaries, filters, loading states
+- Actions: `loadSummaries()`, `setFilter()`, `loadSong()`, `updateMastery()`, `requestSong()`, `canRequestSong()`
+- Follows `gemStore.ts` persistence pattern (debounced save + hydration)
+- **14 tests** for filter, mastery, rate limiting, hydration, reset
+
+#### Batch 6: SongLibraryScreen
+- Genre carousel (All/Classical/Folk/Pop/Film/Game/Holiday), difficulty star filter, search bar (400ms debounce)
+- Song cards with mastery badges, paginated FlatList via `loadMoreSummaries()`
+- "Request a Song" FAB → modal with title input + difficulty picker + rate limit warning
+- Songs tab added to bottom navigation (5 tabs: Home, Learn, Songs, Play, Profile)
+- **12 tests** for genre pills, search, card rendering, FAB, navigation
+
+#### Batch 7: SongPlayerScreen
+- Section pills (horizontal scroll) + layer toggle (Melody/Full) + loop toggle
+- `sectionToExercise()` converts SongSection + layer → Exercise object for ExercisePlayer (zero changes to ExercisePlayer.tsx)
+- On return: reads score from exerciseStore, calls `updateMastery()`, checks tier upgrade → gem reward + achievement
+- **12 tests** for section display, layer toggle, exercise conversion, score capture
+
+#### Batch 8: Song Achievements + Gem Integration
+- **6 new achievements:** first-song-mastered (1 bronze), genre-explorer (3 genres), classical-connoisseur (10 classical), platinum-pianist (any platinum), song-collector (25 bronze), melody-master (50 silver)
+- **5 new condition types** in `isConditionMet()`: songs_bronze_count, song_platinum_any, songs_by_genre, songs_classical_count, songs_silver_count
+- **New `'song'` category** in AchievementCategory
+- **5 new AchievementContext fields** wired through `buildAchievementContext()`
+- **14 tests** for conditions, unlocking, re-trigger prevention, category filter
+
+#### Batch 9: Navigation Wiring
+- Songs tab testID `tab-songs` in CustomTabBar
+- SongPlayer route typed in RootStackParamList
+- **3 new navigation tests** (5-tab assertion, Songs tab, SongPlayer route)
+
+#### Batch 10: Content Import Scripts
+- **scripts/import-thesession.ts:** Fetches folk tunes from TheSession.org API, converts ABC → Song, outputs JSON
+- **scripts/generate-songs.ts:** Gemini batch generator with 50 curated songs (classical/pop/film/game/holiday), `--dry-run` support
+- **scripts/import-pdmx.py:** Python MusicXML converter using music21 (classical corpus)
+
+#### Batch 11: Integration Tests
+- **16 integration tests** covering full mastery progression (none→bronze→silver→gold→platinum), best-score merge, gem rewards, achievement unlocking, filter shapes, tier ordering
+- Located at `src/__tests__/integration/SongFlow.test.tsx`
+
+**New files:** 20 (types, parser, mastery, service, generation, store, screens, tests, scripts)
+**Modified files:** 8 (persistence, authStore, stores/index, achievements, achievementStore, AppNavigator, CustomTabBar, navigation tests)
+
+- **Tests:** 99 suites, 2,302 tests passing (59 new), 4 pre-existing failures in catEvolutionStore, 0 TypeScript errors
+
 ---
 
 ## Known Remaining Items
@@ -211,4 +282,6 @@
 4. **Open bugs on GitHub**: ~45 remaining open issues
 5. **Rive animation files**: .riv files not created (need Rive editor design work) — SVG composable system is working alternative
 6. **Phase 7 Batches 7-10 remaining**: Remaining screen redesigns (AuthScreen, LevelMapScreen, OnboardingScreen), micro-interactions (PressableScale upgrade, animated progress bars, loading skeletons, celebration upgrades), Detox visual audit
-7. **Phase 8+**: Audio input (mic polyphonic detection), Social & Leaderboards, QA + Launch
+7. **Phase 8 remaining**: Real-device mic accuracy testing, ambient noise calibration tuning, polyphonic detection (research)
+8. **Phase 10+**: Social & Leaderboards, QA + Launch
+9. **catEvolutionStore test fix**: 4 pre-existing failures in `completeDailyChallengeAndClaim` (gem amount mismatch 15 vs 10)
