@@ -2,17 +2,23 @@
  * Batch Song Generator (Gemini)
  *
  * Generates simplified piano arrangements for well-known songs using
- * the Gemini song generation pipeline. Includes a curated list of
- * popular, film, game, and holiday songs.
+ * Gemini 2.0 Flash. Calls the Gemini API directly (no Firebase needed)
+ * and outputs Song JSON to a file.
  *
- * Usage: npx ts-node scripts/generate-songs.ts [--dry-run] [--start 0] [--count 10]
+ * Usage: npx tsx scripts/generate-songs.ts [--dry-run] [--start 0] [--count 10] [--output songs.json]
  *
  * Prerequisites:
- * - EXPO_PUBLIC_GEMINI_API_KEY env var
- * - Firebase Admin SDK credentials for saving to Firestore
+ * - EXPO_PUBLIC_GEMINI_API_KEY env var (source from .env.local)
  */
 
-import type { SongRequestParams } from '../src/core/songs/songTypes';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import {
+  buildSongPrompt,
+  validateGeneratedSong,
+  assembleSong,
+} from '../src/core/songs/songAssembler';
+import type { SongRequestParams, Song } from '../src/core/songs/songTypes';
+import { writeFileSync, existsSync, readFileSync } from 'fs';
 
 // ---------------------------------------------------------------------------
 // Curated song list — songs likely in public domain or AI-arrangeable
@@ -31,7 +37,7 @@ const SONG_LIST: SongRequestParams[] = [
   { title: 'The Entertainer', artist: 'Scott Joplin', difficulty: 3 },
   { title: 'Gymnopédie No. 1', artist: 'Erik Satie', difficulty: 2 },
 
-  // Pop (difficulty 2-3)
+  // Pop (difficulty 1-2)
   { title: 'Happy Birthday', difficulty: 1 },
   { title: 'Twinkle Twinkle Little Star', difficulty: 1 },
   { title: 'Mary Had a Little Lamb', difficulty: 1 },
@@ -81,6 +87,73 @@ const SONG_LIST: SongRequestParams[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Gemini generation (standalone — no Firebase)
+// ---------------------------------------------------------------------------
+
+interface GenerativeModel {
+  generateContent(prompt: string): Promise<{
+    response: { text(): string };
+  }>;
+}
+
+async function generateSong(
+  model: GenerativeModel,
+  params: SongRequestParams,
+): Promise<Song | null> {
+  const prompt = buildSongPrompt(params);
+
+  // First attempt
+  let song = await attemptGeneration(model, prompt);
+  if (!song) {
+    // Retry with guidance
+    const retryPrompt =
+      prompt +
+      '\n\nPrevious attempt failed. Ensure each section has valid ABC notation with all required headers (X:, T:, M:, L:, K:).';
+    song = await attemptGeneration(model, retryPrompt);
+  }
+
+  return song;
+}
+
+async function attemptGeneration(
+  model: GenerativeModel,
+  prompt: string,
+): Promise<Song | null> {
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+  const parsed: unknown = JSON.parse(text);
+
+  if (!validateGeneratedSong(parsed)) {
+    return null;
+  }
+
+  return assembleSong(parsed, 'gemini');
+}
+
+// ---------------------------------------------------------------------------
+// Resume support
+// ---------------------------------------------------------------------------
+
+function loadExistingSongs(outputPath: string): Song[] {
+  if (existsSync(outputPath)) {
+    try {
+      return JSON.parse(readFileSync(outputPath, 'utf-8')) as Song[];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function songAlreadyGenerated(existing: Song[], title: string): boolean {
+  const normalised = title.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return existing.some((s) => {
+    const existingNorm = s.metadata.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return existingNorm === normalised || existingNorm.includes(normalised) || normalised.includes(existingNorm);
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -91,8 +164,10 @@ async function main(): Promise<void> {
   const dryRun = args.includes('--dry-run');
   const startIdx = args.indexOf('--start');
   const countIdx = args.indexOf('--count');
+  const outputIdx = args.indexOf('--output');
   const start = startIdx >= 0 ? parseInt(args[startIdx + 1], 10) : 0;
   const count = countIdx >= 0 ? parseInt(args[countIdx + 1], 10) : SONG_LIST.length;
+  const outputFile = outputIdx >= 0 ? args[outputIdx + 1] : '/tmp/gemini-songs.json';
 
   const songs = SONG_LIST.slice(start, start + count);
 
@@ -100,6 +175,7 @@ async function main(): Promise<void> {
   console.log(`======================`);
   console.log(`Total songs in list: ${SONG_LIST.length}`);
   console.log(`Processing range: ${start} to ${start + songs.length - 1}`);
+  console.log(`Output: ${outputFile}`);
   console.log(`Dry run: ${dryRun}`);
   console.log('');
 
@@ -107,30 +183,63 @@ async function main(): Promise<void> {
     console.log('Dry run — listing songs that would be generated:\n');
     for (let i = 0; i < songs.length; i++) {
       const s = songs[i];
-      console.log(`  ${start + i + 1}. ${s.title}${s.artist ? ` — ${s.artist}` : ''} (difficulty ${s.difficulty})`);
+      console.log(
+        `  ${start + i + 1}. ${s.title}${s.artist ? ` — ${s.artist}` : ''} (difficulty ${s.difficulty})`,
+      );
     }
     console.log(`\nTotal: ${songs.length} songs`);
     return;
   }
 
-  // Dynamic import to avoid requiring API keys during dry-run
-  const { generateAndSaveSong } = await import('../src/services/songGenerationService');
+  const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+  if (!apiKey) {
+    console.error('Error: EXPO_PUBLIC_GEMINI_API_KEY is not set.');
+    console.error('Run: source .env.local && npx tsx scripts/generate-songs.ts');
+    process.exit(1);
+  }
 
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.0-flash',
+    generationConfig: {
+      responseMimeType: 'application/json',
+      temperature: 0.8,
+    },
+  });
+
+  // Load existing songs for resume support
+  const existingSongs = loadExistingSongs(outputFile);
+  if (existingSongs.length > 0) {
+    console.log(`Resuming — ${existingSongs.length} songs already in ${outputFile}\n`);
+  }
+
+  const allSongs = [...existingSongs];
   let successCount = 0;
   let failCount = 0;
+  let skippedCount = 0;
 
   for (let i = 0; i < songs.length; i++) {
     const params = songs[i];
     const idx = start + i + 1;
+
+    if (songAlreadyGenerated(allSongs, params.title)) {
+      console.log(`[${idx}/${start + songs.length}] Skipping (already done): ${params.title}`);
+      skippedCount++;
+      continue;
+    }
+
     console.log(`[${idx}/${start + songs.length}] Generating: ${params.title}...`);
 
     try {
-      const song = await generateAndSaveSong(params, 'system-import');
+      const song = await generateSong(model, params);
       if (song) {
-        console.log(`  ✓ ${song.id} — ${song.sections.length} sections`);
+        console.log(`  ✓ ${song.id} — ${song.sections.length} sections, ${song.metadata.durationSeconds}s`);
+        allSongs.push(song);
         successCount++;
+        // Save after each success for resume support
+        writeFileSync(outputFile, JSON.stringify(allSongs, null, 2));
       } else {
-        console.log(`  ✗ Generation returned null`);
+        console.log(`  ✗ Generation returned null (validation or ABC parse failed)`);
         failCount++;
       }
     } catch (err) {
@@ -143,7 +252,9 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log(`\nDone! Success: ${successCount}, Failed: ${failCount}`);
+  console.log(`\nDone! Generated: ${successCount}, Failed: ${failCount}, Skipped: ${skippedCount}`);
+  console.log(`Total songs in output: ${allSongs.length}`);
+  console.log(`Written to: ${outputFile}`);
 }
 
 main().catch((err) => {
