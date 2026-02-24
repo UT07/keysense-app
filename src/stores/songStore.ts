@@ -95,7 +95,9 @@ function persistableData(state: SongStoreState): SongData {
 // ---------------------------------------------------------------------------
 
 /** Pagination cursor — kept outside Zustand because it's not serialisable */
-let lastDocCursor: unknown = null;
+// Cursor for Firestore pagination — typed to match getSongSummaries return
+type PageCursor = Awaited<ReturnType<typeof getSongSummaries>>['lastDoc'];
+let lastDocCursor: PageCursor = null;
 
 export const useSongStore = create<SongStoreState>((set, get) => ({
   ...defaultData,
@@ -123,7 +125,7 @@ export const useSongStore = create<SongStoreState>((set, get) => ({
       const { summaries: more, lastDoc } = await getSongSummaries(
         get().filter,
         20,
-        lastDocCursor as any,
+        lastDocCursor ?? undefined,
       );
       lastDocCursor = lastDoc;
       set((s) => ({ summaries: [...s.summaries, ...more], isLoadingSummaries: false }));

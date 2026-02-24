@@ -314,7 +314,7 @@ export function SongLibraryScreen() {
 
   const handleSongPress = useCallback(
     (songId: string) => {
-      navigation.navigate('SongPlayer', { songId } as any);
+      navigation.navigate('SongPlayer', { songId });
     },
     [navigation],
   );
@@ -324,7 +324,7 @@ export function SongLibraryScreen() {
       const song = await requestSong(params, uid);
       if (song) {
         setRequestModalVisible(false);
-        navigation.navigate('SongPlayer', { songId: song.id } as any);
+        navigation.navigate('SongPlayer', { songId: song.id });
       }
     },
     [requestSong, uid, navigation],

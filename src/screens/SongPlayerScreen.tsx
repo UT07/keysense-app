@@ -101,7 +101,7 @@ function SectionPill({
       <Text style={[styles.sectionPillLabel, isSelected && styles.sectionPillLabelSelected]}>
         {section.label}
       </Text>
-      {score != null && (
+      {score !== null && score !== undefined && (
         <View style={styles.scoreBadge} testID={`score-badge-${section.id}`}>
           <Text style={styles.scoreBadgeText}>{Math.round(score)}%</Text>
         </View>
@@ -216,7 +216,7 @@ export function SongPlayerScreen() {
     navigation.navigate('Exercise', { exerciseId: exercise.id });
   }, [song, selectedSectionIndex, layer, loop, setCurrentExercise, navigation]);
 
-  const hasAccompaniment = song?.sections.some((s) => s.layers.accompaniment != null) ?? false;
+  const hasAccompaniment = song?.sections.some((s) => s.layers.accompaniment !== undefined) ?? false;
 
   // ── Loading state ───────────────────────────────────────────
 

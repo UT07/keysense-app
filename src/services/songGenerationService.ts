@@ -46,7 +46,7 @@ const API_KEY_ENV = ['EXPO', 'PUBLIC', 'GEMINI', 'API', 'KEY'].join('_');
 // ---------------------------------------------------------------------------
 
 export function validateGeneratedSong(raw: unknown): raw is GeneratedSongABC {
-  if (raw == null || typeof raw !== 'object') return false;
+  if (raw === null || raw === undefined || typeof raw !== 'object') return false;
 
   const obj = raw as Record<string, unknown>;
 
@@ -61,7 +61,7 @@ export function validateGeneratedSong(raw: unknown): raw is GeneratedSongABC {
   if (!Array.isArray(obj.sections) || obj.sections.length === 0) return false;
 
   for (const section of obj.sections) {
-    if (typeof section !== 'object' || section == null) return false;
+    if (typeof section !== 'object' || section === null || section === undefined) return false;
     const s = section as Record<string, unknown>;
     if (typeof s.label !== 'string' || s.label.length === 0) return false;
     if (typeof s.melodyABC !== 'string' || s.melodyABC.length === 0) return false;
