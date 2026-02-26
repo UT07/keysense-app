@@ -1,5 +1,5 @@
 import { MultiNoteTracker, MultiNoteTrackerConfig } from '../MultiNoteTracker';
-import type { PolyphonicFrame, DetectedNote } from '../PolyphonicDetector';
+import type { PolyphonicFrame } from '../PolyphonicDetector';
 import type { NoteEvent } from '../PitchDetector';
 
 describe('MultiNoteTracker', () => {

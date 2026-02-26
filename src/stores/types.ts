@@ -130,11 +130,14 @@ export interface NotificationSettings {
 
 export type PreferredInputMethod = 'auto' | 'midi' | 'mic' | 'touch';
 
+export type MicDetectionMode = 'monophonic' | 'polyphonic';
+
 export interface MidiSettings {
   lastMidiDeviceId: string | null;
   lastMidiDeviceName: string | null;
   autoConnectMidi: boolean;
   preferredInputMethod: PreferredInputMethod;
+  micDetectionMode: MicDetectionMode;
 }
 
 export interface OnboardingSettings {
@@ -166,6 +169,7 @@ export interface SettingsStoreState extends AudioSettings, DisplaySettings, Noti
   setDailyGoalMinutes: (minutes: number) => void;
   setLastMidiDevice: (deviceId: string | null, deviceName: string | null) => void;
   setPreferredInputMethod: (method: PreferredInputMethod) => void;
+  setMicDetectionMode: (mode: MicDetectionMode) => void;
   setDarkMode: (enabled: boolean) => void;
   setShowTutorials: (show: boolean) => void;
   setHasCompletedOnboarding: (completed: boolean) => void;

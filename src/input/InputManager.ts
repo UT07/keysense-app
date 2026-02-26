@@ -19,6 +19,7 @@ import { getMidiInput } from './MidiInput';
 import type { MidiInput } from './MidiInput';
 import { MicrophoneInput, createMicrophoneInput } from './MicrophoneInput';
 import { ensureAudioModeConfigured } from '../audio/createAudioEngine';
+import { useSettingsStore } from '../stores/settingsStore';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -83,6 +84,14 @@ export class InputManager {
     this.midiInput = getMidiInput();
   }
 
+  /** Reason why mic failed (if it did). Exposed for UI to show user feedback. */
+  private _micFailureReason: string | null = null;
+
+  /** Get reason why mic failed to initialize (null if no failure) */
+  getMicFailureReason(): string | null {
+    return this._micFailureReason;
+  }
+
   /**
    * Initialize available input sources and determine active method.
    */
@@ -90,16 +99,19 @@ export class InputManager {
     if (this.isInitialized) return;
 
     const preferred = this.config.preferred;
+    this._micFailureReason = null;
+    console.log(`[InputManager] Initializing with preferred=${preferred}`);
 
     // Try MIDI first (always init — it's a no-op if no hardware)
     try {
       await this.midiInput.initialize();
-    } catch {
-      // MIDI init failure is non-fatal
+    } catch (error) {
+      console.warn('[InputManager] MIDI init failed (non-fatal):', error);
     }
 
     const midiAvailable = this.midiInput.isReady() &&
       (await this.midiInput.getConnectedDevices()).length > 0;
+    console.log(`[InputManager] MIDI available: ${midiAvailable}`);
 
     // Determine active method
     // 'auto' tries MIDI only, then falls back to touch.
@@ -108,32 +120,43 @@ export class InputManager {
     // which routes audio through the earpiece instead of the speaker.
     if (preferred === 'midi' || (preferred === 'auto' && midiAvailable)) {
       this._activeMethod = 'midi';
+      console.log('[InputManager] Selected: midi');
     } else if (preferred === 'mic') {
       // Mic explicitly requested — request permission
       try {
         // Reconfigure iOS audio session to allow recording alongside playback
+        console.log('[InputManager] Configuring audio session for recording...');
         await ensureAudioModeConfigured(true);
 
+        const detectionMode = useSettingsStore.getState().micDetectionMode ?? 'monophonic';
         this.micInput = await createMicrophoneInput({
           defaultVelocity: this.config.micDefaultVelocity ?? 80,
           latencyCompensationMs: this.config.micLatencyCompensationMs ?? 0,
+          mode: detectionMode,
         });
         if (this.micInput) {
           this._activeMethod = 'mic';
+          console.log(`[InputManager] Selected: mic (${detectionMode} mode, pipeline ready)`);
         } else {
-          // Permission denied — fall back to touch
+          // Permission denied or initialization failed
           this._activeMethod = 'touch';
+          this._micFailureReason = 'Microphone permission denied. Grant access in Settings > Purrrfect Keys.';
+          console.warn('[InputManager] Mic failed → falling back to touch. Reason:', this._micFailureReason);
         }
-      } catch {
+      } catch (error) {
         this._activeMethod = 'touch';
+        this._micFailureReason = `Microphone initialization error: ${(error as Error).message}`;
+        console.error('[InputManager] Mic init error → falling back to touch:', error);
       }
     } else {
       this._activeMethod = 'touch';
+      console.log('[InputManager] Selected: touch');
     }
 
     // Wire up event forwarding
     this._wireEvents();
     this.isInitialized = true;
+    console.log(`[InputManager] Initialized. Active method: ${this._activeMethod}`);
   }
 
   /**
@@ -229,17 +252,33 @@ export class InputManager {
     this.config.preferred = method;
 
     // Re-determine active method
+    this._micFailureReason = null;
     if (method === 'midi') {
       this._activeMethod = 'midi';
     } else if (method === 'mic') {
       if (!this.micInput) {
-        await ensureAudioModeConfigured(true);
-        this.micInput = await createMicrophoneInput({
-          defaultVelocity: this.config.micDefaultVelocity ?? 80,
-          latencyCompensationMs: this.config.micLatencyCompensationMs ?? 0,
-        });
+        try {
+          await ensureAudioModeConfigured(true);
+          const detectionMode = useSettingsStore.getState().micDetectionMode ?? 'monophonic';
+          this.micInput = await createMicrophoneInput({
+            defaultVelocity: this.config.micDefaultVelocity ?? 80,
+            latencyCompensationMs: this.config.micLatencyCompensationMs ?? 0,
+            mode: detectionMode,
+          });
+        } catch (error) {
+          this._micFailureReason = `Mic init error: ${(error as Error).message}`;
+          console.error('[InputManager] switchMethod mic error:', error);
+        }
       }
-      this._activeMethod = this.micInput ? 'mic' : 'touch';
+      if (this.micInput) {
+        this._activeMethod = 'mic';
+      } else {
+        this._activeMethod = 'touch';
+        if (!this._micFailureReason) {
+          this._micFailureReason = 'Microphone permission denied. Grant access in Settings.';
+        }
+        console.warn('[InputManager] switchMethod: mic failed → touch.', this._micFailureReason);
+      }
     } else if (method === 'touch') {
       this._activeMethod = 'touch';
     } else {
