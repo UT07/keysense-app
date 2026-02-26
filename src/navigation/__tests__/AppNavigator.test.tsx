@@ -86,14 +86,19 @@ jest.mock('../../screens/MidiSetupScreen', () => {
   return { MidiSetupScreen: () => <View testID="midi-setup-screen"><Text>MidiSetupScreen</Text></View> };
 });
 
+jest.mock('../../screens/MicSetupScreen', () => {
+  const { View, Text } = require('react-native');
+  return { MicSetupScreen: () => <View testID="mic-setup-screen"><Text>MicSetupScreen</Text></View> };
+});
+
 jest.mock('../../screens/AccountScreen', () => {
   const { View, Text } = require('react-native');
   return { AccountScreen: () => <View testID="account-screen"><Text>AccountScreen</Text></View> };
 });
 
-jest.mock('../../screens/LessonIntroScreen', () => {
+jest.mock('../../screens/TierIntroScreen', () => {
   const { View, Text } = require('react-native');
-  return { LessonIntroScreen: () => <View testID="lesson-intro-screen"><Text>LessonIntroScreen</Text></View> };
+  return { TierIntroScreen: () => <View testID="tier-intro-screen"><Text>TierIntroScreen</Text></View> };
 });
 
 jest.mock('../../screens/CatSwitchScreen', () => {
@@ -481,9 +486,9 @@ describe('AppNavigator', () => {
       expect(getByTestId('screen-CatSwitch')).toBeTruthy();
     });
 
-    it('should have LessonIntro route available', () => {
+    it('should have TierIntro route available', () => {
       const { getByTestId } = render(<AppNavigator />);
-      expect(getByTestId('screen-LessonIntro')).toBeTruthy();
+      expect(getByTestId('screen-TierIntro')).toBeTruthy();
     });
 
     it('should have DailySession route available', () => {

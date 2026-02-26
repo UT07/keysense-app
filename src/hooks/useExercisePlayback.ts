@@ -13,10 +13,12 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
 import type { Exercise, MidiNoteEvent, ExerciseScore } from '@/core/exercises/types';
 import { scoreExercise } from '@/core/exercises/ExerciseValidator';
-import { getMidiInput } from '@/input/MidiInput';
+import { InputManager, INPUT_LATENCY_COMPENSATION_MS } from '@/input/InputManager';
+import type { ActiveInputMethod } from '@/input/InputManager';
 import { createAudioEngine, ensureAudioModeConfigured } from '@/audio/createAudioEngine';
 import { useExerciseStore } from '@/stores/exerciseStore';
 import { useProgressStore } from '@/stores/progressStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { getLessonIdForExercise } from '../content/ContentLoader';
 
 /**
@@ -32,6 +34,8 @@ export interface UseExercisePlaybackOptions {
   onComplete?: (score: ExerciseScore) => void;
   enableMidi?: boolean;
   enableAudio?: boolean;
+  /** Override input method ('auto' uses settings store preference) */
+  inputMethod?: 'auto' | 'midi' | 'mic' | 'touch';
 }
 
 export interface UseExercisePlaybackReturn {
@@ -60,6 +64,9 @@ export interface UseExercisePlaybackReturn {
   isAudioReady: boolean;
   hasError: boolean;
   errorMessage: string | null;
+
+  /** Which input method is currently active (midi/mic/touch) */
+  activeInputMethod: ActiveInputMethod;
 }
 
 export function useExercisePlayback({
@@ -67,11 +74,15 @@ export function useExercisePlayback({
   onComplete,
   enableMidi = true,
   enableAudio = true,
+  inputMethod,
 }: UseExercisePlaybackOptions): UseExercisePlaybackReturn {
   const exerciseStore = useExerciseStore();
-  const midiInput = getMidiInput();
   const audioEngineRef = useRef(createAudioEngine());
   const audioEngine = audioEngineRef.current;
+  const preferredInput = useSettingsStore((s) => s.preferredInputMethod);
+  const resolvedInputMethod = inputMethod ?? preferredInput ?? 'auto';
+  const inputManagerRef = useRef<InputManager | null>(null);
+  const [activeInputMethod, setActiveInputMethod] = useState<ActiveInputMethod>('touch');
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentBeat, setCurrentBeat] = useState(-exercise.settings.countIn);
@@ -138,7 +149,7 @@ export function useExercisePlayback({
   }, []);
 
   /**
-   * Initialize MIDI input
+   * Initialize input sources (MIDI + InputManager for mic detection)
    */
   useEffect(() => {
     if (!enableMidi) {
@@ -148,32 +159,38 @@ export function useExercisePlayback({
 
     let mounted = true;
 
-    const initMidi = async () => {
+    const initInput = async () => {
       try {
-        await midiInput.initialize();
+        // Initialize InputManager which handles MIDI + Mic detection
+        const manager = new InputManager({ preferred: resolvedInputMethod });
+        await manager.initialize();
+
         if (mounted) {
+          inputManagerRef.current = manager;
+          setActiveInputMethod(manager.activeMethod);
           setIsMidiReady(true);
-          console.log('[useExercisePlayback] MIDI initialized');
+          console.log(`[useExercisePlayback] Input initialized: ${manager.activeMethod}`);
+        } else {
+          manager.dispose();
         }
       } catch (error) {
-        console.error('[useExercisePlayback] MIDI init failed:', error);
+        console.error('[useExercisePlayback] Input init failed:', error);
         if (mounted) {
           setHasError(true);
-          setErrorMessage('MIDI initialization failed. Touch keyboard will still work.');
-          setIsMidiReady(true); // Continue without MIDI
+          setErrorMessage('Input initialization failed. Touch keyboard will still work.');
+          setIsMidiReady(true); // Continue with touch
         }
       }
     };
 
-    initMidi();
+    initInput();
 
     return () => {
       mounted = false;
-      if (enableMidi) {
-        midiInput.dispose().catch(console.error);
-      }
+      inputManagerRef.current?.dispose();
+      inputManagerRef.current = null;
     };
-  }, [enableMidi, midiInput]);
+  }, [enableMidi, resolvedInputMethod]);
 
   /**
    * Initialize audio engine
@@ -233,18 +250,25 @@ export function useExercisePlayback({
   }, [enableAudio, audioEngine]);
 
   /**
-   * Subscribe to MIDI events
+   * Subscribe to input events (MIDI + Mic via InputManager)
    */
   useEffect(() => {
     if (!enableMidi || !isMidiReady) return;
 
-    const unsubscribe = midiInput.onNoteEvent((midiEvent) => {
+    const manager = inputManagerRef.current;
+    if (!manager) return;
+
+    // Start the InputManager (needed for mic capture)
+    manager.start().catch(console.error);
+
+    const unsubscribe = manager.onNoteEvent((midiEvent) => {
       if (!mountedRef.current || !isPlaying) return;
 
       // Only record noteOn events for scoring (noteOff would double-count notes)
       if (midiEvent.type === 'noteOn') {
         // Normalize timestamp to Date.now() domain (native MIDI may use a different clock)
-        const normalizedEvent = { ...midiEvent, timestamp: Date.now(), inputSource: 'midi' as const };
+        const source = midiEvent.inputSource ?? manager.activeMethod;
+        const normalizedEvent = { ...midiEvent, timestamp: Date.now(), inputSource: source as 'midi' | 'mic' | 'touch' };
         const noteIndex = playedNotesRef.current.length;
         playedNotesRef.current.push(normalizedEvent);
         trackNoteOnIndex(normalizedEvent.note, noteIndex);
@@ -252,8 +276,8 @@ export function useExercisePlayback({
         exerciseStore.addPlayedNote(normalizedEvent);
       }
 
-      // Play audio if enabled
-      if (enableAudio && isAudioReady && midiEvent.type === 'noteOn') {
+      // Play audio if enabled (for MIDI input — mic has its own audio)
+      if (enableAudio && isAudioReady && midiEvent.type === 'noteOn' && midiEvent.inputSource !== 'mic') {
         try {
           const velocity = midiEvent.velocity / 127; // Normalize to 0-1
           const handle = audioEngine.playNote(midiEvent.note, velocity);
@@ -267,8 +291,8 @@ export function useExercisePlayback({
         closeLatestNoteDuration(midiEvent.note, Date.now());
       }
 
-      // Release audio if note off
-      if (enableAudio && isAudioReady && midiEvent.type === 'noteOff') {
+      // Release audio if note off (not mic — mic notes have no audio handle)
+      if (enableAudio && isAudioReady && midiEvent.type === 'noteOff' && midiEvent.inputSource !== 'mic') {
         const handle = activeNotesRef.current.get(midiEvent.note);
         if (handle) {
           audioEngine.releaseNote(handle);
@@ -277,14 +301,16 @@ export function useExercisePlayback({
       }
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      manager.stop().catch(console.error);
+    };
   }, [
     enableMidi,
     enableAudio,
     isMidiReady,
     isAudioReady,
     isPlaying,
-    midiInput,
     audioEngine,
     exerciseStore,
     trackNoteOnIndex,
@@ -490,10 +516,14 @@ export function useExercisePlayback({
     const countInMs = exercise.settings.countIn * msPerBeat;
     const beat0EpochMs = startTimeRef.current + countInMs;
 
-    const adjustedNotes = playedNotesRef.current.map((n) => ({
-      ...n,
-      timestamp: n.timestamp - beat0EpochMs - (n.inputSource === 'midi' ? 0 : TOUCH_LATENCY_COMPENSATION_MS),
-    }));
+    const adjustedNotes = playedNotesRef.current.map((n) => {
+      const source = (n.inputSource ?? 'touch') as ActiveInputMethod;
+      const compensation = INPUT_LATENCY_COMPENSATION_MS[source] ?? TOUCH_LATENCY_COMPENSATION_MS;
+      return {
+        ...n,
+        timestamp: n.timestamp - beat0EpochMs - compensation,
+      };
+    });
 
     // Look up previous high score so isNewHighScore is accurate
     const lessonId = getLessonIdForExercise(exercise.id);
@@ -596,5 +626,8 @@ export function useExercisePlayback({
     isAudioReady,
     hasError,
     errorMessage,
+
+    // Input
+    activeInputMethod,
   };
 }

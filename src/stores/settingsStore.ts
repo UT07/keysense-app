@@ -47,6 +47,7 @@ const defaultSettings: SettingsData = {
   lastMidiDeviceId: null,
   lastMidiDeviceName: null,
   autoConnectMidi: true,
+  preferredInputMethod: 'auto' as const,
 
   // Onboarding settings
   hasCompletedOnboarding: false,
@@ -168,6 +169,11 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
       lastMidiDeviceName: deviceName,
     });
     debouncedSave(get());
+  },
+
+  setPreferredInputMethod: (method: 'auto' | 'midi' | 'mic' | 'touch') => {
+    set({ preferredInputMethod: method });
+    debouncedSave({ ...get(), preferredInputMethod: method });
   },
 
   // Onboarding settings — saves IMMEDIATELY (not debounced) because

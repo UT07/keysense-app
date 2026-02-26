@@ -167,22 +167,16 @@ export function recordPracticeSession(streak: StreakData): StreakData {
     return updated;
   }
 
-  // If missed a day
-  if (daysAgo > 1) {
-    // Try to use a freeze
-    if (updated.freezesAvailable > 0) {
-      updated.freezesAvailable--;
-      updated.freezesUsed++;
-      updated.currentStreak++; // Maintain streak
-    } else {
-      // Streak broken
-      updated.currentStreak = 1;
-    }
-  } else if (daysAgo === 1) {
-    // Practiced yesterday, extend streak
+  if (daysAgo === 1) {
+    // Practiced yesterday — extend streak
     updated.currentStreak++;
+  } else if (daysAgo === 2 && updated.freezesAvailable > 0) {
+    // Missed exactly 1 day — use a freeze to maintain streak
+    updated.freezesAvailable--;
+    updated.freezesUsed++;
+    updated.currentStreak++; // Count today as continuation
   } else {
-    // First practice
+    // Missed 2+ days (or 1 day with no freeze) — streak broken
     updated.currentStreak = 1;
   }
 

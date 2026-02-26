@@ -43,6 +43,7 @@ jest.mock('expo-haptics', () => ({
 // eslint-disable-next-line prefer-const
 let mockExerciseState: Record<string, any> = {
   currentExercise: null,
+  setCurrentExercise: jest.fn(),
   clearSession: jest.fn(),
   setScore: jest.fn(),
   addPlayedNote: jest.fn(),

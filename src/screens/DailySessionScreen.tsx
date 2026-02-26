@@ -146,6 +146,7 @@ export function DailySessionScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        testID="daily-session-scroll"
       >
         {/* Header — no back button since this is a tab */}
         <View style={styles.header}>

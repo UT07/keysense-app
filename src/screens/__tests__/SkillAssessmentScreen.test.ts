@@ -24,6 +24,23 @@ jest.mock('../../audio/createAudioEngine', () => ({
   ensureAudioModeConfigured: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../../input/InputManager', () => ({
+  InputManager: jest.fn().mockImplementation(() => ({
+    initialize: jest.fn().mockResolvedValue(undefined),
+    start: jest.fn().mockResolvedValue(undefined),
+    stop: jest.fn().mockResolvedValue(undefined),
+    dispose: jest.fn(),
+    onNoteEvent: jest.fn(() => jest.fn()),
+    activeMethod: 'touch',
+    getIsInitialized: () => true,
+    getIsStarted: () => false,
+    getTimingMultiplier: () => 1.0,
+    getLatencyCompensationMs: () => 0,
+  })),
+  INPUT_TIMING_MULTIPLIERS: { midi: 1.0, touch: 1.0, mic: 1.5 },
+  INPUT_LATENCY_COMPENSATION_MS: { midi: 0, touch: 20, mic: 100 },
+}));
+
 // ---------------------------------------------------------------------------
 // determineStartLesson tests
 // ---------------------------------------------------------------------------

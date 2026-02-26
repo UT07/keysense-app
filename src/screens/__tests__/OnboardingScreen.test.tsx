@@ -31,8 +31,10 @@ let mockSettingsState: any = {
   setDailyGoalMinutes: jest.fn(),
   setHasCompletedOnboarding: jest.fn(),
   setPlaybackSpeed: jest.fn(),
+  setPreferredInputMethod: jest.fn(),
   updateMidiSettings: jest.fn(),
   setSelectedCatId: jest.fn(),
+  preferredInputMethod: 'touch',
 };
 
 jest.mock('../../stores/settingsStore', () => ({
@@ -257,8 +259,10 @@ function resetSettingsState(overrides: Partial<typeof mockSettingsState> = {}) {
     setDailyGoalMinutes: jest.fn(),
     setHasCompletedOnboarding: jest.fn(),
     setPlaybackSpeed: jest.fn(),
+    setPreferredInputMethod: jest.fn(),
     updateMidiSettings: jest.fn(),
     setSelectedCatId: jest.fn(),
+    preferredInputMethod: 'touch',
     ...overrides,
   };
 }
@@ -351,7 +355,7 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
-      fireEvent.press(getByText("No, I'll Use Screen Keyboard"));
+      fireEvent.press(getByText("On-Screen Keyboard"));
       fireEvent.press(getByText('Next'));
 
       expect(getByText('\uD83C\uDFB5')).toBeTruthy(); // musical note
@@ -379,7 +383,7 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
 
-      expect(getByText('Do You Have a MIDI Keyboard?')).toBeTruthy();
+      expect(getByText('How Will You Play?')).toBeTruthy();
     });
 
     it('advances from Equipment Check (step 3) to Goal Setting (step 4)', () => {
@@ -388,7 +392,7 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
-      fireEvent.press(getByText("No, I'll Use Screen Keyboard"));
+      fireEvent.press(getByText("On-Screen Keyboard"));
       fireEvent.press(getByText('Next'));
 
       expect(getByText("What's Your Goal?")).toBeTruthy();
@@ -400,7 +404,7 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
-      fireEvent.press(getByText("No, I'll Use Screen Keyboard"));
+      fireEvent.press(getByText("On-Screen Keyboard"));
       fireEvent.press(getByText('Next'));
       fireEvent.press(getByText('Play My Favorite Songs'));
       fireEvent.press(getByText('Next'));
@@ -429,7 +433,7 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
-      expect(getByText('Do You Have a MIDI Keyboard?')).toBeTruthy();
+      expect(getByText('How Will You Play?')).toBeTruthy();
 
       fireEvent.press(getByText('Back'));
       expect(getByText("What's Your Experience Level?")).toBeTruthy();
@@ -441,12 +445,12 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
-      fireEvent.press(getByText("No, I'll Use Screen Keyboard"));
+      fireEvent.press(getByText("On-Screen Keyboard"));
       fireEvent.press(getByText('Next'));
       expect(getByText("What's Your Goal?")).toBeTruthy();
 
       fireEvent.press(getByText('Back'));
-      expect(getByText('Do You Have a MIDI Keyboard?')).toBeTruthy();
+      expect(getByText('How Will You Play?')).toBeTruthy();
     });
 
     it('goes back from step 5 to step 4', () => {
@@ -455,7 +459,7 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
-      fireEvent.press(getByText("No, I'll Use Screen Keyboard"));
+      fireEvent.press(getByText("On-Screen Keyboard"));
       fireEvent.press(getByText('Next'));
       fireEvent.press(getByText('Play My Favorite Songs'));
       fireEvent.press(getByText('Next'));
@@ -485,16 +489,17 @@ describe('OnboardingScreen', () => {
       expect(getByText('Returning Player')).toBeTruthy();
     });
 
-    it('step 3: Equipment Check renders title and 2 options', () => {
+    it('step 3: Equipment Check renders title and 3 options', () => {
       const { getByText } = render(<OnboardingScreen />);
 
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
 
-      expect(getByText('Do You Have a MIDI Keyboard?')).toBeTruthy();
-      expect(getByText('Yes, I Have a MIDI Keyboard')).toBeTruthy();
-      expect(getByText("No, I'll Use Screen Keyboard")).toBeTruthy();
+      expect(getByText('How Will You Play?')).toBeTruthy();
+      expect(getByText('MIDI Keyboard')).toBeTruthy();
+      expect(getByText('Microphone')).toBeTruthy();
+      expect(getByText('On-Screen Keyboard')).toBeTruthy();
     });
 
     it('step 4: Goal Setting renders title and 3 options', () => {
@@ -503,7 +508,7 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
-      fireEvent.press(getByText("No, I'll Use Screen Keyboard"));
+      fireEvent.press(getByText("On-Screen Keyboard"));
       fireEvent.press(getByText('Next'));
 
       expect(getByText("What's Your Goal?")).toBeTruthy();
@@ -518,7 +523,7 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
-      fireEvent.press(getByText("No, I'll Use Screen Keyboard"));
+      fireEvent.press(getByText("On-Screen Keyboard"));
       fireEvent.press(getByText('Next'));
       fireEvent.press(getByText('Play My Favorite Songs'));
       fireEvent.press(getByText('Next'));
@@ -565,7 +570,7 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
-      fireEvent.press(getByText("No, I'll Use Screen Keyboard"));
+      fireEvent.press(getByText("On-Screen Keyboard"));
       fireEvent.press(getByText('Next'));
       fireEvent.press(getByText('Play My Favorite Songs'));
       fireEvent.press(getByText('Next'));
@@ -584,7 +589,7 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
-      fireEvent.press(getByText("No, I'll Use Screen Keyboard"));
+      fireEvent.press(getByText("On-Screen Keyboard"));
       fireEvent.press(getByText('Next'));
       fireEvent.press(getByText('Learn Proper Technique'));
       fireEvent.press(getByText('Next'));
@@ -603,7 +608,7 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
-      fireEvent.press(getByText("No, I'll Use Screen Keyboard"));
+      fireEvent.press(getByText("On-Screen Keyboard"));
       fireEvent.press(getByText('Next'));
       fireEvent.press(getByText('Just Explore & Have Fun'));
       fireEvent.press(getByText('Next'));
@@ -622,7 +627,7 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
-      fireEvent.press(getByText("No, I'll Use Screen Keyboard"));
+      fireEvent.press(getByText("On-Screen Keyboard"));
       fireEvent.press(getByText('Next'));
       fireEvent.press(getByText('Play My Favorite Songs'));
       fireEvent.press(getByText('Next'));
@@ -696,7 +701,7 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
-      fireEvent.press(getByText("No, I'll Use Screen Keyboard"));
+      fireEvent.press(getByText("On-Screen Keyboard"));
       fireEvent.press(getByText('Next'));
 
       expect(getByTestId('cat-avatar-luna')).toBeTruthy();
@@ -741,7 +746,7 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
-      fireEvent.press(getByText("No, I'll Use Screen Keyboard"));
+      fireEvent.press(getByText("On-Screen Keyboard"));
       fireEvent.press(getByText('Next'));
       fireEvent.press(getByText('Play My Favorite Songs'));
       fireEvent.press(getByText('Next'));
@@ -766,7 +771,7 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
-      fireEvent.press(getByText("No, I'll Use Screen Keyboard"));
+      fireEvent.press(getByText("On-Screen Keyboard"));
       fireEvent.press(getByText('Next'));
       fireEvent.press(getByText('Play My Favorite Songs'));
       fireEvent.press(getByText('Next'));
@@ -780,21 +785,29 @@ describe('OnboardingScreen', () => {
       ]);
     });
 
-    it('navigates to SkillAssessment for intermediate users at step 2', () => {
+    it('navigates to SkillAssessment for intermediate users at step 3', () => {
       const { getByText } = render(<OnboardingScreen />);
 
+      // Step 1: Welcome → Step 2: Experience → Step 3: Input Method → Assessment
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('I Know Some Basics'));
+      fireEvent.press(getByText('Next'));
+      // Step 3: pick an input method
+      fireEvent.press(getByText('On-Screen Keyboard'));
       fireEvent.press(getByText('Next'));
 
       expect(mockNavigate).toHaveBeenCalledWith('SkillAssessment');
     });
 
-    it('navigates to SkillAssessment for returning users at step 2', () => {
+    it('navigates to SkillAssessment for returning users at step 3', () => {
       const { getByText } = render(<OnboardingScreen />);
 
+      // Step 1: Welcome → Step 2: Experience → Step 3: Input Method → Assessment
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Returning Player'));
+      fireEvent.press(getByText('Next'));
+      // Step 3: pick an input method
+      fireEvent.press(getByText('On-Screen Keyboard'));
       fireEvent.press(getByText('Next'));
 
       expect(mockNavigate).toHaveBeenCalledWith('SkillAssessment');
@@ -824,7 +837,7 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Next'));
 
       // Advances to step 3 — button was enabled
-      expect(getByText('Do You Have a MIDI Keyboard?')).toBeTruthy();
+      expect(getByText('How Will You Play?')).toBeTruthy();
     });
 
     it('Next button is disabled on step 3 when no equipment option selected', () => {
@@ -837,7 +850,7 @@ describe('OnboardingScreen', () => {
       // Pressing Next without selecting equipment should NOT advance
       fireEvent.press(getByText('Next'));
       // Still on step 3
-      expect(getByText('Do You Have a MIDI Keyboard?')).toBeTruthy();
+      expect(getByText('How Will You Play?')).toBeTruthy();
     });
 
     it('Next button is disabled on step 4 when no goal selected', () => {
@@ -846,7 +859,7 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
-      fireEvent.press(getByText("No, I'll Use Screen Keyboard"));
+      fireEvent.press(getByText("On-Screen Keyboard"));
       fireEvent.press(getByText('Next'));
 
       // Pressing Next without a goal should NOT advance to step 5
@@ -863,7 +876,7 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
-      fireEvent.press(getByText("No, I'll Use Screen Keyboard"));
+      fireEvent.press(getByText("On-Screen Keyboard"));
       fireEvent.press(getByText('Next'));
       fireEvent.press(getByText('Play My Favorite Songs'));
       fireEvent.press(getByText('Next'));
@@ -886,7 +899,7 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
 
-      fireEvent.press(getByText('Yes, I Have a MIDI Keyboard'));
+      fireEvent.press(getByText('MIDI Keyboard'));
       fireEvent.press(getByText('Next'));
 
       expect(getByText("What's Your Goal?")).toBeTruthy();
@@ -920,8 +933,8 @@ describe('OnboardingScreen', () => {
       fireEvent.press(getByText('Next'));
 
       // Step 3: Equipment Check
-      expect(getByText('Do You Have a MIDI Keyboard?')).toBeTruthy();
-      fireEvent.press(getByText('Yes, I Have a MIDI Keyboard'));
+      expect(getByText('How Will You Play?')).toBeTruthy();
+      fireEvent.press(getByText('MIDI Keyboard'));
       fireEvent.press(getByText('Next'));
 
       // Step 4: Goal Setting

@@ -36,6 +36,35 @@ import {
 import { computeZoomedRange } from '../components/Keyboard/computeZoomedRange';
 import { hitTestPianoKey, getWhiteKeysInRange } from '../components/Keyboard/keyboardHitTest';
 
+// Mocks needed because SkillAssessmentScreen imports InputManager → MicrophoneInput → AudioCapture → react-native-audio-api
+jest.mock('../audio/createAudioEngine', () => ({
+  createAudioEngine: jest.fn(() => ({
+    isReady: () => true,
+    initialize: jest.fn().mockResolvedValue(undefined),
+    playNote: jest.fn(() => ({ note: 60, startTime: 0, release: jest.fn() })),
+    releaseNote: jest.fn(),
+    releaseAllNotes: jest.fn(),
+  })),
+  ensureAudioModeConfigured: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('../input/InputManager', () => ({
+  InputManager: jest.fn().mockImplementation(() => ({
+    initialize: jest.fn().mockResolvedValue(undefined),
+    start: jest.fn().mockResolvedValue(undefined),
+    stop: jest.fn().mockResolvedValue(undefined),
+    dispose: jest.fn(),
+    onNoteEvent: jest.fn(() => jest.fn()),
+    activeMethod: 'touch',
+    getIsInitialized: () => true,
+    getIsStarted: () => false,
+    getTimingMultiplier: () => 1.0,
+    getLatencyCompensationMs: () => 0,
+  })),
+  INPUT_TIMING_MULTIPLIERS: { midi: 1.0, touch: 1.0, mic: 1.5 },
+  INPUT_LATENCY_COMPENSATION_MS: { midi: 0, touch: 20, mic: 100 },
+}));
+
 // ===========================================================================
 // Section 1: Fresh User Store Defaults
 // ===========================================================================

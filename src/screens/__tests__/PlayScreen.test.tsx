@@ -87,6 +87,32 @@ jest.mock('../../components/Keyboard/Keyboard', () => ({
   },
 }));
 
+// Mock InputManager (avoids react-native-audio-api native import)
+jest.mock('../../input/InputManager', () => ({
+  InputManager: jest.fn().mockImplementation(() => ({
+    initialize: jest.fn().mockResolvedValue(undefined),
+    start: jest.fn().mockResolvedValue(undefined),
+    stop: jest.fn().mockResolvedValue(undefined),
+    dispose: jest.fn(),
+    onNoteEvent: jest.fn(() => jest.fn()),
+    activeMethod: 'touch',
+    getIsInitialized: () => true,
+    getIsStarted: () => false,
+    getTimingMultiplier: () => 1.0,
+    getLatencyCompensationMs: () => 0,
+  })),
+  INPUT_TIMING_MULTIPLIERS: { midi: 1.0, touch: 1.0, mic: 1.5 },
+  INPUT_LATENCY_COMPENSATION_MS: { midi: 0, touch: 20, mic: 100 },
+}));
+
+// Mock settingsStore
+jest.mock('../../stores/settingsStore', () => ({
+  useSettingsStore: Object.assign(
+    (selector: any) => selector({ preferredInputMethod: 'touch' }),
+    { getState: () => ({ preferredInputMethod: 'touch' }) },
+  ),
+}));
+
 // Mock vector icons
 jest.mock('@expo/vector-icons', () => {
   const { View, Text } = require('react-native');

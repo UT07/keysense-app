@@ -466,54 +466,8 @@ export const SKILL_TREE: SkillNode[] = [
     tier: 5,
     requiredCompletions: 2,
   },
-  {
-    id: 'scale-speed',
-    name: 'Scale Speed',
-    category: 'scales',
-    prerequisites: ['parallel-scales'],
-    targetExerciseIds: ['lesson-05-ex-03'],
-    masteryThreshold: 0.75,
-    description: 'Increase scale speed while maintaining accuracy',
-    tier: 6,
-    requiredCompletions: 2,
-  },
-  {
-    id: 'scale-review',
-    name: 'Scale Review',
-    category: 'scales',
-    prerequisites: ['scale-speed'],
-    targetExerciseIds: ['lesson-05-ex-04'],
-    masteryThreshold: 0.8,
-    description: 'Comprehensive scale technique review',
-    tier: 6,
-    requiredCompletions: 2,
-  },
 
-  // ── Tier 6: Popular Songs (Lesson 6) ───────────────────────────────────
-  {
-    id: 'beginner-songs',
-    name: 'Beginner Songs',
-    category: 'songs',
-    prerequisites: ['both-hands-review'],
-    targetExerciseIds: ['lesson-06-ex-01', 'lesson-06-ex-02'],
-    masteryThreshold: 0.7,
-    description: 'Play well-known songs (Jingle Bells, Happy Birthday)',
-    tier: 6,
-    requiredCompletions: 2,
-  },
-  {
-    id: 'intermediate-songs',
-    name: 'Intermediate Songs',
-    category: 'songs',
-    prerequisites: ['beginner-songs', 'scale-technique'],
-    targetExerciseIds: ['lesson-06-ex-03', 'lesson-06-ex-04'],
-    masteryThreshold: 0.75,
-    description: 'Play more complex arrangements (Amazing Grace, Let It Go)',
-    tier: 6,
-    requiredCompletions: 2,
-  },
-
-  // ── Tier 7: Black Keys & Sharps/Flats (Lesson 7) ────────────────────────
+  // ── Tier 6: Black Keys & Sharps/Flats (Lesson 7) ────────────────────────
   {
     id: 'find-black-keys',
     name: 'Find Black Keys',
@@ -522,7 +476,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-07-ex-01'],
     masteryThreshold: 0.7,
     description: 'Locate groups of 2 and 3 black keys',
-    tier: 7,
+    tier: 6,
     requiredCompletions: 1,
   },
   {
@@ -533,7 +487,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-07-ex-02'],
     masteryThreshold: 0.7,
     description: 'Play F#, C#, G# with right hand',
-    tier: 7,
+    tier: 6,
     requiredCompletions: 2,
   },
   {
@@ -544,7 +498,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-07-ex-03'],
     masteryThreshold: 0.7,
     description: 'Play Bb, Eb with left hand',
-    tier: 7,
+    tier: 6,
     requiredCompletions: 2,
   },
   {
@@ -555,7 +509,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-07-ex-04'],
     masteryThreshold: 0.7,
     description: 'Chromatic scale one octave ascending and descending',
-    tier: 7,
+    tier: 6,
     requiredCompletions: 2,
   },
   {
@@ -566,7 +520,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-07-ex-05'],
     masteryThreshold: 0.7,
     description: 'Distinguish half steps and whole steps by ear and touch',
-    tier: 7,
+    tier: 6,
     requiredCompletions: 1,
   },
   {
@@ -577,11 +531,11 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-07-ex-06'],
     masteryThreshold: 0.7,
     description: 'Simple melodies using sharps and flats',
-    tier: 7,
+    tier: 6,
     requiredCompletions: 2,
   },
 
-  // ── Tier 8: G Major & F Major (Lessons 8-9) ─────────────────────────────
+  // ── Tier 7: G Major & F Major (Lessons 8-9) ─────────────────────────────
   {
     id: 'g-major-scale-rh',
     name: 'G Major Scale (RH)',
@@ -590,7 +544,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-08-ex-01'],
     masteryThreshold: 0.75,
     description: 'G major scale right hand with F#',
-    tier: 8,
+    tier: 7,
     requiredCompletions: 2,
   },
   {
@@ -601,7 +555,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-08-ex-02'],
     masteryThreshold: 0.75,
     description: 'G major scale left hand',
-    tier: 8,
+    tier: 7,
     requiredCompletions: 2,
   },
   {
@@ -612,7 +566,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-08-ex-03'],
     masteryThreshold: 0.75,
     description: 'G major scale both hands together',
-    tier: 8,
+    tier: 7,
     requiredCompletions: 3,
   },
   {
@@ -623,7 +577,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-08-ex-04', 'lesson-08-ex-05'],
     masteryThreshold: 0.7,
     description: 'Melodies in G major',
-    tier: 8,
+    tier: 7,
     requiredCompletions: 2,
   },
   {
@@ -634,7 +588,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-09-ex-01'],
     masteryThreshold: 0.75,
     description: 'F major scale right hand with Bb',
-    tier: 8,
+    tier: 7,
     requiredCompletions: 2,
   },
   {
@@ -645,7 +599,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-09-ex-02'],
     masteryThreshold: 0.75,
     description: 'F major scale left hand',
-    tier: 8,
+    tier: 7,
     requiredCompletions: 2,
   },
   {
@@ -656,7 +610,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-09-ex-03'],
     masteryThreshold: 0.75,
     description: 'F major scale both hands together',
-    tier: 8,
+    tier: 7,
     requiredCompletions: 3,
   },
   {
@@ -667,11 +621,11 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-09-ex-04', 'lesson-09-ex-05'],
     masteryThreshold: 0.7,
     description: 'Identify C, G, F major by key signature pattern',
-    tier: 8,
+    tier: 7,
     requiredCompletions: 2,
   },
 
-  // ── Tier 9: Minor Keys (Lessons 10-11) ───────────────────────────────────
+  // ── Tier 8: Minor Keys (Lessons 10-11) ───────────────────────────────────
   {
     id: 'a-minor-natural',
     name: 'A Natural Minor',
@@ -680,7 +634,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-10-ex-01'],
     masteryThreshold: 0.75,
     description: 'A natural minor scale (all white keys)',
-    tier: 9,
+    tier: 8,
     requiredCompletions: 2,
   },
   {
@@ -691,7 +645,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-10-ex-02', 'lesson-10-ex-03'],
     masteryThreshold: 0.7,
     description: 'Melodies in A minor',
-    tier: 9,
+    tier: 8,
     requiredCompletions: 2,
   },
   {
@@ -702,7 +656,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-11-ex-01'],
     masteryThreshold: 0.75,
     description: 'D natural minor scale with Bb',
-    tier: 9,
+    tier: 8,
     requiredCompletions: 2,
   },
   {
@@ -713,7 +667,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-11-ex-02'],
     masteryThreshold: 0.7,
     description: 'Melodies in D minor',
-    tier: 9,
+    tier: 8,
     requiredCompletions: 2,
   },
   {
@@ -724,7 +678,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-11-ex-03'],
     masteryThreshold: 0.75,
     description: 'E natural minor scale with F#',
-    tier: 9,
+    tier: 8,
     requiredCompletions: 2,
   },
   {
@@ -735,7 +689,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-10-ex-04'],
     masteryThreshold: 0.7,
     description: 'Compare major and minor tonality by ear',
-    tier: 9,
+    tier: 8,
     requiredCompletions: 1,
   },
   {
@@ -746,7 +700,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-10-ex-05'],
     masteryThreshold: 0.75,
     description: 'A harmonic minor scale with raised G#',
-    tier: 9,
+    tier: 8,
     requiredCompletions: 2,
   },
   {
@@ -757,11 +711,11 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-11-ex-04', 'lesson-11-ex-05'],
     masteryThreshold: 0.7,
     description: 'Songs in minor keys',
-    tier: 9,
+    tier: 8,
     requiredCompletions: 2,
   },
 
-  // ── Tier 10: Chord Progressions (Lessons 13-15) ─────────────────────────
+  // ── Tier 9: Chord Progressions (Lessons 13-15) ─────────────────────────
   {
     id: 'major-triads-root',
     name: 'Major Triads (Root)',
@@ -770,7 +724,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-13-ex-01'],
     masteryThreshold: 0.75,
     description: 'Play C, F, G root position major triads',
-    tier: 10,
+    tier: 9,
     requiredCompletions: 3,
   },
   {
@@ -781,7 +735,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-13-ex-02'],
     masteryThreshold: 0.75,
     description: 'Play Am, Dm, Em minor triads',
-    tier: 10,
+    tier: 9,
     requiredCompletions: 3,
   },
   {
@@ -792,7 +746,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-13-ex-03'],
     masteryThreshold: 0.75,
     description: 'First inversion of major and minor triads',
-    tier: 10,
+    tier: 9,
     requiredCompletions: 3,
   },
   {
@@ -803,7 +757,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-13-ex-04', 'lesson-14-ex-01'],
     masteryThreshold: 0.75,
     description: 'Classic I-IV-V chord progression in C major',
-    tier: 10,
+    tier: 9,
     requiredCompletions: 3,
   },
   {
@@ -814,7 +768,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-14-ex-02'],
     masteryThreshold: 0.75,
     description: 'Classic 50s doo-wop progression',
-    tier: 10,
+    tier: 9,
     requiredCompletions: 3,
   },
   {
@@ -825,7 +779,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-14-ex-03'],
     masteryThreshold: 0.75,
     description: 'Modern pop "Axis" progression',
-    tier: 10,
+    tier: 9,
     requiredCompletions: 3,
   },
   {
@@ -836,7 +790,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-14-ex-04'],
     masteryThreshold: 0.75,
     description: 'Left hand broken chord accompaniment pattern',
-    tier: 10,
+    tier: 9,
     requiredCompletions: 3,
   },
   {
@@ -847,7 +801,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-14-ex-05'],
     masteryThreshold: 0.75,
     description: 'Alberti bass pattern (C-G-E-G)',
-    tier: 10,
+    tier: 9,
     requiredCompletions: 3,
   },
   {
@@ -858,7 +812,7 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-15-ex-01', 'lesson-15-ex-02'],
     masteryThreshold: 0.7,
     description: 'Songs with chord accompaniment',
-    tier: 10,
+    tier: 9,
     requiredCompletions: 3,
   },
   {
@@ -869,8 +823,54 @@ export const SKILL_TREE: SkillNode[] = [
     targetExerciseIds: ['lesson-15-ex-03', 'lesson-15-ex-04', 'lesson-15-ex-05'],
     masteryThreshold: 0.75,
     description: 'Smooth voice-leading transitions between chords',
-    tier: 10,
+    tier: 9,
     requiredCompletions: 3,
+  },
+
+  // ── Tier 10: Popular Songs (Lesson 6) ───────────────────────────────────
+  {
+    id: 'beginner-songs',
+    name: 'Beginner Songs',
+    category: 'songs',
+    prerequisites: ['both-hands-review'],
+    targetExerciseIds: ['lesson-06-ex-01', 'lesson-06-ex-02'],
+    masteryThreshold: 0.7,
+    description: 'Play well-known songs (Jingle Bells, Happy Birthday)',
+    tier: 10,
+    requiredCompletions: 2,
+  },
+  {
+    id: 'intermediate-songs',
+    name: 'Intermediate Songs',
+    category: 'songs',
+    prerequisites: ['beginner-songs', 'scale-technique'],
+    targetExerciseIds: ['lesson-06-ex-03', 'lesson-06-ex-04'],
+    masteryThreshold: 0.75,
+    description: 'Play more complex arrangements (Amazing Grace, Let It Go)',
+    tier: 10,
+    requiredCompletions: 2,
+  },
+  {
+    id: 'scale-speed',
+    name: 'Scale Speed',
+    category: 'scales',
+    prerequisites: ['parallel-scales'],
+    targetExerciseIds: ['lesson-05-ex-03'],
+    masteryThreshold: 0.75,
+    description: 'Increase scale speed while maintaining accuracy',
+    tier: 10,
+    requiredCompletions: 2,
+  },
+  {
+    id: 'scale-review',
+    name: 'Scale Review',
+    category: 'scales',
+    prerequisites: ['scale-speed'],
+    targetExerciseIds: ['lesson-05-ex-04'],
+    masteryThreshold: 0.8,
+    description: 'Comprehensive scale technique review',
+    tier: 10,
+    requiredCompletions: 2,
   },
 
   // ── Tier 11: Advanced Rhythm (Lessons 16-18) ────────────────────────────

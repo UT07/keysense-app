@@ -28,6 +28,7 @@ import { ExpoAudioEngine } from './ExpoAudioEngine';
  */
 let factoryInstance: IAudioEngine | null = null;
 let audioModeConfigured = false;
+let audioModeRecordingEnabled = false;
 
 /**
  * Try to create a WebAudioEngine. Returns null if react-native-audio-api
@@ -53,24 +54,31 @@ function tryCreateWebAudioEngine(): IAudioEngine | null {
 }
 
 /**
- * Configure iOS audio session for playback in silent mode.
+ * Configure iOS audio session for playback and optional recording.
  * Must be called (and awaited) before any audio engine initialization.
  * Uses expo-av's Audio.setAudioModeAsync which works regardless of
  * which engine (WebAudio/ExpoAV) is ultimately used for synthesis.
  *
+ * When allowRecording is true, iOS sets category to PlayAndRecord instead
+ * of Playback, enabling microphone input alongside speaker output.
+ *
  * Exported so useExercisePlayback can await it before engine.initialize().
  */
-export async function ensureAudioModeConfigured(): Promise<void> {
-  if (audioModeConfigured) return;
+export async function ensureAudioModeConfigured(allowRecording = false): Promise<void> {
+  // Re-configure if recording was requested but not previously enabled
+  if (audioModeConfigured && !allowRecording) return;
+  if (audioModeConfigured && allowRecording && audioModeRecordingEnabled) return;
   audioModeConfigured = true;
+  if (allowRecording) audioModeRecordingEnabled = true;
 
   try {
     await Audio.setAudioModeAsync({
       playsInSilentModeIOS: true,
+      allowsRecordingIOS: allowRecording,
       staysActiveInBackground: false,
       shouldDuckAndroid: true,
     });
-    console.log('[createAudioEngine] iOS audio mode configured (playsInSilentModeIOS=true)');
+    console.log(`[createAudioEngine] iOS audio mode configured (playsInSilentModeIOS=true, allowsRecordingIOS=${allowRecording})`);
   } catch (error) {
     console.warn('[createAudioEngine] Audio mode configuration failed:', error);
   }

@@ -65,7 +65,7 @@ import { useDevKeyboardMidi } from '../../input/DevKeyboardMidi';
 import { DemoPlaybackService } from '../../services/demoPlayback';
 import { ExerciseIntroOverlay } from './ExerciseIntroOverlay';
 import { ExerciseLoadingScreen } from './ExerciseLoadingScreen';
-import { getSkillsForExercise, getSkillById, getGenerationHints } from '../../core/curriculum/SkillTree';
+import { SKILL_TREE, getSkillsForExercise, getSkillById, getGenerationHints } from '../../core/curriculum/SkillTree';
 import { adjustDifficulty } from '../../core/curriculum/DifficultyEngine';
 // detectWeakPatterns: kept available for future use but not imported to avoid unused-import errors
 // import { detectWeakPatterns } from '../../core/curriculum/WeakSpotDetector';
@@ -517,6 +517,14 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     exerciseRef.current = exercise;
   }, [exercise]);
 
+  // Persist the active exercise (including AI-generated exercises) so external
+  // E2E automation can read the exact note sequence/timing from AsyncStorage.
+  // For AI mode, wait until the real exercise has loaded (not the fallback).
+  useEffect(() => {
+    if (aiMode && !exerciseReady) return;
+    useExerciseStore.getState().setCurrentExercise(exercise);
+  }, [aiMode, exerciseReady, exercise.id]);
+
   const cycleSpeed = useCallback(() => {
     const speeds: PlaybackSpeed[] = [0.25, 0.5, 0.75, 1.0];
     const currentIdx = speeds.indexOf(playbackSpeed);
@@ -641,9 +649,36 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       }
     }
 
-    // Persist XP and daily goal progress
+    // Persist XP and daily goal progress with challenge context
     const progressStore = useProgressStore.getState();
-    progressStore.recordExerciseCompletion(ex.id, score.overall, score.xpEarned);
+    const todayISO = new Date().toISOString().split('T')[0];
+    const todayGoalData = progressStore.dailyGoalData[todayISO];
+
+    // Compute max combo from score details (longest consecutive correct-pitch streak)
+    let maxCombo = 0;
+    let currentCombo = 0;
+    for (const d of score.details) {
+      if (d.isCorrectPitch && !d.isMissedNote) {
+        currentCombo++;
+        if (currentCombo > maxCombo) maxCombo = currentCombo;
+      } else {
+        currentCombo = 0;
+      }
+    }
+
+    // Look up exercise category from SkillTree
+    const skillTreeNode = SKILL_TREE.find(n =>
+      n.targetExerciseIds.includes(ex.id) || n.id === ex.id,
+    );
+
+    progressStore.recordExerciseCompletion(ex.id, score.overall, score.xpEarned, {
+      score: score.overall,
+      maxCombo,
+      perfectNotes: score.perfectNotes ?? 0,
+      playbackSpeed: useSettingsStore.getState().playbackSpeed,
+      category: skillTreeNode?.category,
+      minutesPracticedToday: todayGoalData?.minutesPracticed ?? 0,
+    });
 
     // Record practice time (convert elapsed ms to minutes)
     if (playbackStartTimeRef.current > 0) {
@@ -1527,10 +1562,13 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     // Brief delay so modal unmount and state cleanup settle
     setTimeout(() => {
       if (mountedRef.current) {
-        (navigation as any).replace('Exercise', { exerciseId: nextExerciseId });
+        (navigation as any).replace('Exercise', {
+          exerciseId: nextExerciseId,
+          ...(skillIdParam ? { skillId: skillIdParam } : {}),
+        });
       }
     }, 100);
-  }, [nextExerciseId, stopPlayback, exerciseStore, navigation]);
+  }, [nextExerciseId, stopPlayback, exerciseStore, navigation, skillIdParam]);
 
   /**
    * Navigate to the next AI-generated exercise (AI mode continuation)
@@ -1540,12 +1578,33 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     setShowExerciseCard(false);
     stopPlayback();
     exerciseStore.clearSession();
+
+    // Determine which skill to target next:
+    // If the current skill is now mastered, advance to the next unmastered skill in the same tier
+    let nextSkillId = skillIdParam;
+    if (skillIdParam) {
+      const masteredSkills = useLearnerProfileStore.getState().masteredSkills;
+      if (masteredSkills.includes(skillIdParam)) {
+        const currentNode = getSkillById(skillIdParam);
+        if (currentNode) {
+          const tierSkills = SKILL_TREE.filter((s) => s.tier === currentNode.tier);
+          const masteredSet = new Set(masteredSkills);
+          const nextUnmastered = tierSkills.find((s) => !masteredSet.has(s.id));
+          nextSkillId = nextUnmastered?.id ?? skillIdParam;
+        }
+      }
+    }
+
     setTimeout(() => {
       if (mountedRef.current) {
-        (navigation as any).replace('Exercise', { exerciseId: 'ai-mode', aiMode: true });
+        (navigation as any).replace('Exercise', {
+          exerciseId: 'ai-mode',
+          aiMode: true,
+          ...(nextSkillId ? { skillId: nextSkillId } : {}),
+        });
       }
     }, 100);
-  }, [stopPlayback, exerciseStore, navigation]);
+  }, [stopPlayback, exerciseStore, navigation, skillIdParam]);
 
   /**
    * Navigate to the mastery test for the current lesson
@@ -1561,10 +1620,14 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     exerciseStore.clearSession();
     setTimeout(() => {
       if (mountedRef.current) {
-        (navigation as any).replace('Exercise', { exerciseId: testEx.id, testMode: true });
+        (navigation as any).replace('Exercise', {
+          exerciseId: testEx.id,
+          testMode: true,
+          ...(skillIdParam ? { skillId: skillIdParam } : {}),
+        });
       }
     }, 100);
-  }, [exercise.id, stopPlayback, exerciseStore, navigation]);
+  }, [exercise.id, stopPlayback, exerciseStore, navigation, skillIdParam]);
 
   // Determine if we should show "Take Mastery Test" in CompletionModal
   const showMasteryTestButton = useMemo(() => {
@@ -1618,6 +1681,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
           tempo={exercise.settings.tempo}
           elapsedTime={(currentBeat + exercise.settings.countIn) * (60000 / exercise.settings.tempo)}
           coachingTip={coachingTip}
+          testID="exercise-count-in"
         />
       )}
 

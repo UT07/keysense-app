@@ -5,7 +5,7 @@
  * countdown timer, and completion state.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -16,24 +16,9 @@ import Animated, {
   interpolateColor,
 } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useProgressStore } from '../stores/progressStore';
 import { useCatEvolutionStore } from '../stores/catEvolutionStore';
+import { getDailyChallengeForDate } from '../core/challenges/challengeSystem';
 import { COLORS, SPACING, BORDER_RADIUS } from '../theme/tokens';
-
-const MOTIVATIONAL_TEXTS = [
-  "Play today's surprise exercise to earn double XP!",
-  'Complete the daily challenge and keep your streak alive!',
-  'A quick challenge a day keeps the rust away!',
-  'Earn bonus XP with today\'s special exercise!',
-  'Push your skills further with today\'s challenge!',
-] as const;
-
-function getMotivationalText(): string {
-  const dayOfYear = Math.floor(
-    (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000
-  );
-  return MOTIVATIONAL_TEXTS[dayOfYear % MOTIVATIONAL_TEXTS.length];
-}
 
 function formatTimeRemaining(ms: number): string {
   const totalMinutes = Math.max(0, Math.floor(ms / 60000));
@@ -55,15 +40,14 @@ interface DailyChallengeCardProps {
 }
 
 export function DailyChallengeCard({ onPress }: DailyChallengeCardProps): React.ReactElement | null {
-  const { dailyGoalData } = useProgressStore();
   const dailyRewards = useCatEvolutionStore((s) => s.dailyRewards);
   const isDailyChallengeCompleted = useCatEvolutionStore((s) => s.isDailyChallengeCompleted);
 
   const today = new Date().toISOString().split('T')[0];
-  const isCompleted = (dailyGoalData[today]?.exercisesCompleted ?? 0) > 0;
 
-  // Check if today's reward has been claimed
+  // Check if the actual daily challenge condition was satisfied (not just any exercise)
   const challengeDone = isDailyChallengeCompleted();
+  const isCompleted = challengeDone;
   const todayDayNum = (() => {
     const start = new Date(dailyRewards.weekStartDate + 'T00:00:00');
     const now = new Date();
@@ -106,24 +90,30 @@ export function DailyChallengeCard({ onPress }: DailyChallengeCardProps): React.
     return { borderColor };
   });
 
-  const motivationalText = getMotivationalText();
+  const todayChallenge = useMemo(() => getDailyChallengeForDate(today), [today]);
 
   return (
     <Animated.View style={[styles.cardBorder, animatedBorderStyle]}>
       <View style={styles.cardInner}>
-        {/* Top row: Title + 2x XP badge */}
+        {/* Top row: Title + XP multiplier badge */}
         <View style={styles.topRow}>
           <View style={styles.titleRow}>
-            <MaterialCommunityIcons name="trophy-outline" size={20} color={COLORS.starGold} />
-            <Text style={styles.title}>Daily Challenge</Text>
+            <MaterialCommunityIcons name={todayChallenge.icon as any} size={20} color={COLORS.starGold} />
+            <Text style={styles.title}>{todayChallenge.label}</Text>
           </View>
           <View style={styles.xpBadge}>
-            <Text style={styles.xpBadgeText}>2x XP</Text>
+            <Text style={styles.xpBadgeText}>{todayChallenge.reward.xpMultiplier}x XP</Text>
           </View>
         </View>
 
-        {/* Middle: Description */}
-        <Text style={styles.description}>{motivationalText}</Text>
+        {/* Middle: Specific challenge description */}
+        <Text style={styles.description}>{todayChallenge.description}</Text>
+        {todayChallenge.reward.gems > 0 && !isCompleted && (
+          <View style={styles.rewardRow}>
+            <MaterialCommunityIcons name="diamond-stone" size={14} color={COLORS.gemGold} />
+            <Text style={styles.rewardText}>+{todayChallenge.reward.gems} gems</Text>
+          </View>
+        )}
 
         {/* Bottom row: Timer or Completed + Button */}
         <View style={styles.bottomRow}>
@@ -201,7 +191,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textSecondary,
     lineHeight: 20,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  rewardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: SPACING.sm,
+  },
+  rewardText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.gemGold,
   },
   bottomRow: {
     flexDirection: 'row',

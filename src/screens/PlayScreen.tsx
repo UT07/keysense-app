@@ -26,6 +26,9 @@ import { createAudioEngine } from '../audio/createAudioEngine';
 import type { NoteHandle } from '../audio/types';
 import { SalsaCoach } from '../components/Mascot/SalsaCoach';
 import type { MidiNoteEvent } from '../core/exercises/types';
+import { InputManager } from '../input/InputManager';
+import type { ActiveInputMethod } from '../input/InputManager';
+import { useSettingsStore } from '../stores/settingsStore';
 import { analyzeSession, type FreePlayAnalysis } from '../services/FreePlayAnalyzer';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS, glowColor } from '../theme/tokens';
 import type { RootStackParamList } from '../navigation/AppNavigator';
@@ -72,8 +75,11 @@ export function PlayScreen(): React.JSX.Element {
   const [showInstructions, setShowInstructions] = useState(true);
   const [isPlayingBack, setIsPlayingBack] = useState(false);
   const [analysis, setAnalysis] = useState<FreePlayAnalysis | null>(null);
+  const [activeInput, setActiveInput] = useState<ActiveInputMethod>('touch');
+  const preferredInput = useSettingsStore((s) => s.preferredInputMethod);
   const recordingStartRef = useRef(0);
   const audioEngineRef = useRef(createAudioEngine());
+  const inputManagerRef = useRef<InputManager | null>(null);
   const activeHandlesRef = useRef<Map<number, NoteHandle>>(new Map());
   const autoReleaseTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const playbackCancelRef = useRef(false);
@@ -150,6 +156,56 @@ export function PlayScreen(): React.JSX.Element {
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     };
   }, []);
+
+  // --------------------------------------------------------------------------
+  // InputManager — MIDI and Mic input (runs alongside touch keyboard)
+  // --------------------------------------------------------------------------
+  const handleNoteOnRef = useRef<(event: MidiNoteEvent) => void>(() => {});
+  const handleNoteOffRef = useRef<(note: number) => void>(() => {});
+
+  useEffect(() => {
+    const resolvedInput = preferredInput ?? 'auto';
+    // Touch-only users don't need InputManager overhead
+    if (resolvedInput === 'touch') {
+      setActiveInput('touch');
+      return;
+    }
+
+    let mounted = true;
+
+    const initInput = async (): Promise<void> => {
+      try {
+        const manager = new InputManager({ preferred: resolvedInput });
+        await manager.initialize();
+        if (!mounted) { manager.dispose(); return; }
+
+        inputManagerRef.current = manager;
+        setActiveInput(manager.activeMethod);
+
+        // Subscribe to MIDI/Mic note events
+        manager.onNoteEvent((event) => {
+          if (event.type === 'noteOn') {
+            handleNoteOnRef.current(event);
+          } else if (event.type === 'noteOff') {
+            handleNoteOffRef.current(event.note);
+          }
+        });
+
+        await manager.start();
+      } catch {
+        // Non-fatal — touch keyboard is always available
+        if (mounted) setActiveInput('touch');
+      }
+    };
+
+    initInput();
+
+    return () => {
+      mounted = false;
+      inputManagerRef.current?.dispose();
+      inputManagerRef.current = null;
+    };
+  }, [preferredInput]);
 
   // --------------------------------------------------------------------------
   // Note event handlers
@@ -262,6 +318,10 @@ export function PlayScreen(): React.JSX.Element {
     },
     [isRecording],
   );
+
+  // Keep refs in sync so InputManager events call latest handlers
+  useEffect(() => { handleNoteOnRef.current = handleNoteOn; }, [handleNoteOn]);
+  useEffect(() => { handleNoteOffRef.current = handleNoteOff; }, [handleNoteOff]);
 
   // --------------------------------------------------------------------------
   // Recording controls
@@ -395,6 +455,20 @@ export function PlayScreen(): React.JSX.Element {
 
         <Text style={styles.title}>Free Play</Text>
 
+        {/* Active input method badge */}
+        {activeInput !== 'touch' && (
+          <View style={styles.inputBadge} testID="freeplay-input-badge">
+            <MaterialCommunityIcons
+              name={activeInput === 'midi' ? 'piano' : 'microphone'}
+              size={14}
+              color={COLORS.success}
+            />
+            <Text style={styles.inputBadgeText}>
+              {activeInput === 'midi' ? 'MIDI' : 'Mic'}
+            </Text>
+          </View>
+        )}
+
         {/* Salsa mini avatar */}
         <SalsaCoach mood="happy" size="small" />
 
@@ -460,7 +534,12 @@ export function PlayScreen(): React.JSX.Element {
             <View style={styles.instructionsTextWrap}>
               <Text style={styles.instructionsTitle}>Welcome to Free Play!</Text>
               <Text style={styles.instructionsText}>
-                Tap the piano keys below to play notes. The note name shows above.{' '}
+                {activeInput === 'mic'
+                  ? 'Play notes on your piano or sing — the app will detect them! You can also tap the on-screen keys.'
+                  : activeInput === 'midi'
+                    ? 'Play your MIDI keyboard and see note names in real time. You can also tap the on-screen keys.'
+                    : 'Tap the piano keys below to play notes. The note name shows above.'
+                }{' '}
                 Press the red circle to record, then play it back!
               </Text>
             </View>
@@ -568,6 +647,20 @@ const styles = StyleSheet.create({
   title: {
     ...TYPOGRAPHY.heading.sm,
     color: COLORS.textPrimary,
+  },
+  inputBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(76, 175, 80, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  inputBadgeText: {
+    ...TYPOGRAPHY.caption.sm,
+    color: COLORS.success,
+    fontWeight: '600',
   },
   noteDisplay: {
     backgroundColor: COLORS.cardSurface,

@@ -57,7 +57,7 @@ const TOTAL_STEPS = 5;
 
 interface OnboardingState {
   experienceLevel?: 'beginner' | 'intermediate' | 'returning';
-  hasMidi?: boolean;
+  inputMethod?: 'midi' | 'mic' | 'touch';
   goal?: 'songs' | 'technique' | 'exploration';
   selectedCatId?: string;
   completedAt?: Date;
@@ -245,8 +245,8 @@ function EquipmentCheckStep({
   direction,
 }: {
   onNext: () => void;
-  value?: boolean;
-  onValueChange: (hasMidi: boolean) => void;
+  value?: 'midi' | 'mic' | 'touch';
+  onValueChange: (input: 'midi' | 'mic' | 'touch') => void;
   direction: SlideDirection;
 }): React.ReactElement {
   const catInfo = STEP_CATS[3];
@@ -257,27 +257,35 @@ function EquipmentCheckStep({
         <CatAvatar catId={catInfo.catId} size="small" showTooltipOnTap={false} />
         <Text style={styles.catIntro}>{catInfo.subtitle}</Text>
       </View>
-      <Text style={styles.stepTitle}>Do You Have a MIDI Keyboard?</Text>
+      <Text style={styles.stepTitle}>How Will You Play?</Text>
       <Text style={styles.stepDescription}>
-        MIDI keyboards provide the best learning experience, but you can also use the on-screen keyboard
+        Choose how you'll input notes. You can always change this later in Settings.
       </Text>
 
       <View style={styles.midiOptions}>
         <OptionCard
           icon="⌨️"
-          title="Yes, I Have a MIDI Keyboard"
-          description="USB or Bluetooth connected device"
-          selected={value === true}
-          onPress={() => onValueChange(true)}
-          testID="onboarding-midi-yes"
+          title="MIDI Keyboard"
+          description="USB or Bluetooth connected — best experience"
+          selected={value === 'midi'}
+          onPress={() => onValueChange('midi')}
+          testID="onboarding-input-midi"
+        />
+        <OptionCard
+          icon="🎤"
+          title="Microphone"
+          description="Play a real piano or sing — the app listens"
+          selected={value === 'mic'}
+          onPress={() => onValueChange('mic')}
+          testID="onboarding-input-mic"
         />
         <OptionCard
           icon="📱"
-          title="No, I'll Use Screen Keyboard"
-          description="Great! You can start learning right away"
-          selected={value === false}
-          onPress={() => onValueChange(false)}
-          testID="onboarding-midi-no"
+          title="On-Screen Keyboard"
+          description="Tap to play — no equipment needed"
+          selected={value === 'touch'}
+          onPress={() => onValueChange('touch')}
+          testID="onboarding-input-touch"
         />
       </View>
 
@@ -287,7 +295,7 @@ function EquipmentCheckStep({
         disabled={value === undefined}
         size="large"
         style={styles.button}
-        testID="onboarding-midi-next"
+        testID="onboarding-input-next"
       />
     </AnimatedStepWrapper>
   );
@@ -601,13 +609,13 @@ export function OnboardingScreen(): React.ReactElement {
   const setLearningGoal = useSettingsStore((s) => s.setLearningGoal);
   const setPlaybackSpeed = useSettingsStore((s) => s.setPlaybackSpeed);
 
-  // When returning from SkillAssessment, advance to step 3
+  // When returning from SkillAssessment, advance to step 4 (Goal Setting)
   useFocusEffect(
     useCallback(() => {
       if (pendingAssessmentReturnRef.current) {
         pendingAssessmentReturnRef.current = false;
         setDirection('forward');
-        setStep(3);
+        setStep(4);
       }
     }, []),
   );
@@ -615,8 +623,13 @@ export function OnboardingScreen(): React.ReactElement {
   const handleNext = useCallback(() => {
     if (step === 2 && state.experienceLevel) {
       setExperienceLevel(state.experienceLevel);
+    }
+    // After equipment selection (step 3), navigate to skill assessment
+    // for intermediate/returning users — they play using their chosen input method
+    if (step === 3 && state.inputMethod) {
+      // Persist input method early so SkillAssessment can use it
+      useSettingsStore.getState().setPreferredInputMethod(state.inputMethod);
 
-      // Navigate to skill assessment for intermediate/returning users
       if (state.experienceLevel === 'intermediate' || state.experienceLevel === 'returning') {
         pendingAssessmentReturnRef.current = true;
         navigation.navigate('SkillAssessment');
@@ -631,9 +644,12 @@ export function OnboardingScreen(): React.ReactElement {
       if (state.goal) {
         setLearningGoal(state.goal);
       }
-      // Persist MIDI equipment answer from step 3
-      if (state.hasMidi != null) {
-        useSettingsStore.getState().updateMidiSettings({ autoConnectMidi: state.hasMidi });
+      // Persist input method selection from step 3
+      if (state.inputMethod) {
+        useSettingsStore.getState().setPreferredInputMethod(state.inputMethod);
+        if (state.inputMethod === 'midi') {
+          useSettingsStore.getState().updateMidiSettings({ autoConnectMidi: true });
+        }
       }
       // Persist cat selection from step 5
       if (state.selectedCatId) {
@@ -644,6 +660,10 @@ export function OnboardingScreen(): React.ReactElement {
       prefillOnboardingBuffer().catch(() => {});
       // Dismiss the onboarding modal and return to MainTabs
       navigation.goBack();
+      // If mic was selected, prompt for permission via MicSetupScreen
+      if (state.inputMethod === 'mic') {
+        setTimeout(() => navigation.navigate('MicSetup'), 300);
+      }
     } else {
       setDirection('forward');
       setStep((prev) => prev + 1);
@@ -651,6 +671,7 @@ export function OnboardingScreen(): React.ReactElement {
   }, [
     step,
     state.experienceLevel,
+    state.inputMethod,
     state.goal,
     state.selectedCatId,
     setExperienceLevel,
@@ -684,11 +705,11 @@ export function OnboardingScreen(): React.ReactElement {
       case 3:
         return (
           <EquipmentCheckStep
-            value={state.hasMidi}
-            onValueChange={(hasMidi) => {
-              setState((prev) => ({ ...prev, hasMidi }));
-              // MIDI users can handle full speed; on-screen stays at 0.5x default
-              setPlaybackSpeed(hasMidi ? 1.0 : 0.5);
+            value={state.inputMethod}
+            onValueChange={(input) => {
+              setState((prev) => ({ ...prev, inputMethod: input }));
+              // MIDI=full speed, Mic=slightly slower, Touch=half speed
+              setPlaybackSpeed(input === 'midi' ? 1.0 : input === 'mic' ? 0.75 : 0.5);
             }}
             onNext={handleNext}
             direction={direction}
@@ -724,6 +745,7 @@ export function OnboardingScreen(): React.ReactElement {
   return (
     <SafeAreaView style={styles.container} testID="onboarding-screen">
       <ScrollView
+        testID="onboarding-scroll"
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >

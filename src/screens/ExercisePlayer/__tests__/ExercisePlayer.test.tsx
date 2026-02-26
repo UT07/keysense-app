@@ -666,6 +666,7 @@ function resetStore(overrides: Record<string, any> = {}) {
   // (The mock factory closure reads from this same object reference)
   const defaults: Record<string, any> = {
     currentExercise: null,
+    setCurrentExercise: jest.fn(),
     clearSession: jest.fn(),
     setScore: jest.fn(),
     addPlayedNote: jest.fn(),

@@ -15,6 +15,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -52,6 +53,9 @@ export function sectionToExercise(
   const notes: NoteEvent[] =
     layer === 'melody' ? section.layers.melody : section.layers.full;
 
+  // Defensive defaults for settings that might be missing from Firestore data
+  const settings = song.settings ?? {} as Song['settings'];
+
   return {
     id: `${song.id}-${section.id}-${layer}`,
     version: song.version,
@@ -64,11 +68,20 @@ export function sectionToExercise(
       prerequisites: [],
     },
     settings: {
-      ...song.settings,
+      tempo: settings.tempo ?? 80,
+      timeSignature: settings.timeSignature ?? [4, 4],
+      keySignature: settings.keySignature ?? 'C',
+      countIn: settings.countIn ?? 4,
+      metronomeEnabled: settings.metronomeEnabled ?? true,
       loopEnabled: loop,
     },
-    notes,
-    scoring: song.scoring,
+    notes: notes ?? [],
+    scoring: {
+      timingToleranceMs: song.scoring?.timingToleranceMs ?? 50,
+      timingGracePeriodMs: song.scoring?.timingGracePeriodMs ?? 150,
+      passingScore: song.scoring?.passingScore ?? 70,
+      starThresholds: song.scoring?.starThresholds ?? [70, 85, 95],
+    },
     hints: {
       beforeStart: `Play the ${section.label}`,
       commonMistakes: [],
@@ -212,6 +225,15 @@ export function SongPlayerScreen() {
     if (!section) return;
 
     const exercise = sectionToExercise(song, section, layer, loop);
+
+    // Guard: don't navigate to an exercise with no notes
+    if (!exercise.notes || exercise.notes.length === 0) {
+      console.warn('[SongPlayer] Section has no notes:', section.id, layer);
+      Alert.alert('No Notes', 'This section has no playable notes. Try a different section or layer.');
+      return;
+    }
+
+    console.log(`[SongPlayer] Playing: ${exercise.id}, notes=${exercise.notes.length}, tempo=${exercise.settings.tempo}, countIn=${exercise.settings.countIn}`);
     setCurrentExercise(exercise);
     navigation.navigate('Exercise', { exerciseId: exercise.id });
   }, [song, selectedSectionIndex, layer, loop, setCurrentExercise, navigation]);

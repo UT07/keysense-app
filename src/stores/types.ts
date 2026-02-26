@@ -4,6 +4,7 @@
  */
 
 import type { Exercise, ExerciseScore, MidiNoteEvent, LessonProgress, ExerciseProgress } from '@/core/exercises/types';
+import type { ExerciseChallengeContext } from '@/core/challenges/challengeSystem';
 
 /**
  * ============================================================================
@@ -78,7 +79,7 @@ export interface ProgressStoreState {
   getLessonProgress: (lessonId: string) => LessonProgress | null;
   getExerciseProgress: (lessonId: string, exerciseId: string) => ExerciseProgress | null;
   recordPracticeSession: (duration: number) => void;
-  recordExerciseCompletion: (exerciseId: string, score: number, xpEarned: number) => void;
+  recordExerciseCompletion: (exerciseId: string, score: number, xpEarned: number, challengeContext?: ExerciseChallengeContext) => void;
   updateDailyGoal: (date: string, data: Partial<DailyGoalData>) => void;
   reset: () => void;
 }
@@ -127,10 +128,13 @@ export interface NotificationSettings {
   completionNotifications: boolean;
 }
 
+export type PreferredInputMethod = 'auto' | 'midi' | 'mic' | 'touch';
+
 export interface MidiSettings {
   lastMidiDeviceId: string | null;
   lastMidiDeviceName: string | null;
   autoConnectMidi: boolean;
+  preferredInputMethod: PreferredInputMethod;
 }
 
 export interface OnboardingSettings {
@@ -161,6 +165,7 @@ export interface SettingsStoreState extends AudioSettings, DisplaySettings, Noti
   setReminderTime: (time: string | null) => void;
   setDailyGoalMinutes: (minutes: number) => void;
   setLastMidiDevice: (deviceId: string | null, deviceName: string | null) => void;
+  setPreferredInputMethod: (method: PreferredInputMethod) => void;
   setDarkMode: (enabled: boolean) => void;
   setShowTutorials: (show: boolean) => void;
   setHasCompletedOnboarding: (completed: boolean) => void;

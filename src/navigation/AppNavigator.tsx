@@ -14,13 +14,14 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { ExercisePlayer } from '../screens/ExercisePlayer/ExercisePlayer';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { MidiSetupScreen } from '../screens/MidiSetupScreen';
+import { MicSetupScreen } from '../screens/MicSetupScreen';
 import { LevelMapScreen } from '../screens/LevelMapScreen';
 import { PlayScreen } from '../screens/PlayScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { AuthScreen } from '../screens/AuthScreen';
 import { EmailAuthScreen } from '../screens/EmailAuthScreen';
 import { AccountScreen } from '../screens/AccountScreen';
-import { LessonIntroScreen } from '../screens/LessonIntroScreen';
+import { TierIntroScreen } from '../screens/TierIntroScreen';
 import { CatSwitchScreen } from '../screens/CatSwitchScreen';
 // CatCollectionScreen is deprecated — CatSwitchScreen serves as the unified gallery
 // import { CatCollectionScreen } from '../screens/CatCollectionScreen';
@@ -53,12 +54,13 @@ export type RootStackParamList = {
       weakNotes: number[];
     };
   };
-  LessonIntro: { lessonId: string; locked?: boolean };
+  TierIntro: { tier: number; locked?: boolean };
   SkillAssessment: undefined;
   DailySession: undefined;
   LevelMap: undefined;
   FreePlay: undefined;
   MidiSetup: undefined;
+  MicSetup: undefined;
   Account: undefined;
   CatSwitch: undefined;
   CatCollection: undefined;
@@ -176,14 +178,19 @@ export function AppNavigator() {
               options={{ animation: 'slide_from_bottom' }}
             />
             <RootStack.Screen
-              name="LessonIntro"
-              component={LessonIntroScreen}
+              name="TierIntro"
+              component={TierIntroScreen}
               options={{ animation: 'slide_from_right' }}
             />
             <RootStack.Screen
               name="MidiSetup"
               component={MidiSetupScreen}
               options={{ presentation: 'modal', headerShown: true, title: 'MIDI Setup' }}
+            />
+            <RootStack.Screen
+              name="MicSetup"
+              component={MicSetupScreen}
+              options={{ presentation: 'modal' }}
             />
             <RootStack.Screen
               name="Account"

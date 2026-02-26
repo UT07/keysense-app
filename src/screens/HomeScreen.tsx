@@ -24,6 +24,8 @@ import { AnimatedGradientBackground } from '../components/common/AnimatedGradien
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { DailyChallengeCard } from '../components/DailyChallengeCard';
+import { WeeklyChallengeCard } from '../components/WeeklyChallengeCard';
+import { MonthlyChallengeCard } from '../components/MonthlyChallengeCard';
 import { DailyRewardCalendar } from '../components/DailyRewardCalendar';
 import { GemEarnPopup } from '../components/GemEarnPopup';
 import { CatAvatar } from '../components/Mascot/CatAvatar';
@@ -388,6 +390,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <DailyChallengeCard onPress={() => {
             navigation.navigate('MainTabs', { screen: 'Learn' } as any);
           }} />
+        </Animated.View>
+
+        {/* Weekly Bonus Challenge (only visible on designated day) */}
+        <Animated.View style={[styles.section, staggerStyle(3)]}>
+          <WeeklyChallengeCard
+            onPress={() => navigation.navigate('MainTabs', { screen: 'Learn' } as any)}
+          />
+        </Animated.View>
+
+        {/* Monthly Challenge (only visible during active 48h window) */}
+        <Animated.View style={[styles.section, staggerStyle(3)]}>
+          <MonthlyChallengeCard
+            onPress={() => navigation.navigate('MainTabs', { screen: 'Learn' } as any)}
+            exercisesCompletedToday={todayGoal?.exercisesCompleted ?? 0}
+          />
         </Animated.View>
 
         {/* Continue Learning Card */}

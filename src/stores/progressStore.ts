@@ -17,6 +17,8 @@ import { PersistenceManager, STORAGE_KEYS, createDebouncedSave } from './persist
 import { levelFromXp } from '@/core/progression/XpSystem';
 import { useGemStore } from './gemStore';
 import { useCatEvolutionStore } from './catEvolutionStore';
+import { getDailyChallengeForDate, isDailyChallengeComplete } from '@/core/challenges/challengeSystem';
+import type { ExerciseChallengeContext } from '@/core/challenges/challengeSystem';
 
 const defaultStreakData: StreakData = {
   currentStreak: 0,
@@ -154,13 +156,14 @@ export const useProgressStore = create<ProgressStoreState>((set, get) => ({
     debouncedSave(get());
   },
 
-  recordExerciseCompletion: (_exerciseId: string, _score: number, xpEarned: number) => {
+  recordExerciseCompletion: (_exerciseId: string, _score: number, xpEarned: number, challengeContext?: ExerciseChallengeContext) => {
     const today = new Date().toISOString().split('T')[0];
 
     // Capture pre-update state inside set() to avoid race conditions.
     // The previous approach read state before set() and after set() separately,
     // which could miss or double-count the daily goal transition.
     let dailyGoalJustCompleted = false;
+    let challengeAlreadyDone = false;
 
     set((state) => {
       const dailyGoal = state.dailyGoalData[today] || {
@@ -175,6 +178,7 @@ export const useProgressStore = create<ProgressStoreState>((set, get) => ({
         newExercisesCompleted >= dailyGoal.exercisesTarget;
 
       dailyGoalJustCompleted = nowComplete && !wasDailyGoalComplete;
+      challengeAlreadyDone = useCatEvolutionStore.getState().isDailyChallengeCompleted();
 
       return {
         totalXp: newTotalXp,
@@ -190,9 +194,24 @@ export const useProgressStore = create<ProgressStoreState>((set, get) => ({
       };
     });
 
-    // Gem reward + daily challenge: only when daily goal transitions to complete
+    // Daily challenge validation: check if this exercise satisfies the challenge condition.
+    // If no challengeContext is provided (backward compat), auto-complete on any exercise.
+    if (!challengeAlreadyDone) {
+      const challenge = getDailyChallengeForDate(today);
+      const ctx: ExerciseChallengeContext = challengeContext ?? {
+        score: _score,
+        maxCombo: 0,
+        perfectNotes: 0,
+        playbackSpeed: 1.0,
+        minutesPracticedToday: 0,
+      };
+      if (isDailyChallengeComplete(challenge, ctx)) {
+        useCatEvolutionStore.getState().completeDailyChallengeAndClaim();
+      }
+    }
+
+    // Bonus gems when the full daily goal (minutes + exercises) is met
     if (dailyGoalJustCompleted) {
-      useCatEvolutionStore.getState().completeDailyChallenge();
       useGemStore.getState().earnGems(10, 'daily-goal');
     }
 

@@ -319,7 +319,9 @@ export function ProfileScreen(): React.ReactElement {
   const { totalXp, level, streakData, lessonProgress } = useProgressStore();
   const {
     dailyGoalMinutes, masterVolume, displayName, selectedCatId,
+    preferredInputMethod,
     setDailyGoalMinutes, setMasterVolume, setDisplayName,
+    setPreferredInputMethod,
   } = useSettingsStore();
   const weeklyPractice = useWeeklyPractice();
   const totalWeekMinutes = weeklyPractice.reduce((sum, d) => sum + d.minutes, 0);
@@ -327,6 +329,7 @@ export function ProfileScreen(): React.ReactElement {
 
   const [showGoalPicker, setShowGoalPicker] = useState(false);
   const [showVolumePicker, setShowVolumePicker] = useState(false);
+  const [showInputPicker, setShowInputPicker] = useState(false);
   const [showNameEditor, setShowNameEditor] = useState(false);
   const [editingName, setEditingName] = useState(displayName);
 
@@ -619,6 +622,47 @@ export function ProfileScreen(): React.ReactElement {
                   onPress={() => { setMasterVolume(opt.value); setShowVolumePicker(false); }}
                 >
                   <Text style={[styles.pickerChipText, masterVolume === opt.value && styles.pickerChipTextActive]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          <TouchableOpacity style={styles.settingItem} onPress={() => setShowInputPicker(!showInputPicker)}>
+            <View style={styles.settingLeft}>
+              <MaterialCommunityIcons name="music-note" size={24} color={COLORS.textSecondary} />
+              <Text style={styles.settingLabel}>Input Method</Text>
+            </View>
+            <View style={styles.settingRight}>
+              <Text style={styles.settingValue}>
+                {preferredInputMethod === 'auto' ? 'Auto' : preferredInputMethod === 'midi' ? 'MIDI' : preferredInputMethod === 'mic' ? 'Mic' : 'Touch'}
+              </Text>
+              <MaterialCommunityIcons name={showInputPicker ? 'chevron-up' : 'chevron-down'} size={20} color={COLORS.textMuted} />
+            </View>
+          </TouchableOpacity>
+          {showInputPicker && (
+            <View style={styles.pickerRow}>
+              {([
+                { value: 'auto', label: 'Auto', icon: 'auto-fix' },
+                { value: 'midi', label: 'MIDI', icon: 'piano' },
+                { value: 'mic', label: 'Mic', icon: 'microphone' },
+                { value: 'touch', label: 'Touch', icon: 'gesture-tap' },
+              ] as const).map((opt) => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[styles.pickerChip, preferredInputMethod === opt.value && styles.pickerChipActive]}
+                  onPress={() => {
+                    if (opt.value === 'mic') {
+                      navigation.navigate('MicSetup');
+                      setShowInputPicker(false);
+                    } else {
+                      setPreferredInputMethod(opt.value);
+                      setShowInputPicker(false);
+                    }
+                  }}
+                >
+                  <Text style={[styles.pickerChipText, preferredInputMethod === opt.value && styles.pickerChipTextActive]}>
                     {opt.label}
                   </Text>
                 </TouchableOpacity>

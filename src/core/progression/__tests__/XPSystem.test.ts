@@ -238,6 +238,22 @@ describe('XPSystem', () => {
         expect(updated.currentStreak).toBe(1); // Reset to 1
       });
 
+      it('should break streak on multi-day gap even with freeze available', () => {
+        // User missed 5+ days — freeze should NOT save a multi-day gap
+        const fiveDaysAgo = new Date();
+        fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+        const fiveDaysAgoStr = fiveDaysAgo.toISOString().split('T')[0];
+        const streak = {
+          ...createEmptyStreak(),
+          lastPracticeDate: fiveDaysAgoStr,
+          currentStreak: 1,
+          freezesAvailable: 1,
+        };
+        const updated = recordPracticeSession(streak);
+        expect(updated.currentStreak).toBe(1); // Reset, freeze not used
+        expect(updated.freezesAvailable).toBe(1); // Freeze preserved
+      });
+
       it('should award freeze every 7 days', () => {
         // Simulate 7 consecutive days of practice by manually constructing streak state
         const today = new Date();

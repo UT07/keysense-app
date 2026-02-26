@@ -32,7 +32,10 @@ import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS, GRADIENTS } from '
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
-type LessonIntroRouteProp = RouteProp<RootStackParamList, 'LessonIntro'>;
+
+/** @deprecated — LessonIntroScreen is no longer used; all tiers use TierIntroScreen */
+type LessonIntroParams = { lessonId: string; locked?: boolean };
+type LessonIntroRouteProp = RouteProp<{ LessonIntro: LessonIntroParams }, 'LessonIntro'>;
 
 // Skill chip colors - semi-transparent crimson variants
 const SKILL_COLORS = [

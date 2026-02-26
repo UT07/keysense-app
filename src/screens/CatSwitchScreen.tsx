@@ -343,8 +343,17 @@ function CatCard({ cat, isSelected, isOwned, evolutionXp, stage, unlockedAbiliti
           </View>
         ) : (
           <View style={styles.lockedCharacter}>
-            <View style={[styles.lockedSilhouette, { backgroundColor: cat.color + '10' }]}>
-              <MaterialCommunityIcons name="lock-outline" size={48} color={COLORS.textMuted} />
+            <View style={{ opacity: 0.4 }}>
+              <KeysieSvg
+                mood="happy"
+                size="large"
+                accentColor={cat.color}
+                pixelSize={140}
+                visuals={cat.visuals}
+              />
+            </View>
+            <View style={styles.lockedBadge}>
+              <MaterialCommunityIcons name="lock" size={20} color="#FFF" />
             </View>
           </View>
         )}
@@ -741,15 +750,18 @@ const styles = StyleSheet.create({
   lockedCharacter: {
     alignItems: 'center',
   },
-  lockedSilhouette: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+  lockedBadge: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: COLORS.cardBorder,
-    borderStyle: 'dashed',
   },
 
   // Stage platform

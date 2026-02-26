@@ -30,6 +30,7 @@ import type { NoteHandle } from '../audio/types';
 import { getRandomCatMessage } from '../content/catDialogue';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS } from '../theme/tokens';
 import type { NoteEvent, MidiNoteEvent } from '../core/exercises/types';
+import { InputManager, type ActiveInputMethod } from '../input/InputManager';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -373,6 +374,14 @@ export function SkillAssessmentScreen(): React.ReactElement {
   const audioReadyRef = useRef(false);
   const activeNoteHandlesRef = useRef<Map<number, NoteHandle>>(new Map());
 
+  // InputManager for mic/MIDI input support
+  const inputManagerRef = useRef<InputManager | null>(null);
+  const inputUnsubRef = useRef<(() => void) | null>(null);
+  const [activeInputMethod, setActiveInputMethod] = useState<ActiveInputMethod>('touch');
+  // Stable refs for InputManager subscription (avoids stale closures)
+  const handleNoteOnRef = useRef<(event: MidiNoteEvent) => void>(() => {});
+  const handleNoteOffRef = useRef<(note: number) => void>(() => {});
+
   const currentRound = ASSESSMENT_ROUNDS[currentRoundIndex];
 
   // Apply playback speed multiplier to round tempo (matches ExercisePlayer behavior)
@@ -442,9 +451,14 @@ export function SkillAssessmentScreen(): React.ReactElement {
   useEffect(() => {
     let mounted = true;
 
-    const initAudio = async () => {
+    const init = async () => {
+      // Read preferred input from store (avoid adding to deps)
+      const preferredInput = useSettingsStore.getState().preferredInputMethod ?? 'auto';
+      const needsMic = preferredInput === 'mic' || preferredInput === 'auto';
+
+      // 1. Configure audio mode (with recording if mic may be used)
       try {
-        await ensureAudioModeConfigured();
+        await ensureAudioModeConfigured(needsMic);
         if (!audioEngineRef.current.isReady()) {
           await audioEngineRef.current.initialize();
         }
@@ -457,9 +471,39 @@ export function SkillAssessmentScreen(): React.ReactElement {
           audioReadyRef.current = false;
         }
       }
+
+      if (!mounted) return;
+
+      // 2. Initialize InputManager for mic/MIDI support
+      try {
+        const manager = new InputManager({ preferred: preferredInput });
+        inputManagerRef.current = manager;
+        await manager.initialize();
+
+        if (!mounted) {
+          manager.dispose();
+          inputManagerRef.current = null;
+          return;
+        }
+
+        setActiveInputMethod(manager.activeMethod);
+
+        // Subscribe to non-touch events (keyboard component handles touch)
+        if (manager.activeMethod !== 'touch') {
+          inputUnsubRef.current = manager.onNoteEvent((event) => {
+            if (event.type === 'noteOn') {
+              handleNoteOnRef.current(event);
+            } else if (event.type === 'noteOff') {
+              handleNoteOffRef.current(event.note);
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('[SkillAssessment] InputManager init failed:', e);
+      }
     };
 
-    initAudio();
+    init();
 
     return () => {
       mounted = false;
@@ -467,6 +511,10 @@ export function SkillAssessmentScreen(): React.ReactElement {
       clearRoundTimers();
       closeAllCapturedNotes(Date.now());
       releaseAllAudioNotes();
+      inputUnsubRef.current?.();
+      inputUnsubRef.current = null;
+      inputManagerRef.current?.dispose();
+      inputManagerRef.current = null;
     };
   }, [clearRoundTimers, closeAllCapturedNotes, releaseAllAudioNotes]);
 
@@ -511,6 +559,8 @@ export function SkillAssessmentScreen(): React.ReactElement {
     clearRoundTimers();
     closeAllCapturedNotes(Date.now());
     releaseAllAudioNotes();
+    // Stop mic/MIDI listening
+    inputManagerRef.current?.stop();
 
     const round = ASSESSMENT_ROUNDS[currentRoundIndex];
     if (!round) return;
@@ -553,6 +603,9 @@ export function SkillAssessmentScreen(): React.ReactElement {
 
     setCurrentBeat(-ASSESSMENT_COUNT_IN_BEATS);
     setPhaseSync('countIn');
+
+    // Start mic/MIDI listening for this round
+    inputManagerRef.current?.start();
 
     beatIntervalRef.current = setInterval(() => {
       // Guard: stop processing if round already finished or component unmounted
@@ -621,6 +674,10 @@ export function SkillAssessmentScreen(): React.ReactElement {
 
     closeCapturedNote(note, timestamp);
   }, [closeCapturedNote, releaseAudioNote]);
+
+  // Keep refs in sync for InputManager subscription
+  handleNoteOnRef.current = handleNoteOn;
+  handleNoteOffRef.current = handleNoteOff;
 
   const handleNextRound = useCallback(() => {
     if (currentRoundIndex + 1 >= ASSESSMENT_ROUNDS.length) {
@@ -782,9 +839,18 @@ export function SkillAssessmentScreen(): React.ReactElement {
     return (
       <View style={styles.playingContainer} testID="assessment-playing">
         <View style={styles.roundHeader}>
-          <Text style={styles.roundHeaderText}>
-            Round {currentRoundIndex + 1} of {ASSESSMENT_ROUNDS.length}
-          </Text>
+          <View style={styles.roundHeaderRow}>
+            <Text style={styles.roundHeaderText}>
+              Round {currentRoundIndex + 1} of {ASSESSMENT_ROUNDS.length}
+            </Text>
+            {activeInputMethod !== 'touch' && (
+              <View style={styles.inputBadge}>
+                <Text style={styles.inputBadgeText}>
+                  {activeInputMethod === 'mic' ? 'Mic' : 'MIDI'}
+                </Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.roundTitle}>{currentRound.title}</Text>
         </View>
 
@@ -1195,6 +1261,22 @@ const styles = StyleSheet.create({
   },
   startingAtValue: {
     ...TYPOGRAPHY.heading.lg,
+    color: COLORS.primary,
+  },
+  roundHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  inputBadge: {
+    backgroundColor: COLORS.primary + '30',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  inputBadgeText: {
+    ...TYPOGRAPHY.caption.lg,
+    fontWeight: '600',
     color: COLORS.primary,
   },
   actionButton: {
