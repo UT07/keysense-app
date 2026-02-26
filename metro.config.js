@@ -3,8 +3,8 @@ const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 
-// Add support for JSON files in exercises
-config.resolver.assetExts.push('json');
+// Add support for JSON files in exercises and ONNX models
+config.resolver.assetExts.push('json', 'onnx');
 
 // The local firebase/ directory (Cloud Functions) conflicts with the firebase
 // npm package. When Metro resolves 'firebase/functions', it finds
