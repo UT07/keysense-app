@@ -280,6 +280,26 @@
 
 - **Tests:** 103 suites, 2,413 tests (102 passing, 4 pre-existing failures in catEvolutionStore)
 
+### Phase 8 Completion: Polyphonic Detection + Polish (Feb 26)
+
+#### Polyphonic Detection Pipeline
+- **PolyphonicDetector (src/input/PolyphonicDetector.ts):** ONNX Runtime wrapper for Spotify Basic Pitch model — resamples 44.1kHz→22.05kHz, runs inference on 88 note bins (A0-C8), extracts DetectedNote[] with confidence + onset flags, configurable thresholds (note=0.5, onset=0.5), max polyphony limit (default 6), pre-allocated resampling buffer
+- **MultiNoteTracker (src/input/MultiNoteTracker.ts):** Per-note hysteresis for polyphonic input — 30ms onset hold, 60ms release hold, tracks Map<midiNote, {startTime, lastSeen}>, emits same NoteEvent interface as monophonic NoteTracker
+- **AmbientNoiseCalibrator (src/input/AmbientNoiseCalibrator.ts):** Records ambient audio, computes RMS energy, auto-tunes YIN threshold (0.15-0.30), confidence (0.5-0.8), and ONNX note threshold (0.3-0.6) based on noise level
+
+#### Integration
+- **MicrophoneInput:** Now supports `mode: 'monophonic' | 'polyphonic'` — polyphonic uses PolyphonicDetector + MultiNoteTracker; falls back to YIN if ONNX fails
+- **InputManager:** Reads `micDetectionMode` from settingsStore, passes to MicrophoneInput, adjusts latency compensation (100ms mono / 120ms poly)
+- **settingsStore:** Added `micDetectionMode: 'monophonic' | 'polyphonic'` with setter
+- **ProfileScreen:** Mic Detection picker (Single Notes / Chords) shown when input method is mic or auto
+
+#### Infrastructure
+- **onnxruntime-react-native:** Added as dependency (^1.17)
+- **Metro config:** Added `.onnx` to asset extensions
+- **Model docs:** assets/models/README.md with download instructions
+
+- **Tests:** 106 suites, 2,441 tests, 0 failures, 0 TypeScript errors
+
 ---
 
 ## Known Remaining Items
@@ -290,5 +310,5 @@
 4. **Open bugs on GitHub**: ~45 remaining open issues
 5. **Rive animation files**: .riv files not created (need Rive editor design work) — SVG composable system is working alternative
 6. **Phase 7 Batches 7-10 remaining**: Remaining screen redesigns (AuthScreen, LevelMapScreen, OnboardingScreen), micro-interactions (PressableScale upgrade, animated progress bars, loading skeletons, celebration upgrades), Detox visual audit
-7. **Phase 8 remaining**: Real-device mic accuracy testing, ambient noise calibration tuning, polyphonic detection (research)
+7. **Phase 8 remaining**: Real-device testing (mic accuracy >95%, ONNX model loading on device, ambient calibration UX), Basic Pitch ONNX model download
 8. **Phase 10+**: Social & Leaderboards, QA + Launch

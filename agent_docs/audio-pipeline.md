@@ -35,11 +35,11 @@ This document details the implementation, optimization strategies, and debugging
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Detection Path (Fallback)
+### Detection Path — Monophonic (YIN)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                   DETECTION LATENCY BUDGET                  │
+│              MONOPHONIC DETECTION LATENCY BUDGET             │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  Stage                          Budget    Cumulative        │
@@ -52,10 +52,36 @@ This document details the implementation, optimization strategies, and debugging
 │  Reanimated UI update          16ms       121ms             │
 │                                                             │
 │  * 4096 samples @ 44.1kHz = 93ms                           │
+│  Compensation applied: -100ms                               │
+│  EFFECTIVE LATENCY: ~21ms                                   │
 │                                                             │
-│  TOTAL TARGET: <150ms                                       │
-│  ACCEPTABLE:   <200ms                                       │
-│  NOTE: This is for feedback only, not real-time playback   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Detection Path — Polyphonic (ONNX Basic Pitch)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│             POLYPHONIC DETECTION LATENCY BUDGET              │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Stage                          Budget    Cumulative        │
+│  ─────                          ──────    ──────────        │
+│  Microphone → buffer fill       46ms*     46ms              │
+│  Resample 44.1→22.05kHz         2ms       48ms              │
+│  ONNX inference (Basic Pitch)  50ms       98ms              │
+│  MultiNoteTracker hysteresis   30ms      128ms              │
+│  ExerciseValidator              1ms      129ms              │
+│  Zustand + UI update           16ms      145ms              │
+│                                                             │
+│  * 2048 samples @ 44.1kHz = 46ms                           │
+│  Compensation applied: -120ms                               │
+│  EFFECTIVE LATENCY: ~25ms                                   │
+│  Timing tolerance: 1.5x multiplier for mic input           │
+│                                                             │
+│  Pipeline: AudioCapture → PolyphonicDetector                │
+│            → MultiNoteTracker → MidiNoteEvent               │
+│  Fallback: If ONNX fails → YIN monophonic                  │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```

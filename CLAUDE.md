@@ -6,20 +6,21 @@ Built with React Native (Expo) + Firebase + Gemini AI.
 
 **Stack:** Expo SDK 52+, TypeScript 5.x, react-native-audio-api, Zustand, Firebase
 
-## Current Sprint (Feb 24, 2026)
+## Current Sprint (Feb 26, 2026)
 
-**Codebase Health:** 103 test suites, 2,413 tests passing, 0 TypeScript errors
+**Codebase Health:** 106 test suites, 2,441 tests passing, 0 TypeScript errors
 
-**Phases 1-9 COMPLETE** (Core Loop, Gamification, Auth, Adaptive Learning, Evolution, UI Revamp, All-AI Exercises, Audio Input, Music Library + 124 songs in Firestore)
+**Phases 1-9 COMPLETE** (Core Loop, Gamification, Auth, Adaptive Learning, Evolution, UI Revamp, All-AI Exercises, Audio Input + Polyphonic Detection, Music Library + 124 songs in Firestore)
 
 **Up Next:** Phase 10 — Social & Leaderboards
 
 **Active Roadmap:**
-- **Phase 8: Audio Input (Mic)** — COMPLETE (device testing remaining)
+- **Phase 8: Audio Input (Mic)** — COMPLETE (monophonic YIN + polyphonic ONNX Basic Pitch, ambient calibration, device testing remaining)
 - **Phase 9: Music Library** — COMPLETE (124 songs uploaded to Firestore: 37 Gemini + 50 folk + 38 classical)
 - **Phase 10: Social & Leaderboards** — UP NEXT (friends, leagues, challenges)
 - Phase 11: QA + Launch — PLANNED
 - Sound Design — PLANNED (parallel)
+- 3D Cat Avatars — PLANNED (parallel, Three.js + Blender)
 
 See `docs/plans/2026-02-13-master-plan.md` for the **single source of truth** on all phases.
 See `docs/PRD.md` for product requirements.
@@ -83,7 +84,10 @@ src/
 │   └── samples/          # Piano sample management
 ├── input/                # Input handling
 │   ├── MidiInput.ts      # MIDI device handling
-│   └── PitchDetector.ts  # Microphone fallback (TurboModule wrapper)
+│   ├── PitchDetector.ts  # YIN pitch detection + NoteTracker (monophonic)
+│   ├── PolyphonicDetector.ts  # ONNX Basic Pitch model wrapper (polyphonic)
+│   ├── MultiNoteTracker.ts  # Multi-note hysteresis for polyphonic detection
+│   └── AmbientNoiseCalibrator.ts  # RMS-based noise calibration for mic thresholds
 ├── stores/               # Zustand stores (13 stores)
 │   ├── persistence.ts    # AsyncStorage persistence (debounced + immediate save)
 │   ├── exerciseStore.ts  # Current exercise state
@@ -131,6 +135,10 @@ src/
 | `src/core/exercises/ExerciseValidator.ts` | Core scoring logic - pure TS, heavily tested |
 | `src/core/exercises/types.ts` | Exercise and score type definitions |
 | `src/input/MidiInput.ts` | MIDI device connection and event handling |
+| `src/input/InputManager.ts` | Unified input factory (MIDI > Mic > Touch), latency compensation |
+| `src/input/PolyphonicDetector.ts` | ONNX Basic Pitch model wrapper for chord detection |
+| `src/input/MultiNoteTracker.ts` | Multi-note hysteresis (onset/release per active note) |
+| `src/input/AmbientNoiseCalibrator.ts` | RMS noise measurement → auto-tune detection thresholds |
 | `src/stores/exerciseStore.ts` | Exercise session state management |
 | `src/stores/progressStore.ts` | XP, levels, streaks, lesson progress, daily goals |
 | `src/screens/ExercisePlayer/ExercisePlayer.tsx` | Main gameplay screen with scoring + completion |
