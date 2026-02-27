@@ -47,12 +47,51 @@ const NODE_SIZE_NORMAL = 64;
 const NODE_SIZE_LOCKED = 52;
 const VERTICAL_SPACING = 130;
 const SECTION_BANNER_HEIGHT = 50;
+const TIER_LABEL_HEIGHT = 28;
 const SALSA_AREA_HEIGHT = 100; // Space reserved for Salsa coach at the top
 const TOP_PADDING = SALSA_AREA_HEIGHT + 12;
 const BOTTOM_PADDING = 140;
 
 /** Zigzag X fractions: center, left, center, right (repeating) */
 const X_PATTERN = [0.5, 0.25, 0.5, 0.75];
+
+// ---------------------------------------------------------------------------
+// Tier theme data — each tier gets a unique environment color scheme
+// ---------------------------------------------------------------------------
+
+interface TierTheme {
+  backgroundGradient: readonly [string, string];
+  nodeColor: string;
+  pathColor: string;
+  label: string;
+  emoji: string;
+}
+
+const TIER_THEMES: Record<number, TierTheme> = {
+  1:  { backgroundGradient: ['#1A3A1A', '#0A1F0A'], nodeColor: '#4CAF50', pathColor: '#2E7D32', label: 'Grassland', emoji: '\u{1F331}' },
+  2:  { backgroundGradient: ['#1A2A3A', '#0A1520'], nodeColor: '#42A5F5', pathColor: '#1565C0', label: 'Lake', emoji: '\u{1F30A}' },
+  3:  { backgroundGradient: ['#3A2A1A', '#1F1508'], nodeColor: '#FF9800', pathColor: '#E65100', label: 'Desert', emoji: '\u{1F3DC}\uFE0F' },
+  4:  { backgroundGradient: ['#2A3A2A', '#0F1F0F'], nodeColor: '#66BB6A', pathColor: '#388E3C', label: 'Forest', emoji: '\u{1F332}' },
+  5:  { backgroundGradient: ['#3A3A2A', '#1F1F0A'], nodeColor: '#FFCA28', pathColor: '#F9A825', label: 'Plains', emoji: '\u{1F33E}' },
+  6:  { backgroundGradient: ['#2A2A3A', '#0F0F20'], nodeColor: '#7E57C2', pathColor: '#4527A0', label: 'Night', emoji: '\u{1F303}' },
+  7:  { backgroundGradient: ['#1A3A3A', '#0A1F1F'], nodeColor: '#26C6DA', pathColor: '#00838F', label: 'Ocean', emoji: '\u{1F30A}' },
+  8:  { backgroundGradient: ['#3A1A2A', '#200A15'], nodeColor: '#EC407A', pathColor: '#AD1457', label: 'Cave', emoji: '\u{1FAA8}' },
+  9:  { backgroundGradient: ['#2A2A1A', '#15150A'], nodeColor: '#FFA726', pathColor: '#EF6C00', label: 'Mountain', emoji: '\u{1F3D4}\uFE0F' },
+  10: { backgroundGradient: ['#2A1A2A', '#150A15'], nodeColor: '#CE93D8', pathColor: '#7B1FA2', label: 'Concert Hall', emoji: '\u{1F3B5}' },
+  11: { backgroundGradient: ['#1A1A3A', '#0A0A20'], nodeColor: '#5C6BC0', pathColor: '#283593', label: 'Jazz Club', emoji: '\u{1F3B7}' },
+  12: { backgroundGradient: ['#3A2A2A', '#1F0F0F'], nodeColor: '#EF5350', pathColor: '#C62828', label: 'Volcano', emoji: '\u{1F30B}' },
+  13: { backgroundGradient: ['#2A3A3A', '#0F1F1F'], nodeColor: '#80DEEA', pathColor: '#00838F', label: 'Crystal', emoji: '\u{1F48E}' },
+  14: { backgroundGradient: ['#1A2A2A', '#0A1515'], nodeColor: '#AED581', pathColor: '#558B2F', label: 'Sky', emoji: '\u{2601}\uFE0F' },
+  15: { backgroundGradient: ['#0A0A2A', '#050515'], nodeColor: '#FFD700', pathColor: '#FFA000', label: 'Space', emoji: '\u{1F680}' },
+};
+
+const DEFAULT_TIER_THEME: TierTheme = {
+  backgroundGradient: ['#1A1A1A', '#0A0A0A'],
+  nodeColor: COLORS.primary,
+  pathColor: COLORS.primaryDark,
+  label: 'Unknown',
+  emoji: '\u{1F3B9}',
+};
 
 /** Metadata for each tier */
 const TIER_META: Record<number, { title: string; icon: string }> = {
@@ -195,8 +234,10 @@ function useNodePositions(nodes: TierNodeData[], screenWidth: number) {
     const usableWidth = screenWidth - SPACING.lg * 2;
     const positions: NodePosition[] = new Array(nodes.length);
     const sectionBannerPositions: { index: number; y: number }[] = [];
+    const tierLabelPositions: { tier: number; y: number }[] = [];
     let currentY = TOP_PADDING;
     let patternIndex = 0;
+    let previousTier = -1;
 
     // Bottom-to-top: place highest tier at top, tier 1 at bottom
     for (let ri = nodes.length - 1; ri >= 0; ri--) {
@@ -205,6 +246,14 @@ function useNodePositions(nodes: TierNodeData[], screenWidth: number) {
         sectionBannerPositions.push({ index: ri, y: currentY });
         currentY += SECTION_BANNER_HEIGHT;
       }
+
+      // Tier theme label at each tier's zone
+      const currentTier = nodes[ri].tier;
+      if (currentTier !== previousTier) {
+        tierLabelPositions.push({ tier: currentTier, y: currentY });
+        currentY += TIER_LABEL_HEIGHT;
+      }
+      previousTier = currentTier;
 
       const state = nodes[ri].state;
       const size = state === 'current' ? NODE_SIZE_CURRENT
@@ -220,7 +269,7 @@ function useNodePositions(nodes: TierNodeData[], screenWidth: number) {
     }
 
     const totalHeight = currentY + BOTTOM_PADDING;
-    return { positions, sectionBannerPositions, totalHeight };
+    return { positions, sectionBannerPositions, tierLabelPositions, totalHeight };
   }, [nodes, screenWidth]);
 }
 
@@ -228,7 +277,7 @@ function useNodePositions(nodes: TierNodeData[], screenWidth: number) {
 // Node style helpers
 // ---------------------------------------------------------------------------
 
-function getNodeColors(state: NodeState) {
+function getNodeColors(state: NodeState, theme: TierTheme) {
   switch (state) {
     case 'completed':
       return {
@@ -248,11 +297,11 @@ function getNodeColors(state: NodeState) {
       };
     case 'current':
       return {
-        bg: COLORS.primary,
-        border: COLORS.primaryLight,
+        bg: theme.nodeColor,
+        border: theme.nodeColor,
         iconColor: '#FFFFFF',
         textColor: COLORS.textPrimary,
-        subtitleColor: COLORS.primaryLight,
+        subtitleColor: theme.nodeColor,
       };
     case 'locked':
     default:
@@ -270,7 +319,7 @@ function getNodeColors(state: NodeState) {
 // PulsingGlow (Reanimated)
 // ---------------------------------------------------------------------------
 
-function PulsingGlow({ size }: { size: number }) {
+function PulsingGlow({ size, color }: { size: number; color?: string }) {
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0.4);
 
@@ -306,7 +355,7 @@ function PulsingGlow({ size }: { size: number }) {
           width: glowSize,
           height: glowSize,
           borderRadius: glowSize / 2,
-          backgroundColor: COLORS.primary,
+          backgroundColor: color ?? COLORS.primary,
           left: -(glowSize - size) / 2,
           top: -(glowSize - size) / 2,
         },
@@ -348,12 +397,13 @@ function PathConnections({
     const d = `M ${from.x} ${fromY} Q ${controlX} ${midY} ${to.x} ${toY}`;
 
     const isCompleted = nodes[i].state === 'completed' || nodes[i].state === 'passed';
+    const tierTheme = TIER_THEMES[nodes[i].tier] ?? DEFAULT_TIER_THEME;
 
     paths.push(
       <Path
         key={`path-${i}`}
         d={d}
-        stroke={isCompleted ? 'rgba(255, 215, 0, 0.25)' : 'rgba(255, 255, 255, 0.06)'}
+        stroke={isCompleted ? 'rgba(255, 215, 0, 0.25)' : `${tierTheme.pathColor}30`}
         strokeWidth={3}
         strokeLinecap="round"
         fill="none"
@@ -390,11 +440,12 @@ function PathNode({
   onPress: () => void;
   tierCatId: string;
 }) {
-  const colors = getNodeColors(data.state);
+  const theme = TIER_THEMES[data.tier] ?? DEFAULT_TIER_THEME;
+  const colors = getNodeColors(data.state, theme);
   const { size } = position;
   const nodeTestID = data.state === 'current' ? 'lesson-node-current' : `tier-node-${data.tier}`;
 
-  // Icon inside the circle — crown for completed + test passed
+  // Icon inside the circle -- crown for completed + test passed
   const iconName = data.state === 'completed' && data.testPassed ? 'crown'
     : data.state === 'completed' ? 'check-bold'
     : data.state === 'passed' ? 'check'
@@ -421,7 +472,7 @@ function PathNode({
         style={{ alignItems: 'center' }}
       >
         {/* Pulsing glow for current */}
-        {data.state === 'current' && <PulsingGlow size={size} />}
+        {data.state === 'current' && <PulsingGlow size={size} color={theme.nodeColor} />}
 
         {/* Circle node */}
         <View style={[
@@ -434,7 +485,8 @@ function PathNode({
             borderColor: colors.border,
             borderWidth: data.state === 'current' ? 3 : 2,
           },
-          data.state === 'current' && { ...SHADOWS.md, shadowColor: COLORS.primary },
+          data.state === 'current' && { ...SHADOWS.md, shadowColor: theme.nodeColor },
+          data.state === 'completed' && { ...SHADOWS.sm, shadowColor: COLORS.starGold },
         ]}>
           <MaterialCommunityIcons
             name={iconName as any}
@@ -463,13 +515,13 @@ function PathNode({
 
         {/* START chip */}
         {data.state === 'current' && (
-          <View style={styles.startChip} testID="lesson-node-start-chip">
+          <View style={[styles.startChip, { backgroundColor: theme.nodeColor }]} testID="lesson-node-start-chip">
             <Text style={styles.startChipText}>START</Text>
             <MaterialCommunityIcons name="chevron-right" size={12} color={COLORS.textPrimary} />
           </View>
         )}
 
-        {/* TEST chip — shown when all skills mastered but test not passed */}
+        {/* TEST chip -- shown when all skills mastered but test not passed */}
         {data.state === 'completed' && !data.testPassed && (
           <View style={styles.testChip} testID={`tier-${data.tier}-test-chip`}>
             <MaterialCommunityIcons name="trophy-outline" size={10} color={COLORS.starGold} />
@@ -554,6 +606,21 @@ function SectionBanner({
 }
 
 // ---------------------------------------------------------------------------
+// TierThemeLabel — subtle zone label between tier transitions
+// ---------------------------------------------------------------------------
+
+function TierThemeLabel({ tier, y }: { tier: number; y: number }) {
+  const theme = TIER_THEMES[tier] ?? DEFAULT_TIER_THEME;
+  return (
+    <View style={[styles.tierThemeLabel, { top: y }]} testID={`tier-theme-label-${tier}`}>
+      <Text style={[styles.tierThemeLabelText, { color: `${theme.nodeColor}80` }]}>
+        {theme.emoji} {theme.label}
+      </Text>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Screen
 // ---------------------------------------------------------------------------
 
@@ -567,7 +634,7 @@ export function LevelMapScreen() {
   const gems = useGemStore((s) => s.gems);
   const ownedCats = useCatEvolutionStore((s) => s.ownedCats);
 
-  const { positions, sectionBannerPositions, totalHeight } = useNodePositions(nodes, screenWidth);
+  const { positions, sectionBannerPositions, tierLabelPositions, totalHeight } = useNodePositions(nodes, screenWidth);
 
   // Auto-scroll to current node on initial mount only
   // BUG-020 fix: was re-scrolling on every store update, jumping the user's scroll position
@@ -676,6 +743,11 @@ export function LevelMapScreen() {
             />
           );
         })}
+
+        {/* Tier theme labels (absolutely positioned) */}
+        {tierLabelPositions.map(({ tier, y }) => (
+          <TierThemeLabel key={`tier-label-${tier}`} tier={tier} y={y} />
+        ))}
 
         {/* Path nodes (absolutely positioned) */}
         {nodes.map((data, index) => (
@@ -797,6 +869,17 @@ const styles = StyleSheet.create({
     width: 20, height: 20, borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.05)',
     alignItems: 'center', justifyContent: 'center',
+  },
+
+  // Tier theme label
+  tierThemeLabel: {
+    position: 'absolute', left: 0, right: 0,
+    height: TIER_LABEL_HEIGHT,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  tierThemeLabelText: {
+    ...TYPOGRAPHY.caption.sm, fontWeight: '600',
+    letterSpacing: 1, textTransform: 'uppercase',
   },
 
   // Salsa footer
