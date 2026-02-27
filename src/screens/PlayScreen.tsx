@@ -1,12 +1,13 @@
 /**
- * PlayScreen - Free play mode with landscape keyboard
+ * PlayScreen - Free play mode (portrait, split keyboard, song reference)
  *
  * Features:
- * - Landscape orientation lock (same pattern as ExercisePlayer)
- * - Full-width 3-octave scrollable keyboard
- * - Live note name display (shows what key you're pressing)
- * - Record / playback / clear your performance
- * - Beginner-friendly instruction banner (dismissible)
+ * - Portrait orientation (no landscape lock)
+ * - SplitKeyboard for two-handed play (Left: C2-B3, Right: C4-C6)
+ * - Song reference panel — load any song from the Music Library as a visual note guide
+ * - Floating action bar for Record / Play / Clear
+ * - Live note name display + session stats + free play analysis
+ * - MIDI and microphone input via InputManager
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
@@ -16,19 +17,21 @@ import {
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
+  ScrollView,
 } from 'react-native';
-import * as ScreenOrientation from 'expo-screen-orientation';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Keyboard } from '../components/Keyboard/Keyboard';
+import { SplitKeyboard } from '../components/Keyboard/SplitKeyboard';
+import { SongReferencePicker } from '../components/SongReferencePicker';
 import { createAudioEngine } from '../audio/createAudioEngine';
 import type { NoteHandle } from '../audio/types';
 import { SalsaCoach } from '../components/Mascot/SalsaCoach';
-import type { MidiNoteEvent } from '../core/exercises/types';
+import type { MidiNoteEvent, NoteEvent } from '../core/exercises/types';
 import { InputManager } from '../input/InputManager';
 import type { ActiveInputMethod } from '../input/InputManager';
 import { useSettingsStore } from '../stores/settingsStore';
+import { useSongStore } from '../stores/songStore';
 import { analyzeSession, type FreePlayAnalysis } from '../services/FreePlayAnalyzer';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS, glowColor } from '../theme/tokens';
 import type { RootStackParamList } from '../navigation/AppNavigator';
@@ -60,6 +63,9 @@ interface RecordedNote {
 // onPressOut doesn't fire (e.g., ScrollView steals the gesture)
 const NOTE_AUTO_RELEASE_MS = 1500;
 
+// Empty NoteEvent array constant for SplitKeyboard (avoids re-allocation)
+const EMPTY_NOTES: NoteEvent[] = [];
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -88,39 +94,13 @@ export function PlayScreen(): React.JSX.Element {
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionNotesRef = useRef<Array<{ note: number; timestamp: number; velocity: number }>>([]);
 
-  // --------------------------------------------------------------------------
-  // Landscape orientation lock — same pattern as ExercisePlayer.
-  // Now a full-screen stack screen (not a tab), so useEffect cleanup is reliable.
-  // --------------------------------------------------------------------------
-  useEffect(() => {
-    // Use lockPlatformAsync for iOS to force landscape even when device rotation
-    // lock is enabled. On iOS, this calls requestGeometryUpdate which overrides
-    // the system orientation lock at the view-controller level.
-    ScreenOrientation.lockPlatformAsync({
-      screenOrientationArrayIOS: [
-        ScreenOrientation.Orientation.LANDSCAPE_LEFT,
-        ScreenOrientation.Orientation.LANDSCAPE_RIGHT,
-      ],
-      screenOrientationConstantAndroid: 6, // ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-    })
-      .catch(() => {
-        // Fallback to the simpler lockAsync if platform-specific call fails
-        return ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-      })
-      .catch((err) => console.warn('[PlayScreen] Landscape lock failed:', err));
-
-    return () => {
-      ScreenOrientation.lockPlatformAsync({
-        screenOrientationArrayIOS: [
-          ScreenOrientation.Orientation.PORTRAIT_UP,
-        ],
-        screenOrientationConstantAndroid: 1, // ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-      }).catch(() => {
-        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)
-          .catch(() => {});
-      });
-    };
-  }, []);
+  // Song reference state
+  const [showSongPicker, setShowSongPicker] = useState(false);
+  const [selectedSongId, setSelectedSongId] = useState<string | null>(null);
+  const [selectedSongTitle, setSelectedSongTitle] = useState<string | null>(null);
+  const currentSong = useSongStore((s) => s.currentSong);
+  const loadSong = useSongStore((s) => s.loadSong);
+  const isLoadingSong = useSongStore((s) => s.isLoadingSong);
 
   // --------------------------------------------------------------------------
   // Audio engine initialization
@@ -436,6 +416,45 @@ export function PlayScreen(): React.JSX.Element {
   }, [stopPlayback]);
 
   // --------------------------------------------------------------------------
+  // Song reference
+  // --------------------------------------------------------------------------
+  const handleSongSelect = useCallback(
+    (songId: string, songTitle: string) => {
+      setSelectedSongId(songId);
+      setSelectedSongTitle(songTitle);
+      setShowSongPicker(false);
+      loadSong(songId);
+    },
+    [loadSong],
+  );
+
+  const handleClearSong = useCallback(() => {
+    setSelectedSongId(null);
+    setSelectedSongTitle(null);
+  }, []);
+
+  // Build note names from loaded song for reference display
+  const songNoteNames = React.useMemo(() => {
+    if (!currentSong || currentSong.id !== selectedSongId) return [];
+    const names: string[] = [];
+    const seen = new Set<number>();
+    for (const section of currentSong.sections) {
+      for (const note of section.layers.melody) {
+        if (!seen.has(note.note)) {
+          seen.add(note.note);
+          names.push(midiToNoteName(note.note));
+        }
+      }
+    }
+    // Sort by MIDI number (ascending)
+    return names.sort((a, b) => {
+      const midiA = noteNameToApproxMidi(a);
+      const midiB = noteNameToApproxMidi(b);
+      return midiA - midiB;
+    });
+  }, [currentSong, selectedSongId]);
+
+  // --------------------------------------------------------------------------
   // Navigation
   // --------------------------------------------------------------------------
   const handleBack = useCallback(() => {
@@ -447,8 +466,8 @@ export function PlayScreen(): React.JSX.Element {
   // --------------------------------------------------------------------------
   return (
     <SafeAreaView style={styles.container} testID="play-screen">
-      {/* Top controls bar */}
-      <View style={styles.topBar}>
+      {/* Header */}
+      <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton} testID="freeplay-back">
           <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textPrimary} />
         </TouchableOpacity>
@@ -469,61 +488,21 @@ export function PlayScreen(): React.JSX.Element {
           </View>
         )}
 
-        {/* Salsa mini avatar */}
-        <SalsaCoach mood="happy" size="small" />
+        <View style={styles.headerSpacer} />
 
         {/* Live note display */}
         <View style={styles.noteDisplay} testID="freeplay-note-display-container">
           <Text style={styles.noteText} testID="freeplay-note-display">{currentNoteName || '\u2014'}</Text>
         </View>
 
-        {/* Session stats */}
-        <View style={styles.statsContainer}>
-          <Text style={styles.statsText}>{sessionNoteCount} notes</Text>
-          {recordedNotes.length > 0 && (
-            <Text style={styles.statsText}>{recordedNotes.length} recorded</Text>
-          )}
-        </View>
-
-        {/* Help button to re-show instructions */}
-        {!showInstructions && (
-          <TouchableOpacity
-            onPress={() => setShowInstructions(true)}
-            style={styles.helpButton}
-            testID="freeplay-help"
-          >
-            <MaterialCommunityIcons name="help-circle-outline" size={22} color={COLORS.textSecondary} />
-          </TouchableOpacity>
-        )}
-
-        {/* Recording controls */}
-        <View style={styles.recordControls}>
-          {!isRecording ? (
-            <TouchableOpacity onPress={startRecording} style={styles.controlTouchable} testID="freeplay-record-start">
-              <MaterialCommunityIcons name="record-circle" size={22} color={COLORS.primary} />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity onPress={stopRecording} style={styles.controlTouchable} testID="freeplay-record-stop">
-              <MaterialCommunityIcons name="stop-circle" size={22} color={COLORS.error} />
-            </TouchableOpacity>
-          )}
-          {recordedNotes.length > 0 && !isRecording && (
-            <>
-              {isPlayingBack ? (
-                <TouchableOpacity onPress={stopPlayback} style={styles.controlTouchable} testID="freeplay-record-stop-playback">
-                  <MaterialCommunityIcons name="stop-circle" size={22} color={COLORS.warning} />
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity onPress={playRecording} style={styles.controlTouchable} testID="freeplay-record-playback">
-                  <MaterialCommunityIcons name="play-circle" size={22} color={COLORS.success} />
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity onPress={clearRecording} style={styles.controlTouchable} testID="freeplay-record-clear">
-                <MaterialCommunityIcons name="delete" size={22} color={COLORS.error} />
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
+        {/* Load Song button */}
+        <TouchableOpacity
+          style={styles.loadSongButton}
+          onPress={() => setShowSongPicker(true)}
+          testID="freeplay-load-song"
+        >
+          <MaterialCommunityIcons name="music-note-plus" size={20} color={COLORS.primary} />
+        </TouchableOpacity>
       </View>
 
       {/* Beginner-friendly instruction banner */}
@@ -554,33 +533,164 @@ export function PlayScreen(): React.JSX.Element {
         </View>
       )}
 
-      {/* Note reference strip — shows octave markers and Middle C label */}
+      {/* Song reference panel */}
+      <View style={styles.songRefPanel} testID="freeplay-song-ref">
+        {selectedSongTitle ? (
+          <View style={styles.songRefLoaded}>
+            <View style={styles.songRefHeader}>
+              <MaterialCommunityIcons name="music-note" size={16} color={COLORS.primary} />
+              <Text style={styles.songRefTitle} numberOfLines={1}>{selectedSongTitle}</Text>
+              <TouchableOpacity
+                onPress={() => setShowSongPicker(true)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.songRefChange}>Change</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleClearSong}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <MaterialCommunityIcons name="close" size={16} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+            {isLoadingSong ? (
+              <Text style={styles.songRefLoading}>Loading notes...</Text>
+            ) : songNoteNames.length > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.songNotesScroll}
+              >
+                {songNoteNames.map((name, i) => (
+                  <View key={`${name}-${i}`} style={styles.songNoteBadge}>
+                    <Text style={styles.songNoteText}>{name}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            ) : (
+              <Text style={styles.songRefLoading}>No melody notes found</Text>
+            )}
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.songRefPlaceholder}
+            onPress={() => setShowSongPicker(true)}
+          >
+            <MaterialCommunityIcons name="music-note-plus" size={20} color={COLORS.textMuted} />
+            <Text style={styles.songRefPlaceholderText}>Load a song for note reference</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Note reference strip — shows octave markers */}
       <View style={styles.noteRefStrip} testID="freeplay-note-ref">
-        <Text style={styles.noteRefLabel}>C3</Text>
+        <Text style={styles.noteRefLabel}>C2</Text>
         <View style={styles.noteRefSpacer} />
         <Text style={[styles.noteRefLabel, styles.noteRefMiddleC]}>Middle C (C4)</Text>
-        <View style={styles.noteRefSpacer} />
-        <Text style={styles.noteRefLabel}>C5</Text>
         <View style={styles.noteRefSpacer} />
         <Text style={styles.noteRefLabel}>C6</Text>
       </View>
 
-      {/* Full-width keyboard */}
+      {/* Split keyboard (flex fill) */}
       <View style={styles.keyboardContainer}>
-        <Keyboard
-          startNote={48}
-          octaveCount={3}
+        <SplitKeyboard
+          notes={EMPTY_NOTES}
+          splitPoint={60}
           onNoteOn={handleNoteOn}
           onNoteOff={handleNoteOff}
           highlightedNotes={highlightedNotes}
-          expectedNotes={new Set()}
           enabled={true}
           hapticEnabled={true}
           showLabels={true}
-          scrollable={true}
-          keyHeight={110}
+          keyHeight={90}
           testID="freeplay-keyboard"
         />
+      </View>
+
+      {/* Floating action bar */}
+      <View style={styles.actionBar} testID="freeplay-action-bar">
+        <View style={styles.actionRow}>
+          {/* Record / Stop */}
+          {!isRecording ? (
+            <TouchableOpacity
+              onPress={startRecording}
+              style={[styles.actionButton, styles.actionRecord]}
+              testID="freeplay-record-start"
+            >
+              <MaterialCommunityIcons name="record-circle" size={24} color={COLORS.textPrimary} />
+              <Text style={styles.actionLabel}>Record</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              onPress={stopRecording}
+              style={[styles.actionButton, styles.actionStop]}
+              testID="freeplay-record-stop"
+            >
+              <MaterialCommunityIcons name="stop-circle" size={24} color={COLORS.textPrimary} />
+              <Text style={styles.actionLabel}>Stop</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Play / Stop playback */}
+          {recordedNotes.length > 0 && !isRecording && (
+            <>
+              {isPlayingBack ? (
+                <TouchableOpacity
+                  onPress={stopPlayback}
+                  style={[styles.actionButton, styles.actionPlayback]}
+                  testID="freeplay-record-stop-playback"
+                >
+                  <MaterialCommunityIcons name="stop-circle" size={24} color={COLORS.textPrimary} />
+                  <Text style={styles.actionLabel}>Stop</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  onPress={playRecording}
+                  style={[styles.actionButton, styles.actionPlayback]}
+                  testID="freeplay-record-playback"
+                >
+                  <MaterialCommunityIcons name="play-circle" size={24} color={COLORS.textPrimary} />
+                  <Text style={styles.actionLabel}>Play</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                onPress={clearRecording}
+                style={[styles.actionButton, styles.actionClear]}
+                testID="freeplay-record-clear"
+              >
+                <MaterialCommunityIcons name="delete" size={24} color={COLORS.textPrimary} />
+                <Text style={styles.actionLabel}>Clear</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
+        {/* Stats row */}
+        <View style={styles.statsRow}>
+          <Text style={styles.statsText}>{sessionNoteCount} notes</Text>
+          {recordedNotes.length > 0 && (
+            <Text style={styles.statsText}>{recordedNotes.length} recorded</Text>
+          )}
+          {analysis?.detectedKey && (
+            <Text style={styles.statsKeyText}>Key of {analysis.detectedKey}</Text>
+          )}
+
+          <View style={styles.statsSpacer} />
+
+          {/* Help button to re-show instructions */}
+          {!showInstructions && (
+            <TouchableOpacity
+              onPress={() => setShowInstructions(true)}
+              style={styles.helpButton}
+              testID="freeplay-help"
+            >
+              <MaterialCommunityIcons name="help-circle-outline" size={20} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+          )}
+
+          {/* Salsa mini avatar */}
+          <SalsaCoach mood="happy" size="small" />
+        </View>
       </View>
 
       {/* Free play analysis card — appears after 2s of silence */}
@@ -618,8 +728,27 @@ export function PlayScreen(): React.JSX.Element {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Song reference picker modal */}
+      <SongReferencePicker
+        visible={showSongPicker}
+        onSelect={handleSongSelect}
+        onClose={() => setShowSongPicker(false)}
+      />
     </SafeAreaView>
   );
+}
+
+// ============================================================================
+// Utility — approximate MIDI from note name for sorting
+// ============================================================================
+
+function noteNameToApproxMidi(name: string): number {
+  const match = name.match(/^([A-G]#?)(\d+)$/);
+  if (!match) return 0;
+  const noteIdx = NOTE_NAMES.indexOf(match[1]);
+  const octave = parseInt(match[2], 10);
+  return (octave + 1) * 12 + noteIdx;
 }
 
 // ============================================================================
@@ -631,7 +760,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  topBar: {
+
+  // ── Header ────────────────────────────────────────────────────────────
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.sm,
@@ -662,41 +793,31 @@ const styles = StyleSheet.create({
     color: COLORS.success,
     fontWeight: '600',
   },
+  headerSpacer: {
+    flex: 1,
+  },
   noteDisplay: {
     backgroundColor: COLORS.cardSurface,
     borderRadius: BORDER_RADIUS.sm,
-    paddingHorizontal: 20,
-    paddingVertical: SPACING.sm,
+    paddingHorizontal: 14,
+    paddingVertical: SPACING.xs,
     borderWidth: 2,
     borderColor: COLORS.primary,
-    minWidth: 80,
+    minWidth: 64,
     alignItems: 'center',
   },
   noteText: {
-    ...TYPOGRAPHY.display.md,
+    ...TYPOGRAPHY.heading.lg,
     color: COLORS.primary,
     fontFamily: 'monospace',
   },
-  statsContainer: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    flex: 1,
+  loadSongButton: {
+    padding: 6,
+    backgroundColor: glowColor(COLORS.primary, 0.1),
+    borderRadius: BORDER_RADIUS.sm,
   },
-  statsText: {
-    ...TYPOGRAPHY.caption.lg,
-    color: COLORS.textMuted,
-  },
-  helpButton: {
-    padding: 4,
-  },
-  recordControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  controlTouchable: {
-    padding: 4,
-  },
+
+  // ── Instructions banner ───────────────────────────────────────────────
   instructionsBanner: {
     backgroundColor: glowColor(COLORS.starGold, 0.06),
     borderBottomWidth: 1,
@@ -723,14 +844,78 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     lineHeight: 17,
   },
+
+  // ── Song reference panel ──────────────────────────────────────────────
+  songRefPanel: {
+    backgroundColor: COLORS.cardSurface,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
+    minHeight: 52,
+  },
+  songRefPlaceholder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    gap: SPACING.sm,
+  },
+  songRefPlaceholderText: {
+    ...TYPOGRAPHY.body.sm,
+    color: COLORS.textMuted,
+  },
+  songRefLoaded: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  songRefHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    marginBottom: SPACING.xs,
+  },
+  songRefTitle: {
+    ...TYPOGRAPHY.body.sm,
+    color: COLORS.textPrimary,
+    fontWeight: '600',
+    flex: 1,
+  },
+  songRefChange: {
+    ...TYPOGRAPHY.caption.lg,
+    color: COLORS.primary,
+    fontWeight: '600',
+    marginRight: SPACING.xs,
+  },
+  songRefLoading: {
+    ...TYPOGRAPHY.caption.lg,
+    color: COLORS.textMuted,
+    fontStyle: 'italic',
+  },
+  songNotesScroll: {
+    gap: 6,
+    paddingVertical: 2,
+  },
+  songNoteBadge: {
+    backgroundColor: glowColor(COLORS.primary, 0.12),
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  songNoteText: {
+    ...TYPOGRAPHY.caption.md,
+    color: COLORS.primary,
+    fontWeight: '600',
+    fontFamily: 'monospace',
+  },
+
+  // ── Note reference strip ──────────────────────────────────────────────
   noteRefStrip: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
     paddingVertical: 4,
     backgroundColor: COLORS.background,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.cardBorder,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
   },
   noteRefLabel: {
     ...TYPOGRAPHY.caption.sm,
@@ -746,15 +931,82 @@ const styles = StyleSheet.create({
   noteRefSpacer: {
     flex: 1,
   },
+
+  // ── Keyboard container ────────────────────────────────────────────────
   keyboardContainer: {
     flex: 1,
     borderTopWidth: 1,
     borderTopColor: COLORS.cardBorder,
   },
+
+  // ── Floating action bar ───────────────────────────────────────────────
+  actionBar: {
+    backgroundColor: COLORS.surface,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.cardBorder,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: SPACING.md,
+    marginBottom: SPACING.xs,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  actionRecord: {
+    backgroundColor: COLORS.primary,
+  },
+  actionStop: {
+    backgroundColor: COLORS.error,
+  },
+  actionPlayback: {
+    backgroundColor: COLORS.success,
+  },
+  actionClear: {
+    backgroundColor: COLORS.cardSurface,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  actionLabel: {
+    ...TYPOGRAPHY.button.sm,
+    color: COLORS.textPrimary,
+  },
+
+  // ── Stats row ─────────────────────────────────────────────────────────
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  statsText: {
+    ...TYPOGRAPHY.caption.lg,
+    color: COLORS.textMuted,
+  },
+  statsKeyText: {
+    ...TYPOGRAPHY.caption.lg,
+    color: COLORS.info,
+    fontWeight: '600',
+  },
+  statsSpacer: {
+    flex: 1,
+  },
+  helpButton: {
+    padding: 4,
+  },
+
+  // ── Analysis overlay ──────────────────────────────────────────────────
   analysisCard: {
     ...SHADOWS.md,
     position: 'absolute',
-    bottom: 120,
+    bottom: 160,
     left: SPACING.md,
     right: SPACING.md,
     backgroundColor: COLORS.cardSurface,

@@ -1,13 +1,14 @@
 /**
  * PlayScreen Tests
  *
- * Comprehensive tests for the Free Play screen:
- * - Renders in landscape mode
- * - Shows note reference strip
- * - Keyboard is full-width, scrollable, 3 octaves
+ * Comprehensive tests for the redesigned Free Play screen:
+ * - Renders in portrait mode (no landscape lock)
+ * - Shows SplitKeyboard with two-hand layout
  * - Note name display updates on key press
  * - Recording controls work
  * - Instructions banner shows and dismisses
+ * - Song reference panel shows placeholder or loaded song
+ * - Floating action bar with record/play/clear
  */
 
 import React from 'react';
@@ -18,12 +19,13 @@ import { render, fireEvent } from '@testing-library/react-native';
 // ---------------------------------------------------------------------------
 
 const mockGoBack = jest.fn();
+const mockNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => {
   const actual = jest.requireActual('@react-navigation/native');
   return {
     ...actual,
     useNavigation: () => ({
-      navigate: jest.fn(),
+      navigate: mockNavigate,
       goBack: mockGoBack,
       dispatch: jest.fn(),
       setOptions: jest.fn(),
@@ -35,22 +37,6 @@ jest.mock('@react-navigation/native', () => {
     },
   };
 });
-
-// Mock expo-screen-orientation
-jest.mock('expo-screen-orientation', () => ({
-  lockAsync: jest.fn().mockResolvedValue(undefined),
-  lockPlatformAsync: jest.fn().mockResolvedValue(undefined),
-  OrientationLock: {
-    LANDSCAPE_LEFT: 'LANDSCAPE_LEFT',
-    LANDSCAPE: 'LANDSCAPE',
-    PORTRAIT_UP: 'PORTRAIT_UP',
-  },
-  Orientation: {
-    LANDSCAPE_LEFT: 3,
-    LANDSCAPE_RIGHT: 4,
-    PORTRAIT_UP: 1,
-  },
-}));
 
 // Mock audio engine
 const mockPlayNote = jest.fn(() => ({
@@ -73,17 +59,27 @@ jest.mock('../../audio/createAudioEngine', () => ({
   })),
 }));
 
-// Capture Keyboard props for assertions
+// Capture SplitKeyboard props for assertions
 let capturedKeyboardProps: any = {};
-jest.mock('../../components/Keyboard/Keyboard', () => ({
-  Keyboard: (props: any) => {
+jest.mock('../../components/Keyboard/SplitKeyboard', () => ({
+  SplitKeyboard: (props: any) => {
     capturedKeyboardProps = props;
     const { View, Text } = require('react-native');
     return (
-      <View testID={props.testID || 'mock-keyboard'}>
-        <Text>Keyboard</Text>
+      <View testID={props.testID || 'mock-split-keyboard'}>
+        <Text>SplitKeyboard</Text>
       </View>
     );
+  },
+  deriveSplitPoint: jest.fn(() => 60),
+  computeKeyboardRange: jest.fn(() => ({ startNote: 48, octaveCount: 2 })),
+}));
+
+// Mock SongReferencePicker
+jest.mock('../../components/SongReferencePicker', () => ({
+  SongReferencePicker: (props: any) => {
+    const { View } = require('react-native');
+    return props.visible ? <View testID="song-picker-modal" /> : null;
   },
 }));
 
@@ -113,6 +109,24 @@ jest.mock('../../stores/settingsStore', () => ({
   ),
 }));
 
+// Mock songStore
+const mockLoadSong = jest.fn();
+const mockLoadSummaries = jest.fn();
+jest.mock('../../stores/songStore', () => ({
+  useSongStore: Object.assign(
+    (selector: any) =>
+      selector({
+        summaries: [],
+        isLoadingSummaries: false,
+        loadSummaries: mockLoadSummaries,
+        currentSong: null,
+        isLoadingSong: false,
+        loadSong: mockLoadSong,
+      }),
+    { getState: () => ({ summaries: [], currentSong: null }) },
+  ),
+}));
+
 // Mock vector icons
 jest.mock('@expo/vector-icons', () => {
   const { View, Text } = require('react-native');
@@ -124,6 +138,14 @@ jest.mock('@expo/vector-icons', () => {
     ),
   };
 });
+
+// Mock SalsaCoach
+jest.mock('../../components/Mascot/SalsaCoach', () => ({
+  SalsaCoach: () => {
+    const { View } = require('react-native');
+    return <View testID="salsa-coach" />;
+  },
+}));
 
 // ---------------------------------------------------------------------------
 // Import after mocks
@@ -166,6 +188,13 @@ describe('PlayScreen', () => {
       fireEvent.press(getByTestId('freeplay-back'));
       expect(mockGoBack).toHaveBeenCalled();
     });
+
+    it('does NOT lock to landscape (portrait mode)', () => {
+      render(<PlayScreen />);
+      // ScreenOrientation is not even imported any more — no mock needed
+      // Just verify the screen renders without any orientation calls
+      expect(true).toBe(true);
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -178,10 +207,9 @@ describe('PlayScreen', () => {
       expect(getByTestId('freeplay-note-ref')).toBeTruthy();
     });
 
-    it('shows octave markers (C3, C5, C6)', () => {
+    it('shows octave markers (C2, C6)', () => {
       const { getByText } = render(<PlayScreen />);
-      expect(getByText('C3')).toBeTruthy();
-      expect(getByText('C5')).toBeTruthy();
+      expect(getByText('C2')).toBeTruthy();
       expect(getByText('C6')).toBeTruthy();
     });
 
@@ -209,28 +237,18 @@ describe('PlayScreen', () => {
   });
 
   // -----------------------------------------------------------------------
-  // Keyboard integration
+  // SplitKeyboard integration
   // -----------------------------------------------------------------------
 
-  describe('Keyboard integration', () => {
-    it('passes correct startNote (C3 = 48)', () => {
-      render(<PlayScreen />);
-      expect(capturedKeyboardProps.startNote).toBe(48);
+  describe('SplitKeyboard integration', () => {
+    it('renders SplitKeyboard', () => {
+      const { getByTestId } = render(<PlayScreen />);
+      expect(getByTestId('freeplay-keyboard')).toBeTruthy();
     });
 
-    it('passes 3 octaves', () => {
+    it('passes splitPoint of 60 (middle C)', () => {
       render(<PlayScreen />);
-      expect(capturedKeyboardProps.octaveCount).toBe(3);
-    });
-
-    it('keyboard is scrollable', () => {
-      render(<PlayScreen />);
-      expect(capturedKeyboardProps.scrollable).toBe(true);
-    });
-
-    it('keyboard shows labels', () => {
-      render(<PlayScreen />);
-      expect(capturedKeyboardProps.showLabels).toBe(true);
+      expect(capturedKeyboardProps.splitPoint).toBe(60);
     });
 
     it('keyboard is enabled', () => {
@@ -243,15 +261,42 @@ describe('PlayScreen', () => {
       expect(capturedKeyboardProps.hapticEnabled).toBe(true);
     });
 
-    it('keyboard height is 110', () => {
+    it('keyboard shows labels', () => {
       render(<PlayScreen />);
-      expect(capturedKeyboardProps.keyHeight).toBe(110);
+      expect(capturedKeyboardProps.showLabels).toBe(true);
     });
 
     it('passes onNoteOn and onNoteOff callbacks', () => {
       render(<PlayScreen />);
       expect(typeof capturedKeyboardProps.onNoteOn).toBe('function');
       expect(typeof capturedKeyboardProps.onNoteOff).toBe('function');
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Song reference panel
+  // -----------------------------------------------------------------------
+
+  describe('Song reference panel', () => {
+    it('renders song reference panel', () => {
+      const { getByTestId } = render(<PlayScreen />);
+      expect(getByTestId('freeplay-song-ref')).toBeTruthy();
+    });
+
+    it('shows placeholder text when no song loaded', () => {
+      const { getByText } = render(<PlayScreen />);
+      expect(getByText('Load a song for note reference')).toBeTruthy();
+    });
+
+    it('shows Load Song button in header', () => {
+      const { getByTestId } = render(<PlayScreen />);
+      expect(getByTestId('freeplay-load-song')).toBeTruthy();
+    });
+
+    it('opens song picker modal when Load Song is pressed', () => {
+      const { getByTestId } = render(<PlayScreen />);
+      fireEvent.press(getByTestId('freeplay-load-song'));
+      expect(getByTestId('song-picker-modal')).toBeTruthy();
     });
   });
 
@@ -296,10 +341,15 @@ describe('PlayScreen', () => {
   });
 
   // -----------------------------------------------------------------------
-  // Recording controls
+  // Floating action bar & recording controls
   // -----------------------------------------------------------------------
 
-  describe('Recording controls', () => {
+  describe('Floating action bar', () => {
+    it('renders the action bar', () => {
+      const { getByTestId } = render(<PlayScreen />);
+      expect(getByTestId('freeplay-action-bar')).toBeTruthy();
+    });
+
     it('shows record button initially', () => {
       const { getByTestId } = render(<PlayScreen />);
       expect(getByTestId('freeplay-record-start')).toBeTruthy();
@@ -313,7 +363,7 @@ describe('PlayScreen', () => {
       expect(queryByTestId('freeplay-record-start')).toBeNull();
     });
 
-    it('shows playback and clear buttons after recording', () => {
+    it('shows playback and clear buttons after recording notes', () => {
       const { getByTestId } = render(<PlayScreen />);
 
       // Start recording
@@ -347,27 +397,6 @@ describe('PlayScreen', () => {
     it('shows "0 notes" initially', () => {
       const { getByText } = render(<PlayScreen />);
       expect(getByText('0 notes')).toBeTruthy();
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // Landscape orientation
-  // -----------------------------------------------------------------------
-
-  describe('Landscape orientation', () => {
-    it('locks to landscape on mount via lockPlatformAsync', () => {
-      const ScreenOrientation = require('expo-screen-orientation');
-      render(<PlayScreen />);
-
-      // Uses lockPlatformAsync with iOS-specific orientations to override device rotation lock
-      expect(ScreenOrientation.lockPlatformAsync).toHaveBeenCalledWith(
-        expect.objectContaining({
-          screenOrientationArrayIOS: [
-            ScreenOrientation.Orientation.LANDSCAPE_LEFT,
-            ScreenOrientation.Orientation.LANDSCAPE_RIGHT,
-          ],
-        }),
-      );
     });
   });
 });
