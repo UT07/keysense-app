@@ -336,7 +336,25 @@ jest.mock('react-native-svg', () => {
   };
 });
 
+jest.mock('../../audio/SoundManager', () => ({
+  soundManager: { play: jest.fn(), preload: jest.fn() },
+}));
+
 jest.mock('../../theme/tokens', () => ({
+  getComboTier: (combo: number) => {
+    if (combo >= 20) return { name: 'LEGENDARY', minCombo: 20, color: '#FF2D55', glowColor: 'rgba(255,45,85,0.6)', borderColor: '#FF2D55', label: 'LEGENDARY!' };
+    if (combo >= 15) return { name: 'SUPER', minCombo: 15, color: '#FFD700', glowColor: 'rgba(255,215,0,0.5)', borderColor: '#FFD700', label: 'SUPER!' };
+    if (combo >= 10) return { name: 'FIRE', minCombo: 10, color: '#FF6B35', glowColor: 'rgba(255,107,53,0.4)', borderColor: '#FF6B35', label: 'FIRE!' };
+    if (combo >= 5) return { name: 'GOOD', minCombo: 5, color: '#4CAF50', glowColor: 'rgba(76,175,80,0.3)', borderColor: '#4CAF50', label: 'NICE!' };
+    return { name: 'NORMAL', minCombo: 0, color: '#FFFFFF', glowColor: 'rgba(255,255,255,0)', borderColor: '#FFFFFF', label: '' };
+  },
+  COMBO_TIERS: [
+    { name: 'NORMAL', minCombo: 0, color: '#FFFFFF', glowColor: 'rgba(255,255,255,0)', borderColor: '#FFFFFF', label: '' },
+    { name: 'GOOD', minCombo: 5, color: '#4CAF50', glowColor: 'rgba(76,175,80,0.3)', borderColor: '#4CAF50', label: 'NICE!' },
+    { name: 'FIRE', minCombo: 10, color: '#FF6B35', glowColor: 'rgba(255,107,53,0.4)', borderColor: '#FF6B35', label: 'FIRE!' },
+    { name: 'SUPER', minCombo: 15, color: '#FFD700', glowColor: 'rgba(255,215,0,0.5)', borderColor: '#FFD700', label: 'SUPER!' },
+    { name: 'LEGENDARY', minCombo: 20, color: '#FF2D55', glowColor: 'rgba(255,45,85,0.6)', borderColor: '#FF2D55', label: 'LEGENDARY!' },
+  ],
   COLORS: {
     background: '#0A0A0A', surface: '#141414', surfaceElevated: '#1C1C1C',
     surfaceOverlay: 'rgba(0, 0, 0, 0.85)', primary: '#DC143C', primaryLight: '#FF2D55',

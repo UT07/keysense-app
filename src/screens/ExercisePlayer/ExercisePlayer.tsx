@@ -65,6 +65,8 @@ import { useDevKeyboardMidi } from '../../input/DevKeyboardMidi';
 import { DemoPlaybackService } from '../../services/demoPlayback';
 import { ExerciseIntroOverlay } from './ExerciseIntroOverlay';
 import { ExerciseLoadingScreen } from './ExerciseLoadingScreen';
+import { ComboMeter } from './ComboMeter';
+import { ComboGlow } from './ComboGlow';
 import { SKILL_TREE, getSkillsForExercise, getSkillById, getGenerationHints } from '../../core/curriculum/SkillTree';
 import type { SkillCategory } from '../../core/curriculum/SkillTree';
 import { getTierMasteryTestSkillId, isTierMasteryTestAvailable, hasTierMasteryTestPassed } from '../../core/curriculum/tierMasteryTest';
@@ -1839,6 +1841,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
 
   return (
     <SafeAreaView style={styles.container} testID="exercise-player">
+      <ComboGlow combo={comboCount} />
       {/* Error banner for non-critical errors */}
       {hasError && errorMessage && (isMidiReady || isAudioReady) && (
         <View style={styles.errorBanner}>
@@ -2031,9 +2034,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
             >
               {getFeedbackLabel(feedback.type)}
             </Text>
-            {comboCount > 2 && (
-              <Text style={styles.comboOverlayText}>{comboCount}x combo</Text>
-            )}
+            <ComboMeter combo={comboCount} />
           </View>
         )}
 
@@ -2250,11 +2251,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '900',
     letterSpacing: 1,
-  },
-  comboOverlayText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.comboGold,
   },
   keyboardContainer: {
     borderTopWidth: 1,
