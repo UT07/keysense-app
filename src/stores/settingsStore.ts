@@ -27,6 +27,8 @@ const defaultSettings: SettingsData = {
   keyboardVolume: 0.8,
   audioBufferSize: 4096,
   playbackSpeed: 0.5 as const, // Default to 50% speed — comfortable for on-screen keyboard beginners
+  uiSoundEnabled: true, // SoundManager game UI sounds
+  uiSoundVolume: 0.7, // SoundManager volume (0-1)
 
   // Display settings
   showFingerNumbers: true,
@@ -123,6 +125,17 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
   setPlaybackSpeed: (speed: 0.25 | 0.5 | 0.75 | 1.0) => {
     set({ playbackSpeed: speed });
     debouncedSave({ ...get(), playbackSpeed: speed });
+  },
+
+  setUiSoundEnabled: (enabled: boolean) => {
+    set({ uiSoundEnabled: enabled });
+    debouncedSave({ ...get(), uiSoundEnabled: enabled });
+  },
+
+  setUiSoundVolume: (vol: number) => {
+    const clamped = Math.max(0, Math.min(1, vol));
+    set({ uiSoundVolume: clamped });
+    debouncedSave({ ...get(), uiSoundVolume: clamped });
   },
 
   // Individual display settings

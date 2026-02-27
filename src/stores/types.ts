@@ -118,6 +118,8 @@ export interface AudioSettings {
   keyboardVolume: number; // 0-1
   audioBufferSize: number;
   playbackSpeed: PlaybackSpeed; // Exercise tempo multiplier
+  uiSoundEnabled: boolean; // SoundManager game UI sounds (separate from piano audio)
+  uiSoundVolume: number; // 0-1, SoundManager volume
 }
 
 export interface DisplaySettings {
@@ -171,6 +173,8 @@ export interface SettingsStoreState extends AudioSettings, DisplaySettings, Noti
   setSoundEnabled: (enabled: boolean) => void;
   setHapticEnabled: (enabled: boolean) => void;
   setPlaybackSpeed: (speed: PlaybackSpeed) => void;
+  setUiSoundEnabled: (enabled: boolean) => void;
+  setUiSoundVolume: (vol: number) => void;
   setShowFingerNumbers: (show: boolean) => void;
   setShowNoteNames: (show: boolean) => void;
   setPreferredHand: (hand: 'right' | 'left' | 'both') => void;
