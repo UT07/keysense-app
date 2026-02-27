@@ -1,7 +1,7 @@
 # Purrrfect Keys Stabilization Report
 
 **Date:** February 2026 (last updated Feb 27)
-**Scope:** Codebase stabilization — tests, types, navigation, UI, adaptive learning, gamification, Phase 7 UI revamp, gem bug fix, cat gallery redesign, Phase 9 Music Library, Phase 8 polyphonic completion, Phase 9.5 UX overhaul
+**Scope:** Codebase stabilization — tests, types, navigation, UI, adaptive learning, gamification, Phase 7 UI revamp, gem bug fix, cat gallery redesign, Phase 9 Music Library, Phase 8 polyphonic completion, Phase 9.5 UX overhaul, Phase 10 Arcade Concert Hall
 **Full history:** See `docs/stabilization-report-archive.md` for detailed change narratives.
 
 ## Final State
@@ -328,6 +328,40 @@
 
 - **Tests:** ~109 suites, ~2,500+ tests, 0 failures, 0 TypeScript errors
 
+### Phase 10: Arcade Concert Hall (Feb 27)
+
+#### Foundation (Batches 1-2)
+- **SoundManager:** Singleton service with `SoundName` type union (20+ sounds), expo-av sound pools, `useSoundManager` hook, haptic mapping per sound, `HAPTIC_MAP` for fallback. Wired into PressableScale for button_press haptic.
+- **Design Tokens:** `RARITY` system (common/rare/epic/legendary border+glow colors), `COMBO_TIERS` (fire/skull/crown thresholds+colors), `ANIMATION_CONFIG` for consistent timing
+- **GameCard:** Rarity-bordered card component with subtle glow, used across HomeScreen, DailySessionScreen, and future screens
+
+#### ExercisePlayer Combo Escalation (Batch 3)
+- **ComboMeter:** Combo count display with tier escalation (fire at 5x, skull at 15x, crown at 25x), pulsing scale animation on milestone hits
+- **ComboGlow:** Full-screen animated border overlay (Reanimated), color synced to combo tier, opacity pulse matching combo rhythm
+- **Keyboard depth:** 3D-style key press animation with subtle shadow and glow on active keys
+
+#### CompletionModal Loot Reveal (Batch 4)
+- **RewardChest system:** `getChestType(stars, isFirstCompletion)` → common/rare/epic/legendary, `getChestReward(chestType)` → gem amount with randomized range per tier
+- **Timed reveal:** 10-phase animation sequence (0-6.5s): dim→title→score→stars→record→chest→gems→xp→cat→actions. Each section guarded by `phaseReached()`. `skipAnimation` prop for tests.
+- **Sound integration:** `exercise_complete` at title, `star_earn` per star, `gem_clink` at gems, `chest_open` for chest
+
+#### Screen Redesigns (Batches 5-9)
+- **HomeScreen:** Sections wrapped with GameCard (rare/epic/common rarity), pulsing Continue Learning CTA, shaking Daily Challenge
+- **AuthScreen:** Larger Salsa (2x), shimmer app name, "Learn piano. Grow cats." tagline, 6 floating musical notes, FadeInUp/FadeInDown
+- **LevelMapScreen:** 15 unique `TIER_THEMES` with per-tier nodeColor/pathColor/backgroundGradient, tier zone labels
+- **DailySessionScreen:** Exercise cards wrapped with GameCard by section type (warmup=common, lesson=rare, challenge=epic), FadeInUp stagger
+- **SongLibraryScreen:** Metallic mastery badges (bronze/silver/gold/platinum), pulsing "NEW" badge, difficulty star crystals with per-level colors
+- **CatSwitchScreen:** Rarity-colored borders (common=grey starters, rare=blue purchasable, legendary=gold animated shimmer), 4 evolution stage dots
+- **ProfileScreen:** Shield-style stat badges with icon watermarks and colored glow, achievement shimmer pulse, animated streak flame (orange→red), larger cat avatar with halo glow
+
+#### PlayScreen Song Mode (Bug Fix)
+- **Song note visualization:** When a song reference is loaded, PlayScreen switches to portrait mode with a horizontal piano roll (notes going left-to-right) above the keyboard. Color-coded note blocks by pitch, beat grid lines, note labels. Section pills for multi-section songs. Keyboard auto-zoomed to song note range.
+
+#### Daily Reward Expiry Fix
+- **No retroactive claiming:** Changed `claimDailyReward()` guard from `day > actualDay` to `day !== actualDay` — only today's reward is claimable, past days expire at midnight. UI updated to show X icon for missed days.
+
+- **Tests:** 116 suites, 2,548 tests, 0 failures, 0 TypeScript errors
+
 ---
 
 ## Known Remaining Items
@@ -337,6 +371,7 @@
 3. **Native MIDI module**: `react-native-midi` not installed yet (needs RN 0.77+). VMPK + IAC Driver ready
 4. **Open bugs on GitHub**: ~45 remaining open issues
 5. **Rive animation files**: .riv files not created (need Rive editor design work) — SVG composable system is working alternative
-6. **Phase 7 Batches 7-10 remaining**: Remaining screen redesigns (AuthScreen, LevelMapScreen, OnboardingScreen), micro-interactions (PressableScale upgrade, animated progress bars, loading skeletons, celebration upgrades), Detox visual audit
-7. **Phase 8 remaining**: Real-device testing (mic accuracy >95%, ONNX model loading on device, ambient calibration UX), Basic Pitch ONNX model download
-8. **Phase 10+**: Social & Leaderboards, QA + Launch
+6. **Phase 8 remaining**: Real-device testing (mic accuracy >95%, ONNX model loading on device, ambient calibration UX), Basic Pitch ONNX model download
+7. **Sound assets**: SoundManager skeleton in place but actual .wav files not yet sourced (30+ sounds needed)
+8. **3D cat infrastructure**: Deferred (expo-gl + three.js could break RN 0.76 build, no Blender models yet)
+9. **Phase 11+**: Social & Leaderboards, QA + Launch

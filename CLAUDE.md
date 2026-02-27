@@ -8,16 +8,16 @@ Built with React Native (Expo) + Firebase + Gemini AI.
 
 ## Current Sprint (Feb 27, 2026)
 
-**Codebase Health:** 106 test suites, 2,441 tests passing, 0 TypeScript errors
+**Codebase Health:** 116 test suites, 2,548 tests passing, 0 TypeScript errors
 
-**Phases 1-9.5 COMPLETE** (Core Loop, Gamification, Auth, Adaptive Learning, Evolution, UI Revamp, All-AI Exercises, Audio Input + Polyphonic Detection, Music Library + 124 songs, UX Overhaul)
+**Phases 1-10 COMPLETE** (Core Loop, Gamification, Auth, Adaptive Learning, Evolution, UI Revamp, All-AI Exercises, Audio Input + Polyphonic Detection, Music Library + 124 songs, Arcade Concert Hall)
 
-**Up Next:** Phase 10 — Arcade Concert Hall Revamp (3D cats, sound design, game-feel, loot reveals)
+**Up Next:** Phase 11 — Social & Leaderboards
 
 **Active Roadmap:**
-- **Phase 10: Arcade Concert Hall Revamp** — IN PROGRESS (SoundManager, combo escalation, loot reveal, 3D cats, screen polish)
-- **Phase 10.5: Social & Leaderboards** — PLANNED (friends, leagues, challenges)
-- **Phase 11: QA + Launch** — PLANNED
+- **Phase 10: Arcade Concert Hall** — COMPLETE (SoundManager, combo escalation, loot reveal, GameCard system, screen redesigns, rarity borders)
+- **Phase 11: Social & Leaderboards** — UP NEXT (friends, leagues, challenges)
+- **Phase 12: QA + Launch** — PLANNED
 
 See `docs/plans/UNIFIED-PLAN.md` for the **single source of truth** on all phases.
 See `docs/plans/2026-02-27-arcade-concert-hall-implementation.md` for the active execution plan.
@@ -79,6 +79,7 @@ src/
 │   ├── ExpoAudioEngine.ts # expo-av implementation with sound pooling
 │   ├── WebAudioEngine.ts  # react-native-audio-api JSI implementation
 │   ├── createAudioEngine.ts # Factory: tries WebAudio, falls back to Expo
+│   ├── SoundManager.ts   # UI sound effects + haptics (combo, stars, gems, chest)
 │   └── samples/          # Piano sample management
 ├── input/                # Input handling
 │   ├── MidiInput.ts      # MIDI device handling
@@ -130,6 +131,11 @@ src/
 | `src/content/ContentLoader.ts` | Exercise/lesson loading from JSON (static require registry) |
 | `src/audio/createAudioEngine.ts` | Audio factory: WebAudioEngine (JSI) with ExpoAudioEngine fallback |
 | `src/audio/ExpoAudioEngine.ts` | Audio playback with round-robin voice pools (50 pre-loaded sounds) |
+| `src/audio/SoundManager.ts` | UI sound effects + haptics: SoundName type, haptic mapping, play/stop API |
+| `src/components/common/GameCard.tsx` | Rarity-bordered card component (common/rare/epic/legendary) |
+| `src/components/common/ComboMeter.tsx` | Combo streak display with tier escalation (fire→skull→crown) |
+| `src/components/common/ComboGlow.tsx` | Full-screen animated border glow synced to combo tier |
+| `src/core/rewards/chestSystem.ts` | Chest loot system: common/rare/epic/legendary chests with gem rewards |
 | `src/core/exercises/ExerciseValidator.ts` | Core scoring logic - pure TS, heavily tested |
 | `src/core/exercises/types.ts` | Exercise and score type definitions |
 | `src/input/MidiInput.ts` | MIDI device connection and event handling |
@@ -259,7 +265,7 @@ onAudioBuffer((buffer: Float32Array) => {
 | E2E | Detox | `e2e/` |
 | Audio latency | Custom harness | `scripts/measure-latency.ts` |
 
-**~2,500+ tests, ~109 suites**. Run tests before committing:
+**2,548 tests, 116 suites**. Run tests before committing:
 ```bash
 npm run typecheck && npm run test
 ```
