@@ -15,6 +15,7 @@ import {
   Alert,
   TextInput,
   Modal,
+  Platform,
   Animated as RNAnimated,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -22,6 +23,15 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  Easing,
+  interpolateColor,
+} from 'react-native-reanimated';
 import { useProgressStore } from '../stores/progressStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useAchievementStore } from '../stores/achievementStore';
@@ -34,7 +44,7 @@ import { CatAvatar } from '../components/Mascot/CatAvatar';
 import { CAT_CHARACTERS, getCatById } from '../components/Mascot/catCharacters';
 import { StreakFlame } from '../components/StreakFlame';
 import { getLevelProgress } from '../core/progression/XpSystem';
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, GRADIENTS, glowColor } from '../theme/tokens';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, GRADIENTS, glowColor, shadowGlow } from '../theme/tokens';
 import { useAuthStore } from '../stores/authStore';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
@@ -52,17 +62,17 @@ const VOLUME_OPTIONS = [
 
 /** Stat card accent colors for gradient overlays */
 const STAT_ACCENTS = {
-  level: glowColor(COLORS.primary, 0.15),
-  xp: glowColor(COLORS.starGold, 0.15),
-  streak: glowColor(COLORS.warning, 0.15),
-  lessons: glowColor(COLORS.success, 0.15),
+  level: glowColor(COLORS.primary, 0.2),
+  xp: glowColor(COLORS.starGold, 0.2),
+  streak: glowColor(COLORS.warning, 0.2),
+  lessons: glowColor(COLORS.success, 0.2),
 } as const;
 
 const STAT_ACCENT_BORDERS = {
-  level: glowColor(COLORS.primary, 0.3),
-  xp: glowColor(COLORS.starGold, 0.3),
-  streak: glowColor(COLORS.warning, 0.3),
-  lessons: glowColor(COLORS.success, 0.3),
+  level: glowColor(COLORS.primary, 0.45),
+  xp: glowColor(COLORS.starGold, 0.45),
+  streak: glowColor(COLORS.warning, 0.45),
+  lessons: glowColor(COLORS.success, 0.45),
 } as const;
 
 const STAT_ICON_COLORS = {
@@ -73,6 +83,14 @@ const STAT_ICON_COLORS = {
 } as const;
 
 type StatAccentKey = keyof typeof STAT_ACCENTS;
+
+/** Shield background icon for each stat badge */
+const STAT_SHIELD_ICONS: Record<StatAccentKey, IconName> = {
+  level: 'shield-star',
+  xp: 'shield-star-outline',
+  streak: 'shield-half-full',
+  lessons: 'shield-check',
+} as const;
 
 interface StatItem {
   icon: IconName;
@@ -121,6 +139,69 @@ function AnimatedStatValue({ value, color }: { value: number; color: string }): 
 
   return (
     <Text style={[styles.statValue, { color }]}>{displayValue}</Text>
+  );
+}
+
+/** Animated shimmer pulse wrapper for unlocked achievements */
+function ShimmerBadge({ children, isUnlocked }: { children: React.ReactNode; isUnlocked: boolean }): React.ReactElement {
+  const shimmerOpacity = useSharedValue(1);
+
+  useEffect(() => {
+    if (isUnlocked) {
+      shimmerOpacity.value = withRepeat(
+        withSequence(
+          withTiming(0.7, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
+          withTiming(1.0, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
+        ),
+        -1,
+        true,
+      );
+    } else {
+      shimmerOpacity.value = 1;
+    }
+  }, [isUnlocked, shimmerOpacity]);
+
+  const shimmerStyle = useAnimatedStyle(() => ({
+    opacity: isUnlocked ? shimmerOpacity.value : 0.5,
+  }));
+
+  return (
+    <Animated.View style={shimmerStyle}>
+      {children}
+    </Animated.View>
+  );
+}
+
+/** Animated streak badge with cycling orange-to-red color */
+function StreakStatBadge({ value }: { value: number }): React.ReactElement {
+  const colorProgress = useSharedValue(0);
+
+  useEffect(() => {
+    colorProgress.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+      ),
+      -1,
+      true,
+    );
+  }, [colorProgress]);
+
+  const colorStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(
+      colorProgress.value,
+      [0, 0.5, 1],
+      [COLORS.streakFlameWarm, COLORS.streakFlameMedium, COLORS.streakFlameHot],
+    ),
+  }));
+
+  return (
+    <View style={styles.streakBadgeContainer}>
+      <StreakFlame streak={value} showCount={false} size="medium" />
+      <Animated.Text style={[styles.streakBadgeValue, colorStyle]}>
+        {value}
+      </Animated.Text>
+    </View>
   );
 }
 
@@ -220,29 +301,31 @@ function AchievementsSection(): React.ReactElement {
               onPress={() => handleBadgePress(achievement, isUnlocked)}
               activeOpacity={0.7}
             >
-              <View
-                style={[
-                  styles.achievementBadge,
-                  isUnlocked
-                    ? styles.achievementBadgeUnlocked
-                    : styles.achievementBadgeLocked,
-                  isRecent && styles.achievementBadgeRecent,
-                ]}
-              >
-                {isUnlocked ? (
-                  <MaterialCommunityIcons
-                    name={achievement.icon as IconName}
-                    size={32}
-                    color={COLORS.starGold}
-                  />
-                ) : (
-                  <MaterialCommunityIcons
-                    name="lock"
-                    size={24}
-                    color={COLORS.textMuted}
-                  />
-                )}
-              </View>
+              <ShimmerBadge isUnlocked={isUnlocked}>
+                <View
+                  style={[
+                    styles.achievementBadge,
+                    isUnlocked
+                      ? styles.achievementBadgeUnlocked
+                      : styles.achievementBadgeLocked,
+                    isRecent && styles.achievementBadgeRecent,
+                  ]}
+                >
+                  {isUnlocked ? (
+                    <MaterialCommunityIcons
+                      name={achievement.icon as IconName}
+                      size={32}
+                      color={COLORS.starGold}
+                    />
+                  ) : (
+                    <MaterialCommunityIcons
+                      name="lock"
+                      size={24}
+                      color={COLORS.textMuted}
+                    />
+                  )}
+                </View>
+              </ShimmerBadge>
               <Text
                 style={[
                   styles.achievementBadgeLabel,
@@ -386,7 +469,7 @@ export function ProfileScreen(): React.ReactElement {
         contentContainerStyle={styles.scrollContent}
         testID="profile-scroll"
       >
-        {/* Gradient Header with cat avatar and level progress ring */}
+        {/* Gradient Header with cat avatar centerpiece and level progress ring */}
         <LinearGradient
           colors={[catColor + '22', COLORS.surface, COLORS.background]}
           style={styles.header}
@@ -397,6 +480,9 @@ export function ProfileScreen(): React.ReactElement {
             activeOpacity={0.7}
             testID="profile-open-cat-switch"
           >
+            {/* Circular halo glow behind avatar */}
+            <View style={[styles.avatarHalo, { backgroundColor: glowColor(catColor, 0.18) }]} />
+            <View style={[styles.avatarHaloInner, { borderColor: glowColor(catColor, 0.25) }]} />
             <CatAvatar catId={selectedCatId} size="large" showTooltipOnTap={false} evolutionStage={evolutionStage} />
             <View style={styles.editBadge}>
               <MaterialCommunityIcons name="pencil" size={12} color={COLORS.textPrimary} />
@@ -425,38 +511,63 @@ export function ProfileScreen(): React.ReactElement {
           </Text>
         </LinearGradient>
 
-        {/* Stats Grid with gradient backgrounds */}
+        {/* Stats Grid — game-style shield badges */}
         <View style={styles.statsGrid}>
-          {stats.map((stat) => (
-            <LinearGradient
-              key={stat.label}
-              colors={[...GRADIENTS.cardWarm]}
-              style={[
-                styles.statCard,
-                { borderColor: STAT_ACCENT_BORDERS[stat.accentKey] },
-              ]}
-            >
-              <View style={[styles.statAccentOverlay, { backgroundColor: STAT_ACCENTS[stat.accentKey] }]} />
-              {stat.useFlame ? (
-                <StreakFlame streak={stat.value} showCount={false} size="small" />
-              ) : (
-                <MaterialCommunityIcons
-                  name={stat.icon}
-                  size={32}
-                  color={STAT_ICON_COLORS[stat.accentKey]}
-                />
-              )}
-              <AnimatedStatValue value={stat.value} color={COLORS.textPrimary} />
-              <Text style={styles.statLabel}>{stat.label}</Text>
-            </LinearGradient>
-          ))}
-          {/* Gem balance card */}
+          {stats.map((stat) => {
+            const accentColor = STAT_ICON_COLORS[stat.accentKey];
+            return (
+              <LinearGradient
+                key={stat.label}
+                colors={[...GRADIENTS.cardWarm]}
+                style={[
+                  styles.statCard,
+                  { borderColor: STAT_ACCENT_BORDERS[stat.accentKey] },
+                  shadowGlow(accentColor, 8) as Record<string, unknown>,
+                ]}
+              >
+                <View style={[styles.statAccentOverlay, { backgroundColor: STAT_ACCENTS[stat.accentKey] }]} />
+                {/* Shield background watermark */}
+                <View style={styles.shieldWatermark}>
+                  <MaterialCommunityIcons
+                    name={STAT_SHIELD_ICONS[stat.accentKey]}
+                    size={64}
+                    color={glowColor(accentColor, 0.08)}
+                  />
+                </View>
+                {stat.useFlame ? (
+                  <StreakStatBadge value={stat.value} />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons
+                      name={stat.icon}
+                      size={28}
+                      color={accentColor}
+                    />
+                    <AnimatedStatValue value={stat.value} color={COLORS.textPrimary} />
+                  </>
+                )}
+                <Text style={styles.statLabel}>{stat.label}</Text>
+              </LinearGradient>
+            );
+          })}
+          {/* Gem balance badge */}
           <LinearGradient
             colors={[...GRADIENTS.cardWarm]}
-            style={[styles.statCard, { borderColor: glowColor(COLORS.starGold, 0.3) }]}
+            style={[
+              styles.statCard,
+              { borderColor: glowColor(COLORS.starGold, 0.45) },
+              shadowGlow(COLORS.gemGold, 8) as Record<string, unknown>,
+            ]}
           >
-            <View style={[styles.statAccentOverlay, { backgroundColor: glowColor(COLORS.starGold, 0.15) }]} />
-            <MaterialCommunityIcons name="diamond-stone" size={32} color={COLORS.gemGold} />
+            <View style={[styles.statAccentOverlay, { backgroundColor: glowColor(COLORS.starGold, 0.2) }]} />
+            <View style={styles.shieldWatermark}>
+              <MaterialCommunityIcons
+                name="shield-star-outline"
+                size={64}
+                color={glowColor(COLORS.gemGold, 0.08)}
+              />
+            </View>
+            <MaterialCommunityIcons name="diamond-stone" size={28} color={COLORS.gemGold} />
             <AnimatedStatValue value={gems} color={COLORS.textPrimary} />
             <Text style={styles.statLabel}>Gems</Text>
           </LinearGradient>
@@ -807,14 +918,31 @@ const styles = StyleSheet.create({
   avatarContainer: {
     marginBottom: SPACING.md,
     position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 160,
+    height: 160,
+  },
+  avatarHalo: {
+    position: 'absolute',
+    width: 156,
+    height: 156,
+    borderRadius: 78,
+  },
+  avatarHaloInner: {
+    position: 'absolute',
+    width: 144,
+    height: 144,
+    borderRadius: 72,
+    borderWidth: 2,
   },
   editBadge: {
     position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    bottom: 8,
+    right: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
@@ -855,7 +983,7 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     marginTop: SPACING.xs,
   },
-  // Stats grid
+  // Stats grid — shield badge style
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -863,28 +991,48 @@ const styles = StyleSheet.create({
     gap: SPACING.md - 4,
   },
   statCard: {
-    ...SHADOWS.sm,
+    ...SHADOWS.md,
     flex: 1,
     minWidth: '45%',
-    padding: SPACING.lg - 4,
-    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.lg - 2,
+    borderRadius: BORDER_RADIUS.lg,
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 1.5,
     overflow: 'hidden',
   },
   statAccentOverlay: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: BORDER_RADIUS.lg,
+  },
+  shieldWatermark: {
+    position: 'absolute',
+    right: -4,
+    bottom: -6,
+    opacity: 1,
   },
   statValue: {
-    ...TYPOGRAPHY.display.md,
-    fontWeight: '800' as const,
-    marginTop: SPACING.sm,
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: '900' as const,
+    marginTop: SPACING.xs,
   },
   statLabel: {
-    ...TYPOGRAPHY.body.md,
+    ...TYPOGRAPHY.caption.lg,
+    fontWeight: '600' as const,
     color: COLORS.textSecondary,
-    marginTop: SPACING.xs,
+    marginTop: 2,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
+  },
+  // Streak badge
+  streakBadgeContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  streakBadgeValue: {
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: '900' as const,
   },
   // Sections
   section: {
@@ -1065,9 +1213,15 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   achievementBadgeUnlocked: {
-    backgroundColor: glowColor(COLORS.starGold, 0.15),
+    backgroundColor: glowColor(COLORS.starGold, 0.18),
     borderWidth: 2,
-    borderColor: glowColor(COLORS.starGold, 0.3),
+    borderColor: glowColor(COLORS.starGold, 0.4),
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: COLORS.starGold,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+    } : { elevation: 4 }),
   },
   achievementBadgeLocked: {
     backgroundColor: COLORS.background,
