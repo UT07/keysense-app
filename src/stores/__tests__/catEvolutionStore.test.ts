@@ -5,6 +5,17 @@
  * daily reward calendar, Chonky Monké legendary unlock, and starter initialization.
  */
 
+// Mock Firebase config (imported transitively via socialService)
+jest.mock('../../services/firebase/config', () => ({
+  auth: { currentUser: null },
+  db: {},
+  functions: {},
+}));
+
+jest.mock('../../services/firebase/socialService', () => ({
+  postActivity: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { useCatEvolutionStore, stageFromXp, xpToNextStage } from '../catEvolutionStore';
 
 // Mock persistence layer

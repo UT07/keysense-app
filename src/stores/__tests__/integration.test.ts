@@ -3,6 +3,19 @@
  * Tests store interactions and multi-store workflows
  */
 
+// Mock Firebase (imported transitively via progressStore/catEvolutionStore -> socialService/leagueService)
+jest.mock('../../services/firebase/config', () => ({
+  auth: { currentUser: null },
+  db: {},
+  functions: {},
+}));
+jest.mock('../../services/firebase/socialService', () => ({
+  postActivity: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../../services/firebase/leagueService', () => ({
+  addLeagueXp: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { useExerciseStore } from '../exerciseStore';
 import { useProgressStore } from '../progressStore';
 import { useSettingsStore } from '../settingsStore';

@@ -10,6 +10,16 @@
  * - Chonky Monke legendary eligibility checks
  */
 
+// Mock Firebase (imported transitively via catEvolutionStore -> socialService)
+jest.mock('../../services/firebase/config', () => ({
+  auth: { currentUser: null },
+  db: {},
+  functions: {},
+}));
+jest.mock('../../services/firebase/socialService', () => ({
+  postActivity: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { useCatEvolutionStore, stageFromXp, xpToNextStage } from '../../stores/catEvolutionStore';
 import { useGemStore } from '../../stores/gemStore';
 import { EVOLUTION_XP_THRESHOLDS } from '../../stores/types';

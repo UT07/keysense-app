@@ -6,6 +6,19 @@
  * banners, navigation, header stats, and tier progression.
  */
 
+// Mock Firebase (imported transitively via stores -> socialService/leagueService)
+jest.mock('../../services/firebase/config', () => ({
+  auth: { currentUser: null },
+  db: {},
+  functions: {},
+}));
+jest.mock('../../services/firebase/socialService', () => ({
+  postActivity: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../../services/firebase/leagueService', () => ({
+  addLeagueXp: jest.fn().mockResolvedValue(undefined),
+}));
+
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 

@@ -18,6 +18,8 @@ import type { EvolutionStage, CatEvolutionData, DailyRewardDay } from './types';
 import { EVOLUTION_XP_THRESHOLDS } from './types';
 import { PersistenceManager, STORAGE_KEYS, createDebouncedSave, createImmediateSave } from './persistence';
 import { CAT_CHARACTERS } from '@/components/Mascot/catCharacters';
+import { postActivity } from '@/services/firebase/socialService';
+import { auth } from '@/services/firebase/config';
 
 /** Calculate evolution stage from accumulated XP */
 export function stageFromXp(xp: number): EvolutionStage {
@@ -207,6 +209,19 @@ export const useCatEvolutionStore = create<CatEvolutionStoreState>((set, get) =>
       },
     }));
     debouncedSave(get());
+
+    // Post evolution activity (fire-and-forget)
+    if (evolved && auth.currentUser && !auth.currentUser.isAnonymous) {
+      postActivity(auth.currentUser.uid, {
+        id: `evolution-${catId}-${newStage}-${Date.now()}`,
+        friendUid: auth.currentUser.uid,
+        friendDisplayName: auth.currentUser.displayName ?? 'Player',
+        friendCatId: catId,
+        type: 'evolution',
+        detail: `Cat evolved to ${newStage}`,
+        timestamp: Date.now(),
+      }).catch(() => {});
+    }
 
     return evolved ? newStage : null;
   },

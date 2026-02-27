@@ -8,6 +8,16 @@
  * - Transaction audit trail correctness
  */
 
+// Mock Firebase (imported transitively via catEvolutionStore -> socialService)
+jest.mock('../../services/firebase/config', () => ({
+  auth: { currentUser: null },
+  db: {},
+  functions: {},
+}));
+jest.mock('../../services/firebase/socialService', () => ({
+  postActivity: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { useGemStore } from '../../stores/gemStore';
 import { useCatEvolutionStore } from '../../stores/catEvolutionStore';
 

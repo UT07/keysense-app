@@ -3,6 +3,21 @@
  * Tests XP progression, streak tracking, lesson progress, and daily goals
  */
 
+// Mock Firebase config (imported transitively via socialService/leagueService)
+jest.mock('../../services/firebase/config', () => ({
+  auth: { currentUser: null },
+  db: {},
+  functions: {},
+}));
+
+jest.mock('../../services/firebase/socialService', () => ({
+  postActivity: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('../../services/firebase/leagueService', () => ({
+  addLeagueXp: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { useProgressStore } from '../progressStore';
 import { useCatEvolutionStore } from '../catEvolutionStore';
 import { PersistenceManager, STORAGE_KEYS } from '../persistence';

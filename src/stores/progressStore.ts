@@ -29,6 +29,10 @@ import {
 import type { ExerciseChallengeContext } from '@/core/challenges/challengeSystem';
 import { useLearnerProfileStore } from './learnerProfileStore';
 import { useSettingsStore } from './settingsStore';
+import { useLeagueStore } from './leagueStore';
+import { addLeagueXp } from '@/services/firebase/leagueService';
+import { postActivity } from '@/services/firebase/socialService';
+import { auth } from '@/services/firebase/config';
 
 // BUG-008 fix: Use local date string so streak day boundary matches user's wall clock
 function localToday(): string {
@@ -80,6 +84,7 @@ export const useProgressStore = create<ProgressStoreState>((set, get) => ({
   ...defaultData,
 
   addXp: (amount: number) => {
+    const oldLevel = get().level;
     set((state) => {
       const newTotalXp = state.totalXp + amount;
       return {
@@ -87,6 +92,21 @@ export const useProgressStore = create<ProgressStoreState>((set, get) => ({
         level: levelFromXp(newTotalXp),
       };
     });
+    const newLevel = get().level;
+
+    // Post level-up activity (fire-and-forget)
+    if (newLevel > oldLevel && auth.currentUser && !auth.currentUser.isAnonymous) {
+      postActivity(auth.currentUser.uid, {
+        id: `level-up-${newLevel}-${Date.now()}`,
+        friendUid: auth.currentUser.uid,
+        friendDisplayName: auth.currentUser.displayName ?? 'Player',
+        friendCatId: useSettingsStore.getState().selectedCatId ?? 'mini-meowww',
+        type: 'level_up',
+        detail: `Reached level ${newLevel}`,
+        timestamp: Date.now(),
+      }).catch(() => {});
+    }
+
     debouncedSave(get());
   },
 
@@ -257,6 +277,7 @@ export const useProgressStore = create<ProgressStoreState>((set, get) => ({
 
     // ── Apply XP with multiplier ──
     const effectiveXp = Math.round(xpEarned * xpMultiplier);
+    const oldLevel = get().level;
 
     let dailyGoalJustCompleted = false;
 
@@ -313,6 +334,28 @@ export const useProgressStore = create<ProgressStoreState>((set, get) => ({
     }
 
     debouncedSave(get());
+
+    // ── League XP update (fire-and-forget) ──
+    const leagueMembership = useLeagueStore.getState().membership;
+    if (leagueMembership && auth.currentUser && !auth.currentUser.isAnonymous) {
+      const newWeeklyXp = leagueMembership.weeklyXp + effectiveXp;
+      useLeagueStore.getState().updateWeeklyXp(newWeeklyXp);
+      addLeagueXp(leagueMembership.leagueId, auth.currentUser.uid, effectiveXp).catch(() => {});
+    }
+
+    // ── Post level-up activity (fire-and-forget) ──
+    const newLevel = get().level;
+    if (newLevel > oldLevel && auth.currentUser && !auth.currentUser.isAnonymous) {
+      postActivity(auth.currentUser.uid, {
+        id: `level-up-${newLevel}-${Date.now()}`,
+        friendUid: auth.currentUser.uid,
+        friendDisplayName: auth.currentUser.displayName ?? 'Player',
+        friendCatId: useSettingsStore.getState().selectedCatId ?? 'mini-meowww',
+        type: 'level_up',
+        detail: `Reached level ${newLevel}`,
+        timestamp: Date.now(),
+      }).catch(() => {});
+    }
   },
 
   updateDailyGoal: (date: string, data: Partial<DailyGoalData>) => {
