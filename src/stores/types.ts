@@ -327,6 +327,67 @@ export interface DailyRewardDay {
 
 /**
  * ============================================================================
+ * SOCIAL & LEAGUE TYPES
+ * ============================================================================
+ */
+
+export type LeagueTier = 'bronze' | 'silver' | 'gold' | 'diamond';
+
+export type FriendStatus = 'pending_outgoing' | 'pending_incoming' | 'accepted';
+
+export interface FriendConnection {
+  uid: string;
+  displayName: string;
+  selectedCatId: string;
+  status: FriendStatus;
+  connectedAt: number; // epoch ms
+}
+
+export interface ActivityFeedItem {
+  id: string;
+  friendUid: string;
+  friendDisplayName: string;
+  friendCatId: string;
+  type: 'streak_milestone' | 'level_up' | 'evolution' | 'song_mastered' | 'league_promoted';
+  detail: string;
+  timestamp: number;
+}
+
+export interface LeagueMembership {
+  leagueId: string;
+  tier: LeagueTier;
+  weekStart: string; // ISO date
+  weeklyXp: number;
+  rank: number;
+  totalMembers: number;
+}
+
+export interface FriendChallenge {
+  id: string;
+  fromUid: string;
+  fromDisplayName: string;
+  fromCatId: string;
+  toUid: string;
+  exerciseId: string;
+  exerciseTitle: string;
+  fromScore: number;
+  toScore: number | null;
+  status: 'pending' | 'completed' | 'expired';
+  createdAt: number;
+  expiresAt: number;
+}
+
+export interface ShareCardData {
+  type: 'score' | 'streak' | 'evolution' | 'league';
+  title: string;
+  subtitle: string;
+  value: string;
+  catId: string;
+  evolutionStage: number;
+}
+
+/**
+ * ============================================================================
  * DERIVED STATE UTILITIES
  * ============================================================================
  */

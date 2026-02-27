@@ -56,6 +56,8 @@ export const STORAGE_KEYS = {
   GEMS: 'purrrfect_gems_state',
   CAT_EVOLUTION: 'purrrfect_cat_evolution_state',
   SONGS: 'purrrfect_songs_state',
+  SOCIAL: 'purrrfect_social_state',
+  LEAGUE: 'purrrfect_league_state',
 } as const;
 
 /**
