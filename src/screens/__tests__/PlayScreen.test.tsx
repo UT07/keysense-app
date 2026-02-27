@@ -1,14 +1,13 @@
 /**
  * PlayScreen Tests
  *
- * Comprehensive tests for the redesigned Free Play screen:
- * - Renders in portrait mode (no landscape lock)
- * - Shows SplitKeyboard with two-hand layout
+ * Tests for the landscape Free Play screen:
+ * - Locks to landscape on mount, restores portrait on unmount
+ * - Side-by-side keyboards (left = C2-B3, right = C4-C6)
  * - Note name display updates on key press
- * - Recording controls work
- * - Instructions banner shows and dismisses
- * - Song reference panel shows placeholder or loaded song
- * - Floating action bar with record/play/clear
+ * - Recording controls work (record/stop/play/clear)
+ * - Song reference picker opens on button press
+ * - Analysis card and drill generation
  */
 
 import React from 'react';
@@ -38,6 +37,9 @@ jest.mock('@react-navigation/native', () => {
   };
 });
 
+// expo-screen-orientation is globally mocked in jest.setup.js
+import * as ScreenOrientation from 'expo-screen-orientation';
+
 // Mock audio engine
 const mockPlayNote = jest.fn(() => ({
   note: 60,
@@ -59,20 +61,20 @@ jest.mock('../../audio/createAudioEngine', () => ({
   })),
 }));
 
-// Capture SplitKeyboard props for assertions
-let capturedKeyboardProps: any = {};
-jest.mock('../../components/Keyboard/SplitKeyboard', () => ({
-  SplitKeyboard: (props: any) => {
-    capturedKeyboardProps = props;
+// Capture left and right keyboard props
+let capturedLeftProps: any = {};
+let capturedRightProps: any = {};
+jest.mock('../../components/Keyboard/Keyboard', () => ({
+  Keyboard: (props: any) => {
+    if (props.testID === 'freeplay-keyboard-left') capturedLeftProps = props;
+    if (props.testID === 'freeplay-keyboard-right') capturedRightProps = props;
     const { View, Text } = require('react-native');
     return (
-      <View testID={props.testID || 'mock-split-keyboard'}>
-        <Text>SplitKeyboard</Text>
+      <View testID={props.testID || 'mock-keyboard'}>
+        <Text>Keyboard</Text>
       </View>
     );
   },
-  deriveSplitPoint: jest.fn(() => 60),
-  computeKeyboardRange: jest.fn(() => ({ startNote: 48, octaveCount: 2 })),
 }));
 
 // Mock SongReferencePicker
@@ -111,14 +113,13 @@ jest.mock('../../stores/settingsStore', () => ({
 
 // Mock songStore
 const mockLoadSong = jest.fn();
-const mockLoadSummaries = jest.fn();
 jest.mock('../../stores/songStore', () => ({
   useSongStore: Object.assign(
     (selector: any) =>
       selector({
         summaries: [],
         isLoadingSummaries: false,
-        loadSummaries: mockLoadSummaries,
+        loadSummaries: jest.fn(),
         currentSong: null,
         isLoadingSong: false,
         loadSong: mockLoadSong,
@@ -139,14 +140,6 @@ jest.mock('@expo/vector-icons', () => {
   };
 });
 
-// Mock SalsaCoach
-jest.mock('../../components/Mascot/SalsaCoach', () => ({
-  SalsaCoach: () => {
-    const { View } = require('react-native');
-    return <View testID="salsa-coach" />;
-  },
-}));
-
 // ---------------------------------------------------------------------------
 // Import after mocks
 // ---------------------------------------------------------------------------
@@ -160,7 +153,8 @@ import { PlayScreen } from '../PlayScreen';
 describe('PlayScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    capturedKeyboardProps = {};
+    capturedLeftProps = {};
+    capturedRightProps = {};
   });
 
   // -----------------------------------------------------------------------
@@ -189,33 +183,73 @@ describe('PlayScreen', () => {
       expect(mockGoBack).toHaveBeenCalled();
     });
 
-    it('does NOT lock to landscape (portrait mode)', () => {
+    it('locks to landscape on mount', () => {
       render(<PlayScreen />);
-      // ScreenOrientation is not even imported any more — no mock needed
-      // Just verify the screen renders without any orientation calls
-      expect(true).toBe(true);
+      expect(ScreenOrientation.lockAsync).toHaveBeenCalledWith(
+        ScreenOrientation.OrientationLock.LANDSCAPE_RIGHT,
+      );
     });
   });
 
   // -----------------------------------------------------------------------
-  // Note reference strip
+  // Side-by-side keyboards
   // -----------------------------------------------------------------------
 
-  describe('Note reference strip', () => {
-    it('renders the note reference strip', () => {
+  describe('Side-by-side keyboards', () => {
+    it('renders left keyboard', () => {
       const { getByTestId } = render(<PlayScreen />);
-      expect(getByTestId('freeplay-note-ref')).toBeTruthy();
+      expect(getByTestId('freeplay-keyboard-left')).toBeTruthy();
     });
 
-    it('shows octave markers (C2, C6)', () => {
-      const { getByText } = render(<PlayScreen />);
-      expect(getByText('C2')).toBeTruthy();
-      expect(getByText('C6')).toBeTruthy();
+    it('renders right keyboard', () => {
+      const { getByTestId } = render(<PlayScreen />);
+      expect(getByTestId('freeplay-keyboard-right')).toBeTruthy();
     });
 
-    it('highlights Middle C label', () => {
-      const { getByText } = render(<PlayScreen />);
-      expect(getByText('Middle C (C4)')).toBeTruthy();
+    it('left keyboard starts at C2 (MIDI 36)', () => {
+      render(<PlayScreen />);
+      expect(capturedLeftProps.startNote).toBe(36);
+    });
+
+    it('left keyboard has 2 octaves', () => {
+      render(<PlayScreen />);
+      expect(capturedLeftProps.octaveCount).toBe(2);
+    });
+
+    it('right keyboard starts at C4 (MIDI 60)', () => {
+      render(<PlayScreen />);
+      expect(capturedRightProps.startNote).toBe(60);
+    });
+
+    it('right keyboard has 2 octaves', () => {
+      render(<PlayScreen />);
+      expect(capturedRightProps.octaveCount).toBe(2);
+    });
+
+    it('both keyboards are enabled', () => {
+      render(<PlayScreen />);
+      expect(capturedLeftProps.enabled).toBe(true);
+      expect(capturedRightProps.enabled).toBe(true);
+    });
+
+    it('both keyboards have haptic enabled', () => {
+      render(<PlayScreen />);
+      expect(capturedLeftProps.hapticEnabled).toBe(true);
+      expect(capturedRightProps.hapticEnabled).toBe(true);
+    });
+
+    it('both keyboards show labels', () => {
+      render(<PlayScreen />);
+      expect(capturedLeftProps.showLabels).toBe(true);
+      expect(capturedRightProps.showLabels).toBe(true);
+    });
+
+    it('both keyboards have note event callbacks', () => {
+      render(<PlayScreen />);
+      expect(typeof capturedLeftProps.onNoteOn).toBe('function');
+      expect(typeof capturedLeftProps.onNoteOff).toBe('function');
+      expect(typeof capturedRightProps.onNoteOn).toBe('function');
+      expect(typeof capturedRightProps.onNoteOff).toBe('function');
     });
   });
 
@@ -237,63 +271,16 @@ describe('PlayScreen', () => {
   });
 
   // -----------------------------------------------------------------------
-  // SplitKeyboard integration
+  // Song reference
   // -----------------------------------------------------------------------
 
-  describe('SplitKeyboard integration', () => {
-    it('renders SplitKeyboard', () => {
-      const { getByTestId } = render(<PlayScreen />);
-      expect(getByTestId('freeplay-keyboard')).toBeTruthy();
-    });
-
-    it('passes splitPoint of 60 (middle C)', () => {
-      render(<PlayScreen />);
-      expect(capturedKeyboardProps.splitPoint).toBe(60);
-    });
-
-    it('keyboard is enabled', () => {
-      render(<PlayScreen />);
-      expect(capturedKeyboardProps.enabled).toBe(true);
-    });
-
-    it('keyboard has haptic enabled', () => {
-      render(<PlayScreen />);
-      expect(capturedKeyboardProps.hapticEnabled).toBe(true);
-    });
-
-    it('keyboard shows labels', () => {
-      render(<PlayScreen />);
-      expect(capturedKeyboardProps.showLabels).toBe(true);
-    });
-
-    it('passes onNoteOn and onNoteOff callbacks', () => {
-      render(<PlayScreen />);
-      expect(typeof capturedKeyboardProps.onNoteOn).toBe('function');
-      expect(typeof capturedKeyboardProps.onNoteOff).toBe('function');
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // Song reference panel
-  // -----------------------------------------------------------------------
-
-  describe('Song reference panel', () => {
-    it('renders song reference panel', () => {
-      const { getByTestId } = render(<PlayScreen />);
-      expect(getByTestId('freeplay-song-ref')).toBeTruthy();
-    });
-
-    it('shows placeholder text when no song loaded', () => {
-      const { getByText } = render(<PlayScreen />);
-      expect(getByText('Load a song for note reference')).toBeTruthy();
-    });
-
-    it('shows Load Song button in header', () => {
+  describe('Song reference', () => {
+    it('shows load song button', () => {
       const { getByTestId } = render(<PlayScreen />);
       expect(getByTestId('freeplay-load-song')).toBeTruthy();
     });
 
-    it('opens song picker modal when Load Song is pressed', () => {
+    it('opens song picker modal when button is pressed', () => {
       const { getByTestId } = render(<PlayScreen />);
       fireEvent.press(getByTestId('freeplay-load-song'));
       expect(getByTestId('song-picker-modal')).toBeTruthy();
@@ -301,55 +288,10 @@ describe('PlayScreen', () => {
   });
 
   // -----------------------------------------------------------------------
-  // Instructions banner
+  // Recording controls
   // -----------------------------------------------------------------------
 
-  describe('Instructions banner', () => {
-    it('shows instructions banner by default', () => {
-      const { getByTestId } = render(<PlayScreen />);
-      expect(getByTestId('freeplay-instructions')).toBeTruthy();
-    });
-
-    it('shows "Welcome to Free Play!" text', () => {
-      const { getByText } = render(<PlayScreen />);
-      expect(getByText('Welcome to Free Play!')).toBeTruthy();
-    });
-
-    it('can dismiss instructions via close button', () => {
-      const { getByTestId, queryByTestId } = render(<PlayScreen />);
-
-      expect(getByTestId('freeplay-instructions')).toBeTruthy();
-      fireEvent.press(getByTestId('freeplay-instructions-close'));
-      expect(queryByTestId('freeplay-instructions')).toBeNull();
-    });
-
-    it('shows help button after dismissing instructions', () => {
-      const { getByTestId, queryByTestId } = render(<PlayScreen />);
-
-      fireEvent.press(getByTestId('freeplay-instructions-close'));
-      expect(queryByTestId('freeplay-instructions')).toBeNull();
-      expect(getByTestId('freeplay-help')).toBeTruthy();
-    });
-
-    it('can re-show instructions via help button', () => {
-      const { getByTestId } = render(<PlayScreen />);
-
-      fireEvent.press(getByTestId('freeplay-instructions-close'));
-      fireEvent.press(getByTestId('freeplay-help'));
-      expect(getByTestId('freeplay-instructions')).toBeTruthy();
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // Floating action bar & recording controls
-  // -----------------------------------------------------------------------
-
-  describe('Floating action bar', () => {
-    it('renders the action bar', () => {
-      const { getByTestId } = render(<PlayScreen />);
-      expect(getByTestId('freeplay-action-bar')).toBeTruthy();
-    });
-
+  describe('Recording controls', () => {
     it('shows record button initially', () => {
       const { getByTestId } = render(<PlayScreen />);
       expect(getByTestId('freeplay-record-start')).toBeTruthy();
@@ -369,10 +311,10 @@ describe('PlayScreen', () => {
       // Start recording
       fireEvent.press(getByTestId('freeplay-record-start'));
 
-      // Simulate a note being played while recording
-      if (capturedKeyboardProps.onNoteOn) {
-        capturedKeyboardProps.onNoteOn({
-          note: 60,
+      // Simulate a note via left keyboard onNoteOn
+      if (capturedLeftProps.onNoteOn) {
+        capturedLeftProps.onNoteOn({
+          note: 48,
           velocity: 100,
           timestamp: Date.now(),
           type: 'noteOn',
@@ -383,7 +325,7 @@ describe('PlayScreen', () => {
       // Stop recording
       fireEvent.press(getByTestId('freeplay-record-stop'));
 
-      // Now playback and clear should be visible
+      // Playback and clear should be visible
       expect(getByTestId('freeplay-record-playback')).toBeTruthy();
       expect(getByTestId('freeplay-record-clear')).toBeTruthy();
     });
