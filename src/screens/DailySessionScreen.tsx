@@ -15,7 +15,8 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import { PressableScale } from '../components/common/PressableScale';
+import Animated, { FadeInUp } from 'react-native-reanimated';
+import { GameCard } from '../components/common/GameCard';
 import { AnimatedProgressBar } from '../components/common/AnimatedProgressBar';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -28,7 +29,7 @@ import { midiToNoteName } from '../core/music/MusicTheory';
 import { useLearnerProfileStore } from '../stores/learnerProfileStore';
 import { useGemStore } from '../stores/gemStore';
 import { SalsaCoach } from '../components/Mascot/SalsaCoach';
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, glowColor } from '../theme/tokens';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, glowColor, type RarityLevel } from '../theme/tokens';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
@@ -50,6 +51,12 @@ const SECTION_LABELS = {
   warmUp: 'Warm Up',
   lesson: "Today's Lesson",
   challenge: 'Challenge',
+};
+
+const SECTION_RARITY: Record<'warmUp' | 'lesson' | 'challenge', RarityLevel> = {
+  warmUp: 'common',
+  lesson: 'rare',
+  challenge: 'epic',
 };
 
 /** Replace MIDI numbers in reasoning strings with note names */
@@ -306,25 +313,34 @@ function SessionSection({
   const colors = SECTION_COLORS[sectionKey];
   const icon = SECTION_ICONS[sectionKey];
   const label = SECTION_LABELS[sectionKey];
+  const rarity = SECTION_RARITY[sectionKey];
 
   if (exercises.length === 0) return null;
 
   return (
     <View style={styles.section}>
-      <View style={styles.sectionHeader}>
+      <Animated.View
+        entering={FadeInUp.delay(0).duration(400)}
+        style={styles.sectionHeader}
+      >
         <View style={[styles.sectionIconBg, { backgroundColor: colors.bg }]}>
           <MaterialCommunityIcons name={icon} size={20} color={colors.accent} />
         </View>
         <Text style={[styles.sectionLabel, { color: colors.accent }]}>{label}</Text>
-      </View>
+      </Animated.View>
 
       {exercises.map((ref, i) => (
-        <SessionExerciseCard
+        <Animated.View
           key={`${ref.exerciseId}-${i}`}
-          exerciseRef={ref}
-          colors={colors}
-          onPress={() => onExercisePress(ref)}
-        />
+          entering={FadeInUp.delay((i + 1) * 100).duration(400)}
+        >
+          <SessionExerciseCard
+            exerciseRef={ref}
+            rarity={rarity}
+            colors={colors}
+            onPress={() => onExercisePress(ref)}
+          />
+        </Animated.View>
       ))}
     </View>
   );
@@ -336,10 +352,12 @@ function SessionSection({
 
 function SessionExerciseCard({
   exerciseRef,
+  rarity,
   colors,
   onPress,
 }: {
   exerciseRef: ExerciseRef;
+  rarity: RarityLevel;
   colors: { accent: string; bg: string; border: string };
   onPress: () => void;
 }) {
@@ -350,44 +368,44 @@ function SessionExerciseCard({
   const difficulty = exercise?.metadata.difficulty ?? 1;
 
   return (
-    <PressableScale haptic onPress={onPress}>
-      <View
-        style={[styles.exerciseCard, { borderColor: colors.border, backgroundColor: colors.bg }]}
-      >
-        <View style={styles.exerciseCardContent}>
-          <View style={styles.exerciseInfo}>
-            <Text style={styles.exerciseTitle}>{title}</Text>
-            <Text style={styles.exerciseReason}>{humanizeReasoning(exerciseRef.reason)}</Text>
-            <View style={styles.exerciseMeta}>
-              {isAI && (
-                <View style={styles.aiTag}>
-                  <MaterialCommunityIcons name="robot" size={12} color={COLORS.info} />
-                  <Text style={styles.aiTagText}>AI</Text>
-                </View>
-              )}
-              <View style={styles.difficultyDots}>
-                {Array.from({ length: 5 }, (_, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      styles.difficultyDot,
-                      i < difficulty && { backgroundColor: colors.accent },
-                    ]}
-                  />
-                ))}
+    <GameCard
+      rarity={rarity}
+      onPress={onPress}
+      style={styles.exerciseGameCard}
+    >
+      <View style={styles.exerciseCardContent}>
+        <View style={styles.exerciseInfo}>
+          <Text style={styles.exerciseTitle}>{title}</Text>
+          <Text style={styles.exerciseReason}>{humanizeReasoning(exerciseRef.reason)}</Text>
+          <View style={styles.exerciseMeta}>
+            {isAI && (
+              <View style={styles.aiTag}>
+                <MaterialCommunityIcons name="robot" size={12} color={COLORS.info} />
+                <Text style={styles.aiTagText}>AI</Text>
               </View>
-              <View style={styles.gemRewardHint}>
-                <MaterialCommunityIcons name="diamond-stone" size={10} color={COLORS.gemGold} />
-                <Text style={styles.gemRewardHintText}>5 for 90%+, 15 for perfect</Text>
-              </View>
+            )}
+            <View style={styles.difficultyDots}>
+              {Array.from({ length: 5 }, (_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.difficultyDot,
+                    i < difficulty && { backgroundColor: colors.accent },
+                  ]}
+                />
+              ))}
+            </View>
+            <View style={styles.gemRewardHint}>
+              <MaterialCommunityIcons name="diamond-stone" size={10} color={COLORS.gemGold} />
+              <Text style={styles.gemRewardHintText}>5 for 90%+, 15 for perfect</Text>
             </View>
           </View>
-          <View style={[styles.playIconBg, { backgroundColor: colors.accent }]}>
-            <MaterialCommunityIcons name="play" size={20} color={COLORS.textPrimary} />
-          </View>
+        </View>
+        <View style={[styles.playIconBg, { backgroundColor: colors.accent }]}>
+          <MaterialCommunityIcons name="play" size={20} color={COLORS.textPrimary} />
         </View>
       </View>
-    </PressableScale>
+    </GameCard>
   );
 }
 
@@ -533,18 +551,13 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.heading.sm,
     fontWeight: '700' as const,
   },
-  // Exercise Cards
-  exerciseCard: {
-    ...SHADOWS.sm,
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 1,
+  // Exercise Cards (GameCard wrapper)
+  exerciseGameCard: {
     marginBottom: SPACING.sm,
-    overflow: 'hidden',
   },
   exerciseCardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.md,
   },
   exerciseInfo: {
     flex: 1,
