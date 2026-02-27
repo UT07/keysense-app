@@ -29,9 +29,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
 import { useLearnerProfileStore } from '../stores/learnerProfileStore';
+import { useProgressStore } from '../stores/progressStore';
 import { useGemStore } from '../stores/gemStore';
 import { useCatEvolutionStore } from '../stores/catEvolutionStore';
 import { SKILL_TREE } from '../core/curriculum/SkillTree';
+import { hasTierMasteryTestPassed } from '../core/curriculum/tierMasteryTest';
 import { CatAvatar } from '../components/Mascot/CatAvatar';
 import { SalsaCoach } from '../components/Mascot/SalsaCoach';
 import { COLORS, GRADIENTS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../theme/tokens';
@@ -120,6 +122,7 @@ interface TierNodeData {
   masteredCount: number;
   totalSkills: number;
   firstUnmasteredSkillId: string | null;
+  testPassed: boolean;
 }
 
 interface NodePosition {
@@ -134,6 +137,7 @@ interface NodePosition {
 
 function useTierNodes(): TierNodeData[] {
   const masteredSkills = useLearnerProfileStore((s) => s.masteredSkills);
+  const tierTestResults = useProgressStore((s) => s.tierTestResults);
 
   return useMemo(() => {
     const masteredSet = new Set(masteredSkills);
@@ -175,9 +179,10 @@ function useTierNodes(): TierNodeData[] {
         tier: raw.tier, title: raw.title, icon: raw.icon, state,
         masteredCount: raw.masteredCount, totalSkills: raw.totalSkills,
         firstUnmasteredSkillId: raw.firstUnmasteredSkillId,
+        testPassed: hasTierMasteryTestPassed(raw.tier, tierTestResults),
       };
     });
-  }, [masteredSkills]);
+  }, [masteredSkills, tierTestResults]);
 }
 
 // ---------------------------------------------------------------------------
@@ -387,8 +392,9 @@ function PathNode({
   const { size } = position;
   const nodeTestID = data.state === 'current' ? 'lesson-node-current' : `tier-node-${data.tier}`;
 
-  // Icon inside the circle
-  const iconName = data.state === 'completed' ? 'check-bold'
+  // Icon inside the circle — crown for completed + test passed
+  const iconName = data.state === 'completed' && data.testPassed ? 'crown'
+    : data.state === 'completed' ? 'check-bold'
     : data.state === 'passed' ? 'check'
     : data.state === 'locked' ? 'lock'
     : data.icon;
@@ -458,6 +464,14 @@ function PathNode({
           <View style={styles.startChip} testID="lesson-node-start-chip">
             <Text style={styles.startChipText}>START</Text>
             <MaterialCommunityIcons name="chevron-right" size={12} color={COLORS.textPrimary} />
+          </View>
+        )}
+
+        {/* TEST chip — shown when all skills mastered but test not passed */}
+        {data.state === 'completed' && !data.testPassed && (
+          <View style={styles.testChip} testID={`tier-${data.tier}-test-chip`}>
+            <MaterialCommunityIcons name="trophy-outline" size={10} color={COLORS.starGold} />
+            <Text style={styles.testChipText}>TEST</Text>
           </View>
         )}
       </TouchableOpacity>
@@ -726,6 +740,18 @@ const styles = StyleSheet.create({
   startChipText: {
     ...TYPOGRAPHY.special.badge, fontWeight: '800',
     color: COLORS.textPrimary, letterSpacing: 1,
+  },
+
+  // TEST chip
+  testChip: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: 2, marginTop: 4, backgroundColor: 'rgba(255, 215, 0, 0.15)',
+    paddingHorizontal: 8, paddingVertical: 2, borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1, borderColor: 'rgba(255, 215, 0, 0.3)',
+  },
+  testChipText: {
+    ...TYPOGRAPHY.special.badge, fontWeight: '800',
+    color: COLORS.starGold, letterSpacing: 1, fontSize: 9,
   },
 
   // Cat companion

@@ -66,6 +66,7 @@ import { DemoPlaybackService } from '../../services/demoPlayback';
 import { ExerciseIntroOverlay } from './ExerciseIntroOverlay';
 import { ExerciseLoadingScreen } from './ExerciseLoadingScreen';
 import { SKILL_TREE, getSkillsForExercise, getSkillById, getGenerationHints } from '../../core/curriculum/SkillTree';
+import { getTierMasteryTestSkillId, isTierMasteryTestAvailable, hasTierMasteryTestPassed } from '../../core/curriculum/tierMasteryTest';
 import { adjustDifficulty } from '../../core/curriculum/DifficultyEngine';
 // detectWeakPatterns: kept available for future use but not imported to avoid unused-import errors
 // import { detectWeakPatterns } from '../../core/curriculum/WeakSpotDetector';
@@ -861,6 +862,18 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       }
     }
 
+    // Record tier mastery test result when in testMode + aiMode
+    if (testMode && skillIdParam) {
+      const testSkillNode = getSkillById(skillIdParam);
+      if (testSkillNode) {
+        useProgressStore.getState().recordTierTestResult(
+          testSkillNode.tier,
+          score.isPassed,
+          score.overall,
+        );
+      }
+    }
+
     // Adjust difficulty based on performance (DifficultyEngine owns tempo progression)
     const profileForDiff = useLearnerProfileStore.getState();
     const adjustment = adjustDifficulty(
@@ -1000,6 +1013,9 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     isAudioReady,
     hasError,
     errorMessage,
+    activeInputMethod,
+    lastExternalNoteRef,
+    externalNoteCount,
   } = useExercisePlayback({
     exercise,
     onComplete: handleExerciseCompletion,
@@ -1500,6 +1516,87 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     [handleManualNoteOff]
   );
 
+  /**
+   * Relay external (MIDI/mic) noteOn events to keyboard highlighting + feedback.
+   * The playback hook records mic/MIDI events for scoring but doesn't drive the
+   * keyboard UI. This effect bridges that gap by calling handleKeyDown when a
+   * new external noteOn arrives, giving the user visual + haptic feedback.
+   */
+  const lastProcessedExternalNoteRef = useRef<number>(0);
+  useEffect(() => {
+    const externalNote = lastExternalNoteRef.current;
+    if (!externalNote) return;
+
+    // Avoid re-processing the same event (dedup by timestamp)
+    if (externalNote.timestamp <= lastProcessedExternalNoteRef.current) return;
+    lastProcessedExternalNoteRef.current = externalNote.timestamp;
+
+    // Highlight the key
+    setHighlightedKeys((prev) => new Set([...prev, externalNote.note]));
+
+    // Auto-release highlight after 300ms (external inputs don't have noteOff keyboard events)
+    const releaseTimer = setTimeout(() => {
+      setHighlightedKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(externalNote.note);
+        return next;
+      });
+    }, 300);
+
+    // Trigger feedback scoring (same path as touch, but skip audio since hook handles it)
+    if (isPlaying && !isPaused && countInComplete) {
+      // Feed into the same nearest-note matching for visual feedback
+      const realtimeBeat = realtimeBeatRef.current;
+      const msPerBeat = 60000 / exercise.settings.tempo;
+      const graceWindowBeats = exercise.scoring.timingGracePeriodMs / msPerBeat;
+      const toleranceWindowBeats = exercise.scoring.timingToleranceMs / msPerBeat;
+      const matchWindowBeats = Math.max(graceWindowBeats, toleranceWindowBeats) + 0.35;
+
+      let bestMatch: { index: number; beatDiffSigned: number; startBeat: number; matchScore: number } | null = null;
+
+      for (let i = 0; i < exercise.notes.length; i++) {
+        const note = exercise.notes[i];
+        if (consumedNoteIndicesRef.current.has(i)) continue;
+        if (note.note !== externalNote.note) continue;
+        const beatDiffSigned = realtimeBeat - note.startBeat;
+        const beatDiffAbs = Math.abs(beatDiffSigned);
+        if (beatDiffAbs > matchWindowBeats) continue;
+        const matchScore = beatDiffAbs + (beatDiffSigned < 0 ? 0.1 : 0);
+        if (!bestMatch || matchScore < bestMatch.matchScore || (matchScore === bestMatch.matchScore && note.startBeat < bestMatch.startBeat)) {
+          bestMatch = { index: i, beatDiffSigned, startBeat: note.startBeat, matchScore };
+        }
+      }
+
+      if (bestMatch) {
+        consumedNoteIndicesRef.current.add(bestMatch.index);
+        const beatDiffMs = Math.abs(bestMatch.beatDiffSigned) * msPerBeat;
+        let feedbackType: FeedbackState['type'];
+        if (beatDiffMs <= exercise.scoring.timingToleranceMs * 0.5) feedbackType = 'perfect';
+        else if (beatDiffMs <= exercise.scoring.timingToleranceMs) feedbackType = 'good';
+        else if (beatDiffMs <= exercise.scoring.timingGracePeriodMs) feedbackType = bestMatch.beatDiffSigned < 0 ? 'early' : 'late';
+        else feedbackType = 'ok';
+
+        setComboCount((prev) => prev + 1);
+        setFeedback({ type: feedbackType, noteIndex: bestMatch.index, timestamp: Date.now() });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      } else {
+        setComboCount(0);
+        setFeedback({ type: 'miss', noteIndex: -1, timestamp: Date.now() });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      }
+
+      // Clear feedback after delay
+      if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+      feedbackTimeoutRef.current = setTimeout(() => {
+        setFeedback({ type: null, noteIndex: -1, timestamp: 0 });
+      }, 500);
+    }
+
+    return () => clearTimeout(releaseTimer);
+  // externalNoteCount increments each time a MIDI/mic noteOn arrives
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalNoteCount]);
+
   // Dev-mode: map laptop keyboard keys to MIDI notes for testing
   const devKeyboardCallback = useCallback(
     (note: number, velocity: number, isNoteOn: boolean) => {
@@ -1607,9 +1704,34 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   }, [stopPlayback, exerciseStore, navigation, skillIdParam]);
 
   /**
-   * Navigate to the mastery test for the current lesson
+   * Navigate to the mastery test for the current lesson/tier
    */
   const handleStartTest = useCallback(() => {
+    // AI mode: navigate to tier mastery test
+    if (aiMode && skillIdParam) {
+      const skillNode = getSkillById(skillIdParam);
+      if (skillNode) {
+        const testSkillId = getTierMasteryTestSkillId(skillNode.tier);
+        if (testSkillId) {
+          setShowCompletion(false);
+          stopPlayback();
+          exerciseStore.clearSession();
+          setTimeout(() => {
+            if (mountedRef.current) {
+              (navigation as any).replace('Exercise', {
+                exerciseId: 'ai-mode',
+                aiMode: true,
+                testMode: true,
+                skillId: testSkillId,
+              });
+            }
+          }, 100);
+          return;
+        }
+      }
+    }
+
+    // Static lesson: navigate to test exercise JSON
     const lid = getLessonIdForExercise(exercise.id);
     if (!lid) return;
     const testEx = getTestExercise(lid);
@@ -1627,11 +1749,29 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         });
       }
     }, 100);
-  }, [exercise.id, stopPlayback, exerciseStore, navigation, skillIdParam]);
+  }, [exercise.id, aiMode, stopPlayback, exerciseStore, navigation, skillIdParam]);
 
   // Determine if we should show "Take Mastery Test" in CompletionModal
   const showMasteryTestButton = useMemo(() => {
     if (testMode) return false; // Already in test mode
+
+    // AI mode: check if all tier skills are mastered and test not yet passed
+    if (aiMode && skillIdParam) {
+      const skillNode = getSkillById(skillIdParam);
+      if (skillNode) {
+        const masteredSkills = useLearnerProfileStore.getState().masteredSkills;
+        const tierTestResults = useProgressStore.getState().tierTestResults;
+        if (
+          isTierMasteryTestAvailable(skillNode.tier, masteredSkills) &&
+          !hasTierMasteryTestPassed(skillNode.tier, tierTestResults)
+        ) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    // Static lessons: existing logic
     if (isTestExercise(exercise.id)) return false;
     const lid = getLessonIdForExercise(exercise.id);
     if (!lid) return false;
@@ -1648,7 +1788,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     const testEx = getTestExercise(lid);
     if (!testEx) return false;
     return !lp?.exerciseScores[testEx.id]?.completedAt;
-  }, [exercise.id, testMode, finalScore]); // finalScore dep ensures recalc after score persisted
+  }, [exercise.id, aiMode, skillIdParam, testMode, finalScore]); // finalScore dep ensures recalc after score persisted
 
   // Show error if initialization failed
   if (hasError && errorMessage && !isMidiReady && !isAudioReady) {
@@ -1720,6 +1860,20 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
               compact
             />
           </View>
+
+          {/* Active input method badge (MIDI or Mic) */}
+          {activeInputMethod !== 'touch' && (
+            <View style={styles.inputBadge} testID="exercise-input-badge">
+              <MaterialCommunityIcons
+                name={activeInputMethod === 'midi' ? 'piano' : 'microphone'}
+                size={14}
+                color={COLORS.success}
+              />
+              <Text style={styles.inputBadgeText}>
+                {activeInputMethod === 'midi' ? 'MIDI' : 'Mic'}
+              </Text>
+            </View>
+          )}
 
           {/* Active ability indicators */}
           {activeAbilities.length > 0 && (
@@ -2121,6 +2275,23 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     fontSize: 12,
     fontWeight: '700',
+  },
+  // Input method badge
+  inputBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: 'rgba(76, 175, 80, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(76, 175, 80, 0.3)',
+  },
+  inputBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.success,
   },
   // Active ability indicators
   abilityRow: {

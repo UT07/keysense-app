@@ -95,6 +95,9 @@ let mockPlaybackState: Record<string, any> = {
   isAudioReady: true,
   hasError: false,
   errorMessage: null,
+  activeInputMethod: 'touch' as const,
+  lastExternalNoteRef: { current: null },
+  externalNoteCount: 0,
 };
 
 jest.mock('../../../hooks/useExercisePlayback', () => ({
@@ -364,6 +367,14 @@ jest.mock('../../../core/curriculum/SkillTree', () => ({
   getSkillsForExercise: jest.fn(() => []),
   getSkillById: jest.fn(() => null),
   getGenerationHints: jest.fn(() => null),
+}));
+
+// Mock tierMasteryTest
+jest.mock('../../../core/curriculum/tierMasteryTest', () => ({
+  getTierMasteryTestSkillId: jest.fn(() => null),
+  isTierMasteryTestAvailable: jest.fn(() => false),
+  hasTierMasteryTestPassed: jest.fn(() => false),
+  STATIC_LESSON_TIERS: 6,
 }));
 
 // Mock DifficultyEngine
@@ -656,6 +667,9 @@ function resetPlaybackState() {
     isAudioReady: true,
     hasError: false,
     errorMessage: null,
+    activeInputMethod: 'touch' as const,
+    lastExternalNoteRef: { current: null },
+    externalNoteCount: 0,
   };
   const { useExercisePlayback } = require('../../../hooks/useExercisePlayback');
   useExercisePlayback.mockImplementation(() => mockPlaybackState);

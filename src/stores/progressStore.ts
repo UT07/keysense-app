@@ -41,7 +41,7 @@ const defaultDailyGoal: DailyGoalData = {
 /** Data-only shape of progress state (excludes actions) */
 type ProgressData = Pick<
   ProgressStoreState,
-  'totalXp' | 'level' | 'streakData' | 'lessonProgress' | 'dailyGoalData'
+  'totalXp' | 'level' | 'streakData' | 'lessonProgress' | 'dailyGoalData' | 'tierTestResults'
 >;
 
 const defaultData: ProgressData = {
@@ -50,6 +50,7 @@ const defaultData: ProgressData = {
   streakData: defaultStreakData,
   lessonProgress: {},
   dailyGoalData: {},
+  tierTestResults: {},
 };
 
 // Create debounced save function
@@ -239,6 +240,24 @@ export const useProgressStore = create<ProgressStoreState>((set, get) => ({
     debouncedSave(get());
   },
 
+  recordTierTestResult: (tier: number, passed: boolean, score: number) => {
+    const key = `tier-${tier}`;
+    set((state) => {
+      const existing = state.tierTestResults[key];
+      return {
+        tierTestResults: {
+          ...state.tierTestResults,
+          [key]: {
+            passed: existing?.passed || passed,
+            score: Math.max(existing?.score ?? 0, score),
+            attempts: (existing?.attempts ?? 0) + 1,
+          },
+        },
+      };
+    });
+    debouncedSave(get());
+  },
+
   reset: () => {
     set({
       totalXp: 0,
@@ -246,6 +265,7 @@ export const useProgressStore = create<ProgressStoreState>((set, get) => ({
       streakData: defaultStreakData,
       lessonProgress: {},
       dailyGoalData: {},
+      tierTestResults: {},
     });
     PersistenceManager.deleteState(STORAGE_KEYS.PROGRESS);
   },

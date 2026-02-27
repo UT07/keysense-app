@@ -62,6 +62,12 @@ export interface StreakData {
   weeklyPractice: boolean[]; // Last 7 days
 }
 
+export interface TierTestResult {
+  passed: boolean;
+  score: number;
+  attempts: number;
+}
+
 export interface ProgressStoreState {
   // User progression
   totalXp: number;
@@ -69,6 +75,7 @@ export interface ProgressStoreState {
   streakData: StreakData;
   lessonProgress: Record<string, LessonProgress>;
   dailyGoalData: Record<string, DailyGoalData>; // ISO date -> goal data
+  tierTestResults: Record<string, TierTestResult>; // "tier-N" -> result
 
   // Actions
   addXp: (amount: number) => void;
@@ -80,6 +87,7 @@ export interface ProgressStoreState {
   getExerciseProgress: (lessonId: string, exerciseId: string) => ExerciseProgress | null;
   recordPracticeSession: (duration: number) => void;
   recordExerciseCompletion: (exerciseId: string, score: number, xpEarned: number, challengeContext?: ExerciseChallengeContext) => void;
+  recordTierTestResult: (tier: number, passed: boolean, score: number) => void;
   updateDailyGoal: (date: string, data: Partial<DailyGoalData>) => void;
   reset: () => void;
 }
