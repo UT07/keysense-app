@@ -12,6 +12,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { COLORS } from '../../theme/tokens';
+import { soundManager } from '../../audio/SoundManager';
 
 let Haptics: typeof import('expo-haptics') | null = null;
 try {
@@ -32,6 +33,8 @@ export interface PressableScaleProps {
   haptic?: boolean;
   /** Show a subtle crimson glow when pressed (default: false) */
   glowOnPress?: boolean;
+  /** Play button_press sound + haptic on press via SoundManager (default: true) */
+  soundOnPress?: boolean;
   style?: StyleProp<ViewStyle>;
   children: React.ReactNode;
   testID?: string;
@@ -46,6 +49,7 @@ export function PressableScale({
   disabled,
   haptic = false,
   glowOnPress = false,
+  soundOnPress = true,
   testID,
 }: PressableScaleProps): React.JSX.Element {
   const scale = useSharedValue(1);
@@ -64,10 +68,14 @@ export function PressableScale({
     if (glowOnPress) {
       glowOpacity.value = withSpring(1, { damping: 20, stiffness: 300 });
     }
-    if (haptic && Haptics) {
+    if (soundOnPress) {
+      // SoundManager handles both sound + haptic — skip manual Haptics
+      soundManager.play('button_press');
+    } else if (haptic && Haptics) {
+      // Fallback: manual haptic only when soundOnPress is off
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     }
-  }, [scale, scaleDown, glowOnPress, glowOpacity, haptic]);
+  }, [scale, scaleDown, glowOnPress, glowOpacity, soundOnPress, haptic]);
 
   const handlePressOut = useCallback(() => {
     scale.value = withSpring(1, { damping: 12, stiffness: 180 });

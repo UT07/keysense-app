@@ -3,15 +3,27 @@
  *
  * Tests the animated Pressable wrapper with spring scale on press.
  * Validates onPress, onLongPress, disabled state, testID forwarding,
- * children rendering, custom scaleDown, and style passthrough.
+ * children rendering, custom scaleDown, style passthrough, and
+ * SoundManager integration.
  */
 
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import { Text, View } from 'react-native';
 import { PressableScale } from '../PressableScale';
+import { soundManager } from '../../../audio/SoundManager';
+
+jest.mock('../../../audio/SoundManager', () => ({
+  soundManager: { play: jest.fn() },
+}));
+
+const mockSoundManagerPlay = soundManager.play as jest.Mock;
 
 describe('PressableScale', () => {
+  beforeEach(() => {
+    mockSoundManagerPlay.mockClear();
+  });
+
   describe('Basic rendering', () => {
     it('renders without crashing with minimal props', () => {
       const { getByText } = render(
@@ -404,6 +416,78 @@ describe('PressableScale', () => {
 
       fireEvent.press(getByTestId('full-props'));
       expect(onPress).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('SoundManager integration (soundOnPress)', () => {
+    it('plays button_press sound by default on pressIn', () => {
+      const { getByTestId } = render(
+        <PressableScale testID="sound-default">
+          <Text>Default Sound</Text>
+        </PressableScale>,
+      );
+      fireEvent(getByTestId('sound-default'), 'pressIn');
+      expect(mockSoundManagerPlay).toHaveBeenCalledWith('button_press');
+      expect(mockSoundManagerPlay).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not play sound when soundOnPress is false', () => {
+      const { getByTestId } = render(
+        <PressableScale testID="sound-off" soundOnPress={false}>
+          <Text>No Sound</Text>
+        </PressableScale>,
+      );
+      fireEvent(getByTestId('sound-off'), 'pressIn');
+      expect(mockSoundManagerPlay).not.toHaveBeenCalled();
+    });
+
+    it('skips manual Haptics when soundOnPress is active', () => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const HapticsMock = require('expo-haptics');
+      HapticsMock.impactAsync.mockClear();
+
+      const { getByTestId } = render(
+        <PressableScale testID="no-double-haptic" haptic soundOnPress>
+          <Text>No Double Haptic</Text>
+        </PressableScale>,
+      );
+      fireEvent(getByTestId('no-double-haptic'), 'pressIn');
+
+      // SoundManager was called (it handles haptic internally)
+      expect(mockSoundManagerPlay).toHaveBeenCalledWith('button_press');
+      // Manual Haptics should NOT be called — SoundManager handles it
+      expect(HapticsMock.impactAsync).not.toHaveBeenCalled();
+    });
+
+    it('falls back to manual Haptics when soundOnPress=false and haptic=true', () => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const HapticsMock = require('expo-haptics');
+      HapticsMock.impactAsync.mockClear();
+
+      const { getByTestId } = render(
+        <PressableScale testID="manual-haptic" haptic soundOnPress={false}>
+          <Text>Manual Haptic</Text>
+        </PressableScale>,
+      );
+      fireEvent(getByTestId('manual-haptic'), 'pressIn');
+
+      // SoundManager should NOT be called
+      expect(mockSoundManagerPlay).not.toHaveBeenCalled();
+      // Manual Haptics SHOULD be called
+      expect(HapticsMock.impactAsync).toHaveBeenCalledTimes(1);
+    });
+
+    it('plays sound on each pressIn event', () => {
+      const { getByTestId } = render(
+        <PressableScale testID="multi-press">
+          <Text>Multi</Text>
+        </PressableScale>,
+      );
+      const target = getByTestId('multi-press');
+      fireEvent(target, 'pressIn');
+      fireEvent(target, 'pressOut');
+      fireEvent(target, 'pressIn');
+      expect(mockSoundManagerPlay).toHaveBeenCalledTimes(2);
     });
   });
 });
