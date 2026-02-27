@@ -287,23 +287,53 @@ jest.mock('../../stores/types', () => ({
   EVOLUTION_XP_THRESHOLDS: { baby: 0, teen: 500, adult: 2000, master: 5000 },
 }));
 
-jest.mock('../../components/DailyRewardCalendar', () => {
+// Song store mock
+const mockSongStoreState: any = {
+  summaries: [],
+  isLoadingSummaries: false,
+  filter: {},
+  currentSong: null,
+  isLoadingSong: false,
+  isGeneratingSong: false,
+  generationError: null,
+  songMastery: {},
+  recentSongIds: [],
+  songRequestsToday: { date: '', count: 0 },
+  loadSummaries: jest.fn(),
+  loadMoreSummaries: jest.fn(),
+  setFilter: jest.fn(),
+  loadSong: jest.fn(),
+  updateMastery: jest.fn(),
+  getMastery: jest.fn(),
+  requestSong: jest.fn(),
+  canRequestSong: jest.fn(() => true),
+};
+jest.mock('../../stores/songStore', () => ({
+  useSongStore: Object.assign(
+    (sel?: any) => (sel ? sel(mockSongStoreState) : mockSongStoreState),
+    { getState: () => mockSongStoreState }
+  ),
+}));
+
+jest.mock('../../components/MusicLibrarySpotlight', () => {
   const React = require('react');
   const { View, Text } = require('react-native');
   return {
-    DailyRewardCalendar: (props: any) =>
-      React.createElement(View, { testID: 'daily-reward-calendar', ...props },
-        React.createElement(Text, null, 'Daily Rewards')
+    MusicLibrarySpotlight: (props: any) =>
+      React.createElement(View, { testID: 'music-library-spotlight', ...props },
+        React.createElement(Text, null, 'Music Library')
       ),
   };
 });
 
-jest.mock('../../components/GemEarnPopup', () => {
+jest.mock('../../components/ReviewChallengeCard', () => {
   const React = require('react');
-  const { View } = require('react-native');
+  const { View, Text } = require('react-native');
   return {
-    GemEarnPopup: (props: any) =>
-      React.createElement(View, { testID: 'gem-earn-popup', ...props }),
+    ReviewChallengeCard: (props: any) =>
+      React.createElement(View, { testID: 'review-challenge-card', ...props },
+        React.createElement(Text, null, 'Review Challenge')
+      ),
   };
 });
 
@@ -406,7 +436,7 @@ describe('HomeScreen', () => {
   it('shows quick actions grid', () => {
     const { getByText } = render(<HomeScreen />);
     expect(getByText('Learn')).toBeTruthy();
-    expect(getByText('Practice')).toBeTruthy();
+    expect(getByText('Songs')).toBeTruthy();
     expect(getByText('Free Play')).toBeTruthy();
     expect(getByText('Collection')).toBeTruthy();
   });
@@ -462,9 +492,9 @@ describe('HomeScreen', () => {
     expect(getByText('100')).toBeTruthy();
   });
 
-  it('shows daily reward calendar', () => {
+  it('shows music library spotlight', () => {
     const { getByTestId } = render(<HomeScreen />);
-    expect(getByTestId('daily-reward-calendar')).toBeTruthy();
+    expect(getByTestId('music-library-spotlight')).toBeTruthy();
   });
 
   it('shows evolution progress bar when cat has evolution data', () => {

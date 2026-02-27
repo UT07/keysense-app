@@ -4,7 +4,7 @@
  * daily goal arc, streak flame, stats pills, and continue learning card
  */
 
-import React, { useMemo, useEffect, useRef, useState, useCallback } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -24,10 +24,14 @@ import { AnimatedGradientBackground } from '../components/common/AnimatedGradien
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { DailyChallengeCard } from '../components/DailyChallengeCard';
-import { WeeklyChallengeCard } from '../components/WeeklyChallengeCard';
-import { MonthlyChallengeCard } from '../components/MonthlyChallengeCard';
-import { DailyRewardCalendar } from '../components/DailyRewardCalendar';
-import { GemEarnPopup } from '../components/GemEarnPopup';
+// WeeklyChallengeCard and MonthlyChallengeCard kept for future re-integration
+// import { WeeklyChallengeCard } from '../components/WeeklyChallengeCard';
+// import { MonthlyChallengeCard } from '../components/MonthlyChallengeCard';
+import { getDailyChallengeForDate } from '../core/challenges/challengeSystem';
+import type { SkillCategory } from '../core/curriculum/SkillTree';
+import { MusicLibrarySpotlight } from '../components/MusicLibrarySpotlight';
+import { ReviewChallengeCard } from '../components/ReviewChallengeCard';
+import { useSongStore } from '../stores/songStore';
 import { CatAvatar } from '../components/Mascot/CatAvatar';
 import { SalsaCoach } from '../components/Mascot/SalsaCoach';
 import { StreakFlame } from '../components/StreakFlame';
@@ -59,6 +63,33 @@ function getGreeting(): string {
   if (hour >= 12 && hour < 17) return 'Good Afternoon';
   if (hour >= 17 && hour < 21) return 'Good Evening';
   return 'Good Night';
+}
+
+/**
+ * Maps a challenge category or type to the best skill ID for AI exercise generation.
+ * For category-specific challenges, finds the first unmastered skill in that category.
+ * For generic challenges, picks a skill from the user's current learning tier.
+ */
+function getSkillIdForChallenge(
+  category: SkillCategory | undefined,
+  masteredSkillIds: string[],
+): string {
+  const masteredSet = new Set(masteredSkillIds);
+
+  // Category-specific: find first unmastered skill in that category
+  if (category) {
+    const match = SKILL_TREE.find(
+      (s) => s.category === category && !masteredSet.has(s.id),
+    );
+    if (match) return match.id;
+    // All mastered in category — pick last one for a review exercise
+    const lastInCat = [...SKILL_TREE].reverse().find((s) => s.category === category);
+    if (lastInCat) return lastInCat.id;
+  }
+
+  // Generic challenge: pick from current tier (first unmastered skill overall)
+  const nextSkill = SKILL_TREE.find((s) => !masteredSet.has(s.id));
+  return nextSkill?.id ?? SKILL_TREE[0].id;
 }
 
 export interface HomeScreenProps {
@@ -135,13 +166,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Gem store
   const gems = useGemStore((s) => s.gems);
-  const earnGems = useGemStore((s) => s.earnGems);
 
   // Cat evolution store
-  const dailyRewards = useCatEvolutionStore((s) => s.dailyRewards);
-  const claimDailyReward = useCatEvolutionStore((s) => s.claimDailyReward);
-  const advanceDailyRewardDate = useCatEvolutionStore((s) => s.advanceDailyRewardDate);
-  const isDailyChallengeCompleted = useCatEvolutionStore((s) => s.isDailyChallengeCompleted);
   const evolutionData = useCatEvolutionStore((s) => s.evolutionData);
   const activeCatId = selectedCatId ?? 'mini-meowww';
   const activeCatEvolution = evolutionData[activeCatId];
@@ -160,37 +186,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     if (range <= 0) return 100;
     return Math.min(100, Math.round(((currentXp - stageStart) / range) * 100));
   }, [activeCatEvolution, evolutionNext]);
-
-  // Advance daily reward calendar to match actual date on each HomeScreen visit
-  useEffect(() => {
-    advanceDailyRewardDate();
-  }, [advanceDailyRewardDate]);
-
-  const dailyChallengeCompleted = isDailyChallengeCompleted();
-
-  // Gem earn popup state
-  const [gemPopup, setGemPopup] = useState<{ amount: number; key: number } | null>(null);
-
-  // Toast state for failed claims
-  const [claimToast, setClaimToast] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!claimToast) return;
-    const t = setTimeout(() => setClaimToast(null), 2500);
-    return () => clearTimeout(t);
-  }, [claimToast]);
-
-  const handleClaimReward = useCallback((day: number) => {
-    const reward = claimDailyReward(day);
-    if (!reward) {
-      setClaimToast("Complete today's challenge first!");
-      return;
-    }
-    if (reward.type === 'gems' || reward.type === 'chest') {
-      earnGems(reward.amount, 'daily-reward');
-      setGemPopup({ amount: reward.amount, key: Date.now() });
-    }
-  }, [claimDailyReward, earnGems]);
 
   // Stagger animation
   const fadeAnims = useRef(
@@ -229,6 +224,35 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const goalArcOffset = GOAL_ARC_CIRCUMFERENCE * (1 - dailyGoalProgress);
 
   const streak = streakData?.currentStreak ?? 0;
+
+  // Song library data for spotlight card
+  const songSummaries = useSongStore((s) => s.summaries);
+  const totalSongs = songSummaries.length || 124;
+  const genres = useMemo(() => {
+    const genreSet = new Set(songSummaries.map((s) => s.metadata.genre));
+    return genreSet.size || 6;
+  }, [songSummaries]);
+  const featuredSong = useMemo(() => {
+    if (songSummaries.length === 0) return null;
+    const dayOfYear = Math.floor(
+      (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000,
+    );
+    const idx = dayOfYear % songSummaries.length;
+    const s = songSummaries[idx];
+    return {
+      title: s.metadata.title,
+      artist: s.metadata.artist,
+      genre: s.metadata.genre,
+      difficulty: s.metadata.difficulty,
+    };
+  }, [songSummaries]);
+
+  // Decayed skills for review card
+  const decayedSkillIds = useMemo(() => {
+    const profile = useLearnerProfileStore.getState();
+    if (!profile.calculateDecayedSkills) return [];
+    return profile.calculateDecayedSkills();
+  }, []);
 
   return (
     <SafeAreaView style={styles.container} testID="home-screen">
@@ -349,66 +373,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </AnimatedGradientBackground>
         </Animated.View>
 
-        {/* Salsa coach greeting */}
+        {/* Music Library Spotlight */}
         <Animated.View style={[styles.section, staggerStyle(1)]}>
-          <SalsaCoach
-            mood={mascotMood}
-            size="small"
-            showCatchphrase
-            catchphrase={catMessage}
-          />
-        </Animated.View>
-
-        {/* Daily Reward Calendar */}
-        <Animated.View style={[styles.section, staggerStyle(2)]}>
-          <View style={styles.dailyRewardWrapper}>
-            <DailyRewardCalendar
-              days={dailyRewards.days}
-              currentDay={dailyRewards.currentDay}
-              onClaim={handleClaimReward}
-              dailyChallengeCompleted={dailyChallengeCompleted}
-            />
-            {gemPopup && (
-              <GemEarnPopup
-                key={gemPopup.key}
-                amount={gemPopup.amount}
-                onComplete={() => setGemPopup(null)}
-                offsetY={-10}
-              />
-            )}
-            {claimToast && (
-              <View style={styles.claimToast}>
-                <MaterialCommunityIcons name="information-outline" size={14} color={COLORS.warning} />
-                <Text style={styles.claimToastText}>{claimToast}</Text>
-              </View>
-            )}
-          </View>
-        </Animated.View>
-
-        {/* Daily Challenge Card */}
-        <Animated.View style={[styles.section, staggerStyle(3)]}>
-          <DailyChallengeCard onPress={() => {
-            navigation.navigate('MainTabs', { screen: 'Learn' } as any);
-          }} />
-        </Animated.View>
-
-        {/* Weekly Bonus Challenge (only visible on designated day) */}
-        <Animated.View style={[styles.section, staggerStyle(3)]}>
-          <WeeklyChallengeCard
-            onPress={() => navigation.navigate('MainTabs', { screen: 'Learn' } as any)}
-          />
-        </Animated.View>
-
-        {/* Monthly Challenge (only visible during active 48h window) */}
-        <Animated.View style={[styles.section, staggerStyle(3)]}>
-          <MonthlyChallengeCard
-            onPress={() => navigation.navigate('MainTabs', { screen: 'Learn' } as any)}
-            exercisesCompletedToday={todayGoal?.exercisesCompleted ?? 0}
+          <MusicLibrarySpotlight
+            totalSongs={totalSongs}
+            totalGenres={genres}
+            featuredSong={featuredSong}
+            onBrowse={() => navigation.navigate('MainTabs', { screen: 'Songs' } as any)}
+            onPlayFeatured={() => navigation.navigate('MainTabs', { screen: 'Songs' } as any)}
           />
         </Animated.View>
 
         {/* Continue Learning Card */}
-        <Animated.View style={[styles.section, staggerStyle(4)]}>
+        <Animated.View style={[styles.section, staggerStyle(2)]}>
           <Text style={styles.sectionTitle}>Continue Learning</Text>
           <PressableScale
             haptic
@@ -446,8 +423,47 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </PressableScale>
         </Animated.View>
 
-        {/* Quick Stats Row */}
+        {/* Review Challenge (conditional — only when skills are decaying) */}
+        {decayedSkillIds.length > 0 && (
+          <Animated.View style={[styles.section, staggerStyle(3)]}>
+            <ReviewChallengeCard
+              decayedSkills={decayedSkillIds}
+              onStartReview={() => {
+                navigation.navigate('Exercise', {
+                  exerciseId: 'ai-mode',
+                  aiMode: true,
+                  skillId: decayedSkillIds[0],
+                });
+              }}
+            />
+          </Animated.View>
+        )}
+
+        {/* Salsa coach greeting */}
+        <Animated.View style={[styles.section, staggerStyle(4)]}>
+          <SalsaCoach
+            mood={mascotMood}
+            size="small"
+            showCatchphrase
+            catchphrase={catMessage}
+          />
+        </Animated.View>
+
+        {/* Daily Challenge Card */}
         <Animated.View style={[styles.section, staggerStyle(5)]}>
+          <DailyChallengeCard onPress={() => {
+            const challenge = getDailyChallengeForDate(today);
+            const skillId = getSkillIdForChallenge(challenge.category, masteredSkills);
+            navigation.navigate('Exercise', {
+              exerciseId: 'ai-mode',
+              aiMode: true,
+              skillId,
+            });
+          }} />
+        </Animated.View>
+
+        {/* Quick Stats Row */}
+        <Animated.View style={[styles.section, staggerStyle(6)]}>
           <View style={styles.statsPillRow}>
             <StatPill icon="music-note" label="Exercises" value={totalCompleted} color={COLORS.primary} />
             <StatPill icon="book-open-variant" label="Lessons" value={Object.values(lessonProgress).filter(l => l.status === 'completed').length} color={COLORS.info} />
@@ -457,7 +473,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </Animated.View>
 
         {/* Quick Actions Grid */}
-        <Animated.View style={[styles.section, staggerStyle(6)]}>
+        <Animated.View style={[styles.section, staggerStyle(7)]}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.actionsGrid}>
             <ActionCard
@@ -467,12 +483,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               onPress={onNavigateToLesson ?? (() => navigation.navigate('DailySession'))}
             />
             <ActionCard
-              icon="music-box-multiple"
-              label="Practice"
-              gradient={[COLORS.cardHighlight, COLORS.cardSurface]}
-              onPress={onNavigateToExercise ?? (() => {
-                navigation.navigate('MainTabs', { screen: 'Learn' } as any);
-              })}
+              icon="music-note-sixteenth-dotted"
+              label="Songs"
+              gradient={[COLORS.primaryDark, COLORS.cardSurface]}
+              onPress={() => navigation.navigate('MainTabs', { screen: 'Songs' } as any)}
             />
             <ActionCard
               icon="piano"
@@ -691,28 +705,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: COLORS.evolutionGlow,
     minWidth: 50,
-  },
-  // Daily reward wrapper
-  dailyRewardWrapper: {
-    position: 'relative' as const,
-  },
-  claimToast: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'center',
-    gap: 6,
-    marginTop: SPACING.sm,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: glowColor(COLORS.warning, 0.12),
-    borderRadius: BORDER_RADIUS.full,
-    borderWidth: 1,
-    borderColor: glowColor(COLORS.warning, 0.25),
-  },
-  claimToastText: {
-    ...TYPOGRAPHY.caption.lg,
-    fontWeight: '600' as const,
-    color: COLORS.warning,
   },
   // Sections
   section: {
