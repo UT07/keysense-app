@@ -18,6 +18,13 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  FadeIn,
+} from 'react-native-reanimated';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -100,11 +107,117 @@ function DifficultyPill({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Mastery badge icon mapping
+// ---------------------------------------------------------------------------
+
+const MASTERY_ICONS: Record<Exclude<MasteryTier, 'none'>, keyof typeof MaterialCommunityIcons.glyphMap> = {
+  bronze: 'shield-half-full',
+  silver: 'shield-check',
+  gold: 'trophy',
+  platinum: 'diamond-stone',
+};
+
+// ---------------------------------------------------------------------------
+// Difficulty star colors — ramps from green (easy) to red (hard)
+// ---------------------------------------------------------------------------
+
+const DIFFICULTY_STAR_COLORS: Record<number, string> = {
+  1: '#4CAF50', // green — easy
+  2: '#8BC34A', // light green
+  3: '#FFD700', // gold — medium
+  4: '#FF9800', // orange
+  5: '#F44336', // red — hard
+};
+
+// ---------------------------------------------------------------------------
+// Metallic Mastery Badge
+// ---------------------------------------------------------------------------
+
 function MasteryBadge({ tier }: { tier: MasteryTier }) {
   if (tier === 'none') return null;
+
+  const color = masteryColor(tier);
+  const icon = MASTERY_ICONS[tier];
+  const isPlatinum = tier === 'platinum';
+
   return (
-    <View style={[styles.masteryBadge, { backgroundColor: masteryColor(tier) }]} testID="mastery-badge">
-      <Text style={styles.masteryBadgeText}>{masteryLabel(tier)}</Text>
+    <View
+      style={[
+        styles.masteryBadge,
+        {
+          backgroundColor: color,
+          borderWidth: 1,
+          borderColor: isPlatinum ? '#FFFFFF' : color,
+        },
+      ]}
+      testID="mastery-badge"
+    >
+      <MaterialCommunityIcons
+        name={icon}
+        size={11}
+        color={tier === 'silver' || tier === 'platinum' ? '#1A1A1A' : '#FFFFFF'}
+        style={{ marginRight: 3 }}
+      />
+      <Text
+        style={[
+          styles.masteryBadgeText,
+          {
+            color: tier === 'silver' || tier === 'platinum' ? '#1A1A1A' : '#FFFFFF',
+          },
+        ]}
+      >
+        {masteryLabel(tier)}
+      </Text>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Pulsing "NEW" Badge
+// ---------------------------------------------------------------------------
+
+function NewBadge() {
+  const opacity = useSharedValue(1);
+
+  useEffect(() => {
+    opacity.value = withRepeat(
+      withTiming(0.4, { duration: 1200 }),
+      -1,
+      true,
+    );
+  }, [opacity]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View
+      style={[styles.newBadge, animatedStyle]}
+      testID="new-badge"
+    >
+      <Text style={styles.newBadgeText}>NEW</Text>
+    </Animated.View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Difficulty Star Crystals
+// ---------------------------------------------------------------------------
+
+function DifficultyStarCrystals({ difficulty }: { difficulty: number }) {
+  const color = DIFFICULTY_STAR_COLORS[difficulty] ?? COLORS.starGold;
+  return (
+    <View style={styles.difficultyStars}>
+      {Array.from({ length: difficulty }, (_, i) => (
+        <MaterialCommunityIcons
+          key={i}
+          name="star-four-points"
+          size={13}
+          color={color}
+        />
+      ))}
     </View>
   );
 }
@@ -118,42 +231,36 @@ function SongCard({
   mastery: MasteryTier;
   onPress: () => void;
 }) {
+  const isNew = mastery === 'none';
   return (
-    <TouchableOpacity
-      style={[styles.songCard, SHADOWS.sm as Record<string, unknown>]}
-      onPress={onPress}
-      activeOpacity={0.7}
-      testID={`song-card-${summary.id}`}
-    >
-      <View style={styles.songCardContent}>
-        <View style={styles.songCardLeft}>
-          <Text style={styles.songTitle} numberOfLines={1}>{summary.metadata.title}</Text>
-          <Text style={styles.songArtist} numberOfLines={1}>{summary.metadata.artist}</Text>
-          <View style={styles.songMeta}>
-            <View style={styles.genreChip}>
-              <Text style={styles.genreChipText}>{summary.metadata.genre}</Text>
+    <Animated.View entering={FadeIn.duration(300)}>
+      <TouchableOpacity
+        style={[styles.songCard, SHADOWS.sm as Record<string, unknown>]}
+        onPress={onPress}
+        activeOpacity={0.7}
+        testID={`song-card-${summary.id}`}
+      >
+        <View style={styles.songCardContent}>
+          <View style={styles.songCardLeft}>
+            <Text style={styles.songTitle} numberOfLines={1}>{summary.metadata.title}</Text>
+            <Text style={styles.songArtist} numberOfLines={1}>{summary.metadata.artist}</Text>
+            <View style={styles.songMeta}>
+              <View style={styles.genreChip}>
+                <Text style={styles.genreChipText}>{summary.metadata.genre}</Text>
+              </View>
+              <DifficultyStarCrystals difficulty={summary.metadata.difficulty} />
+              <Text style={styles.durationText}>
+                {Math.floor(summary.metadata.durationSeconds / 60)}:{String(summary.metadata.durationSeconds % 60).padStart(2, '0')}
+              </Text>
             </View>
-            <View style={styles.difficultyStars}>
-              {Array.from({ length: summary.metadata.difficulty }, (_, i) => (
-                <MaterialCommunityIcons
-                  key={i}
-                  name="star"
-                  size={12}
-                  color={COLORS.starGold}
-                />
-              ))}
-            </View>
-            <Text style={styles.durationText}>
-              {Math.floor(summary.metadata.durationSeconds / 60)}:{String(summary.metadata.durationSeconds % 60).padStart(2, '0')}
-            </Text>
+          </View>
+          <View style={styles.songCardRight}>
+            {isNew ? <NewBadge /> : <MasteryBadge tier={mastery} />}
+            <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.textMuted} />
           </View>
         </View>
-        <View style={styles.songCardRight}>
-          <MasteryBadge tier={mastery} />
-          <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.textMuted} />
-        </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
@@ -619,17 +726,35 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
 
-  // Mastery badge
+  // Mastery badge (metallic style)
   masteryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: BORDER_RADIUS.sm,
+    paddingVertical: 3,
+    borderRadius: BORDER_RADIUS.full,
   },
   masteryBadgeText: {
     ...TYPOGRAPHY.caption.sm,
-    color: COLORS.background,
     fontWeight: '700',
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+
+  // NEW badge (pulsing)
+  newBadge: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.primaryLight,
+  },
+  newBadgeText: {
+    ...TYPOGRAPHY.caption.sm,
+    color: '#FFFFFF',
+    fontWeight: '800',
+    letterSpacing: 1,
   },
 
   // Empty / loading
