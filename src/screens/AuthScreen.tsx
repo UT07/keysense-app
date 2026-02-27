@@ -6,9 +6,12 @@
  * - "Skip for now" calls signInAnonymously() with proper error handling
  * - Google/Apple sign-in show an alert if native SDKs are not configured
  * - Firebase Auth persistence ensures the session is remembered across restarts
+ *
+ * Visual: Cinematic intro with floating musical notes, shimmer app title,
+ * Salsa coach at large scale, and enhanced auth buttons.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,10 +20,23 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  withSequence,
+  withDelay,
+  Easing,
+  FadeIn,
+  FadeInUp,
+  FadeInDown,
+} from 'react-native-reanimated';
 import { SalsaCoach } from '../components/Mascot/SalsaCoach';
 import { AnimatedGradientBackground } from '../components/common/AnimatedGradientBackground';
 import { PressableScale } from '../components/common/PressableScale';
@@ -56,12 +72,120 @@ function isGoogleAuthAvailable(): boolean {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Floating Musical Note
+// ---------------------------------------------------------------------------
+
+interface FloatingNoteConfig {
+  id: number;
+  symbol: string;
+  x: number;
+  delay: number;
+}
+
+function FloatingNote({ config }: { config: FloatingNoteConfig }): React.ReactElement {
+  const translateY = useSharedValue(0);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    // Start with delay, then loop: drift upward while fading in then out
+    translateY.value = withDelay(
+      config.delay,
+      withRepeat(
+        withTiming(-120, { duration: 4000, easing: Easing.inOut(Easing.ease) }),
+        -1,
+        false,
+      ),
+    );
+    opacity.value = withDelay(
+      config.delay,
+      withRepeat(
+        withSequence(
+          withTiming(0.6, { duration: 1200, easing: Easing.out(Easing.ease) }),
+          withTiming(0.6, { duration: 1600 }),
+          withTiming(0, { duration: 1200, easing: Easing.in(Easing.ease) }),
+        ),
+        -1,
+        false,
+      ),
+    );
+  }, [config.delay, translateY, opacity]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.Text
+      style={[
+        styles.floatingNote,
+        { left: config.x },
+        animatedStyle,
+      ]}
+    >
+      {config.symbol}
+    </Animated.Text>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Shimmer Title
+// ---------------------------------------------------------------------------
+
+function ShimmerTitle(): React.ReactElement {
+  const shimmerValue = useSharedValue(0.7);
+
+  useEffect(() => {
+    shimmerValue.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.7, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+      ),
+      -1,
+      false,
+    );
+  }, [shimmerValue]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: shimmerValue.value,
+    textShadowColor: `rgba(255, 215, 0, ${shimmerValue.value * 0.6})`,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 12,
+  }));
+
+  return (
+    <Animated.View entering={FadeIn.duration(800)}>
+      <Animated.Text style={[styles.appName, animatedStyle]}>
+        Purrrfect Keys
+      </Animated.Text>
+    </Animated.View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AuthScreen
+// ---------------------------------------------------------------------------
+
 export function AuthScreen(): React.ReactElement {
   const navigation = useNavigation<AuthNavProp>();
   const isLoading = useAuthStore((s) => s.isLoading);
   const error = useAuthStore((s) => s.error);
   const signInAnonymously = useAuthStore((s) => s.signInAnonymously);
   const clearError = useAuthStore((s) => s.clearError);
+  const { width: screenWidth } = useWindowDimensions();
+
+  // Generate floating note configs
+  const notes: FloatingNoteConfig[] = useMemo(
+    () =>
+      Array.from({ length: 6 }, (_, i) => ({
+        id: i,
+        symbol: i % 2 === 0 ? '\u266A' : '\u266B',
+        x: 20 + ((i * 60) % (Math.min(screenWidth, 400) - 40)),
+        delay: i * 400,
+      })),
+    [screenWidth],
+  );
 
   const handleAppleSignIn = useCallback(async () => {
     if (!isAppleAuthAvailable()) {
@@ -150,11 +274,22 @@ export function AuthScreen(): React.ReactElement {
 
   return (
     <AnimatedGradientBackground style={styles.container} testID="auth-screen">
-      <View style={styles.hero}>
-        <SalsaCoach mood="excited" size="large" />
-        <Text style={styles.title}>Let's make music!</Text>
-        <Text style={styles.subtitle}>Sign in to save your progress across devices</Text>
+      {/* Floating musical notes — decorative, non-interactive */}
+      <View style={styles.floatingNotesContainer} pointerEvents="none">
+        {notes.map((note) => (
+          <FloatingNote key={note.id} config={note} />
+        ))}
       </View>
+
+      {/* Hero section: Salsa + App name + Tagline */}
+      <Animated.View entering={FadeInUp.duration(600).delay(200)} style={styles.hero}>
+        <View style={styles.salsaContainer}>
+          <SalsaCoach mood="excited" size="large" />
+        </View>
+        <ShimmerTitle />
+        <Text style={styles.tagline}>Learn piano. Grow cats.</Text>
+        <Text style={styles.subtitle}>Sign in to save your progress across devices</Text>
+      </Animated.View>
 
       {error && (
         <TouchableOpacity style={styles.errorBanner} onPress={clearError}>
@@ -163,7 +298,8 @@ export function AuthScreen(): React.ReactElement {
         </TouchableOpacity>
       )}
 
-      <View style={styles.buttons}>
+      {/* Auth buttons */}
+      <Animated.View entering={FadeInDown.duration(500).delay(500)} style={styles.buttons}>
         {Platform.OS === 'ios' && (
           <PressableScale
             haptic
@@ -172,7 +308,7 @@ export function AuthScreen(): React.ReactElement {
             testID="apple-signin"
           >
             <View style={[styles.button, styles.appleButton]}>
-              <MaterialCommunityIcons name="apple" size={20} color="#000000" style={styles.buttonIcon} />
+              <MaterialCommunityIcons name="apple" size={22} color="#000000" style={styles.buttonIcon} />
               <Text style={[styles.buttonText, styles.appleButtonText]}>
                 Continue with Apple
               </Text>
@@ -187,7 +323,7 @@ export function AuthScreen(): React.ReactElement {
           testID="google-signin"
         >
           <View style={[styles.button, styles.googleButton]}>
-            <MaterialCommunityIcons name="google" size={20} color={COLORS.textPrimary} style={styles.buttonIcon} />
+            <MaterialCommunityIcons name="google" size={22} color={COLORS.textPrimary} style={styles.buttonIcon} />
             <Text style={[styles.buttonText, styles.googleButtonText]}>
               Continue with Google
             </Text>
@@ -201,11 +337,11 @@ export function AuthScreen(): React.ReactElement {
           testID="email-signin"
         >
           <View style={[styles.button, styles.emailButton]}>
-            <MaterialCommunityIcons name="email-outline" size={20} color={COLORS.textPrimary} style={styles.buttonIcon} />
+            <MaterialCommunityIcons name="email-outline" size={22} color={COLORS.textPrimary} style={styles.buttonIcon} />
             <Text style={styles.buttonText}>Continue with Email</Text>
           </View>
         </PressableScale>
-      </View>
+      </Animated.View>
 
       <PressableScale
         onPress={handleSkip}
@@ -230,21 +366,51 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: SPACING.xl,
   },
+
+  // Floating musical notes overlay
+  floatingNotesContainer: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  floatingNote: {
+    position: 'absolute',
+    bottom: 80,
+    fontSize: 28,
+    color: COLORS.primary,
+    opacity: 0, // initial; animated via Reanimated
+  },
+
+  // Hero section
   hero: {
     alignItems: 'center',
     marginBottom: SPACING.xxl,
   },
-  title: {
-    ...TYPOGRAPHY.display.md,
-    color: COLORS.textPrimary,
-    marginTop: SPACING.md,
+  salsaContainer: {
+    transform: [{ scale: 2 }],
+    marginBottom: SPACING.xl + SPACING.lg,
+    marginTop: SPACING.lg,
+  },
+  appName: {
+    ...TYPOGRAPHY.display.lg,
+    fontSize: 38,
+    color: COLORS.starGold,
+    letterSpacing: 1,
+    marginTop: SPACING.sm,
+  },
+  tagline: {
+    ...TYPOGRAPHY.heading.md,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.sm,
+    letterSpacing: 0.5,
   },
   subtitle: {
     ...TYPOGRAPHY.body.md,
-    color: COLORS.textSecondary,
-    marginTop: SPACING.sm,
+    color: COLORS.textMuted,
+    marginTop: SPACING.xs,
     textAlign: 'center',
   },
+
+  // Error banner
   errorBanner: {
     backgroundColor: 'rgba(244, 67, 54, 0.12)',
     borderRadius: BORDER_RADIUS.md,
@@ -264,29 +430,33 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     marginTop: SPACING.xs,
   },
+
+  // Auth buttons
   buttons: {
     gap: SPACING.md,
   },
   button: {
-    ...SHADOWS.sm,
-    height: 52,
-    borderRadius: BORDER_RADIUS.md,
+    ...SHADOWS.md,
+    height: 56,
+    borderRadius: BORDER_RADIUS.lg,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   buttonIcon: {
     marginRight: SPACING.sm,
   },
   appleButton: {
     backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   appleButtonText: {
     color: '#000000',
   },
   googleButton: {
     backgroundColor: COLORS.surface,
-    borderWidth: 1,
     borderColor: COLORS.cardBorder,
   },
   googleButtonText: {
@@ -294,11 +464,15 @@ const styles = StyleSheet.create({
   },
   emailButton: {
     backgroundColor: COLORS.primary,
+    borderColor: COLORS.primaryLight + '40',
   },
   buttonText: {
     ...TYPOGRAPHY.button.lg,
     color: COLORS.textPrimary,
+    letterSpacing: 0.3,
   },
+
+  // Skip
   skipButton: {
     marginTop: SPACING.lg,
     alignItems: 'center',

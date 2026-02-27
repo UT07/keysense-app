@@ -170,10 +170,11 @@ describe('AuthScreen', () => {
       expect(getByTestId('skip-signin')).toBeTruthy();
     });
 
-    it('should display title and subtitle text', () => {
+    it('should display title, tagline, and subtitle text', () => {
       const { getByText } = render(<AuthScreen />);
 
-      expect(getByText("Let's make music!")).toBeTruthy();
+      expect(getByText('Purrrfect Keys')).toBeTruthy();
+      expect(getByText('Learn piano. Grow cats.')).toBeTruthy();
       expect(getByText('Sign in to save your progress across devices')).toBeTruthy();
     });
   });
