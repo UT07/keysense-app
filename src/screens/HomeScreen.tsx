@@ -525,6 +525,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </GameCard>
         </Animated.View>
 
+        {/* Free Play */}
+        <Animated.View style={[styles.section, staggerStyle(6)]}>
+          <PressableScale haptic onPress={() => navigation.navigate('FreePlay')}>
+            <View style={styles.freePlayCard} testID="free-play-card">
+              <View style={styles.freePlayIconContainer}>
+                <MaterialCommunityIcons name="piano" size={28} color={COLORS.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.freePlayTitle}>Free Play</Text>
+                <Text style={styles.freePlaySubtitle}>Practice freely on the keyboard</Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={24} color={COLORS.textMuted} />
+            </View>
+          </PressableScale>
+        </Animated.View>
+
         {/* Review Challenge (conditional — only when skills are decaying) */}
         {decayedSkillIds.length > 0 && (
           <Animated.View style={[styles.section, staggerStyle(7)]}>
@@ -911,5 +927,34 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontSize: 10,
   },
-  // Actions grid
+  // Free Play card
+  freePlayCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    padding: SPACING.md,
+    gap: SPACING.md,
+    ...SHADOWS.sm,
+  },
+  freePlayIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: glowColor(COLORS.primary, 0.12),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  freePlayTitle: {
+    ...TYPOGRAPHY.body.md,
+    fontWeight: '700' as const,
+    color: COLORS.textPrimary,
+  },
+  freePlaySubtitle: {
+    ...TYPOGRAPHY.caption.lg,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
 });

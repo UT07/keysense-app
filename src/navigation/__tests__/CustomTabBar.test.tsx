@@ -65,7 +65,7 @@ import { COLORS } from '../../theme/tokens';
 // ---------------------------------------------------------------------------
 
 function createMockTabBarProps(activeIndex = 0) {
-  const routeNames = ['Home', 'Learn', 'Play', 'Profile'];
+  const routeNames = ['Home', 'Learn', 'Social', 'Profile'];
   const routes = routeNames.map((name, i) => ({
     key: `${name}-key-${i}`,
     name,
@@ -120,7 +120,7 @@ describe('CustomTabBar', () => {
 
     expect(getByTestId('tab-home')).toBeTruthy();
     expect(getByTestId('tab-learn')).toBeTruthy();
-    expect(getByTestId('tab-play')).toBeTruthy();
+    expect(getByTestId('tab-social')).toBeTruthy();
     expect(getByTestId('tab-profile')).toBeTruthy();
   });
 
@@ -160,11 +160,11 @@ describe('CustomTabBar', () => {
     const { getByTestId } = render(<CustomTabBar {...props} />);
 
     const learnIcon = getByTestId('tab-icon-Learn');
-    const playIcon = getByTestId('tab-icon-Play');
+    const socialIcon = getByTestId('tab-icon-Social');
     const profileIcon = getByTestId('tab-icon-Profile');
 
     expect(learnIcon.props.color).toBe(COLORS.textMuted);
-    expect(playIcon.props.color).toBe(COLORS.textMuted);
+    expect(socialIcon.props.color).toBe(COLORS.textMuted);
     expect(profileIcon.props.color).toBe(COLORS.textMuted);
   });
 

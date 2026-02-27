@@ -4,7 +4,7 @@
  * Tests the root navigation structure:
  * - Auth-conditional routing (authenticated vs unauthenticated)
  * - Loading state (renders null while auth initializing)
- * - Tab navigator structure (5 tabs: Home, Learn, Songs, Play, Profile)
+ * - Tab navigator structure (5 tabs: Home, Learn, Songs, Social, Profile)
  * - Auth stack has EmailAuth route
  */
 
@@ -414,12 +414,10 @@ describe('AppNavigator', () => {
       expect(getByTestId('song-library-screen')).toBeTruthy();
     });
 
-    it('should have a Play tab', () => {
+    it('should have a Social tab', () => {
       const { getByTestId } = render(<AppNavigator />);
 
-      // Play tab exists but renders a placeholder — actual PlayScreen is a
-      // full-screen stack route (FreePlay) for proper landscape orientation
-      expect(getByTestId('tab-Play')).toBeTruthy();
+      expect(getByTestId('tab-Social')).toBeTruthy();
     });
 
     it('should have a Profile tab', () => {
@@ -429,18 +427,19 @@ describe('AppNavigator', () => {
       expect(getByTestId('profile-screen')).toBeTruthy();
     });
 
-    it('should have exactly 5 tabs: Home, Learn, Songs, Play, Profile', () => {
+    it('should have exactly 5 tabs: Home, Learn, Songs, Social, Profile', () => {
       const { getByTestId, queryByTestId } = render(<AppNavigator />);
 
       expect(getByTestId('tab-Home')).toBeTruthy();
       expect(getByTestId('tab-Learn')).toBeTruthy();
       expect(getByTestId('tab-Songs')).toBeTruthy();
-      expect(getByTestId('tab-Play')).toBeTruthy();
+      expect(getByTestId('tab-Social')).toBeTruthy();
       expect(getByTestId('tab-Profile')).toBeTruthy();
 
       // Verify no unexpected tabs
       expect(queryByTestId('tab-Settings')).toBeNull();
       expect(queryByTestId('tab-Auth')).toBeNull();
+      expect(queryByTestId('tab-Play')).toBeNull();
     });
   });
 
@@ -506,6 +505,21 @@ describe('AppNavigator', () => {
     it('should have SongPlayer route available', () => {
       const { getByTestId } = render(<AppNavigator />);
       expect(getByTestId('screen-SongPlayer')).toBeTruthy();
+    });
+
+    it('should have Leaderboard route available', () => {
+      const { getByTestId } = render(<AppNavigator />);
+      expect(getByTestId('screen-Leaderboard')).toBeTruthy();
+    });
+
+    it('should have Friends route available', () => {
+      const { getByTestId } = render(<AppNavigator />);
+      expect(getByTestId('screen-Friends')).toBeTruthy();
+    });
+
+    it('should have AddFriend route available', () => {
+      const { getByTestId } = render(<AppNavigator />);
+      expect(getByTestId('screen-AddFriend')).toBeTruthy();
     });
   });
 

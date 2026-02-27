@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { View } from 'react-native';
+import { View, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -65,26 +65,57 @@ export type RootStackParamList = {
   CatSwitch: undefined;
   CatCollection: undefined;
   SongPlayer: { songId: string };
+  Leaderboard: undefined;
+  Friends: undefined;
+  AddFriend: undefined;
 };
 
 export type MainTabParamList = {
   Home: undefined;
   Learn: undefined;
   Songs: undefined;
-  Play: undefined;
+  Social: undefined;
   Profile: undefined;
 };
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-/** Placeholder for the Play tab — never actually rendered because tabPress is intercepted */
-function FreePlayPlaceholder() {
-  return <View style={{ flex: 1, backgroundColor: COLORS.background }} />;
+/** Placeholder for the Social tab — replaced when SocialScreen is implemented */
+function SocialScreenPlaceholder(): React.JSX.Element {
+  return (
+    <View style={{ flex: 1, backgroundColor: COLORS.background, justifyContent: 'center', alignItems: 'center' }}>
+      <Text style={{ color: COLORS.textPrimary, fontSize: 16 }}>Social — Coming Soon</Text>
+    </View>
+  );
+}
+
+function LeaderboardPlaceholder(): React.JSX.Element {
+  return (
+    <View style={{ flex: 1, backgroundColor: COLORS.background, justifyContent: 'center', alignItems: 'center' }}>
+      <Text style={{ color: COLORS.textPrimary, fontSize: 16 }}>Leaderboard — Coming Soon</Text>
+    </View>
+  );
+}
+
+function FriendsPlaceholder(): React.JSX.Element {
+  return (
+    <View style={{ flex: 1, backgroundColor: COLORS.background, justifyContent: 'center', alignItems: 'center' }}>
+      <Text style={{ color: COLORS.textPrimary, fontSize: 16 }}>Friends — Coming Soon</Text>
+    </View>
+  );
+}
+
+function AddFriendPlaceholder(): React.JSX.Element {
+  return (
+    <View style={{ flex: 1, backgroundColor: COLORS.background, justifyContent: 'center', alignItems: 'center' }}>
+      <Text style={{ color: COLORS.textPrimary, fontSize: 16 }}>Add Friend — Coming Soon</Text>
+    </View>
+  );
 }
 
 /**
- * Main tab navigator (Home, Learn, Play, Profile)
+ * Main tab navigator (Home, Learn, Songs, Social, Profile)
  */
 function MainTabs() {
   return (
@@ -110,20 +141,9 @@ function MainTabs() {
         options={{ tabBarButtonTestID: 'tab-songs' }}
       />
       <Tab.Screen
-        name="Play"
-        component={FreePlayPlaceholder}
-        options={{ tabBarButtonTestID: 'tab-play' }}
-        listeners={({ navigation }) => ({
-          tabPress: (e) => {
-            // Prevent default tab behavior — navigate to full-screen FreePlay
-            // so landscape orientation works without the tab bar interfering
-            e.preventDefault();
-            const parent = navigation.getParent();
-            if (parent) {
-              parent.navigate('FreePlay');
-            }
-          },
-        })}
+        name="Social"
+        component={SocialScreenPlaceholder}
+        options={{ tabBarButtonTestID: 'tab-social' }}
       />
       <Tab.Screen
         name="Profile"
@@ -221,6 +241,21 @@ export function AppNavigator() {
               name="SongPlayer"
               component={SongPlayerScreen}
               options={{ animation: 'slide_from_right' }}
+            />
+            <RootStack.Screen
+              name="Leaderboard"
+              component={LeaderboardPlaceholder}
+              options={{ animation: 'slide_from_right' }}
+            />
+            <RootStack.Screen
+              name="Friends"
+              component={FriendsPlaceholder}
+              options={{ animation: 'slide_from_right' }}
+            />
+            <RootStack.Screen
+              name="AddFriend"
+              component={AddFriendPlaceholder}
+              options={{ animation: 'slide_from_bottom' }}
             />
             <RootStack.Screen
               name="CatSwitch"
