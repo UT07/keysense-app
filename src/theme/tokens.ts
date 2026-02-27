@@ -253,3 +253,65 @@ export const ANIMATION_CONFIG = {
     slow: 120,
   },
 } as const;
+
+// ─────────────────────────────────────────────────
+// COMBO TIER SYSTEM (ExercisePlayer escalation)
+// ─────────────────────────────────────────────────
+
+export interface ComboTier {
+  name: string;
+  minCombo: number;
+  color: string;
+  glowColor: string;
+  borderColor: string;
+  label: string;
+}
+
+export const COMBO_TIERS: readonly ComboTier[] = [
+  { name: 'NORMAL',    minCombo: 0,  color: '#FFFFFF',  glowColor: 'transparent',          borderColor: 'transparent',  label: '' },
+  { name: 'GOOD',      minCombo: 5,  color: '#FFD700',  glowColor: 'rgba(255,215,0,0.3)',  borderColor: '#FFD700',      label: 'GOOD!' },
+  { name: 'FIRE',      minCombo: 10, color: '#FF6B35',  glowColor: 'rgba(255,107,53,0.4)', borderColor: '#FF4500',      label: 'FIRE!' },
+  { name: 'SUPER',     minCombo: 15, color: '#FFD700',  glowColor: 'rgba(255,215,0,0.5)',  borderColor: '#FFD700',      label: 'SUPER!' },
+  { name: 'LEGENDARY', minCombo: 20, color: '#FF2D55',  glowColor: 'rgba(255,45,85,0.6)',  borderColor: '#FF2D55',      label: 'LEGENDARY!' },
+] as const;
+
+/** Get the active combo tier for a given combo count */
+export function getComboTier(comboCount: number): ComboTier {
+  for (let i = COMBO_TIERS.length - 1; i >= 0; i--) {
+    if (comboCount >= COMBO_TIERS[i].minCombo) return COMBO_TIERS[i];
+  }
+  return COMBO_TIERS[0];
+}
+
+// ─────────────────────────────────────────────────
+// RARITY SYSTEM (Game cards, chests, cat borders)
+// ─────────────────────────────────────────────────
+
+export const RARITY = {
+  common: {
+    borderColor: '#555555',
+    glowColor: 'rgba(100,100,100,0.2)',
+    label: 'Common',
+    gradient: ['#3A3A3A', '#2A2A2A'] as const,
+  },
+  rare: {
+    borderColor: '#4FC3F7',
+    glowColor: 'rgba(79,195,247,0.3)',
+    label: 'Rare',
+    gradient: ['#1A3A5C', '#0D2137'] as const,
+  },
+  epic: {
+    borderColor: '#CE93D8',
+    glowColor: 'rgba(206,147,216,0.4)',
+    label: 'Epic',
+    gradient: ['#3A1A4A', '#1F0A2A'] as const,
+  },
+  legendary: {
+    borderColor: '#FFD700',
+    glowColor: 'rgba(255,215,0,0.5)',
+    label: 'Legendary',
+    gradient: ['#4A3A0A', '#2A1F00'] as const,
+  },
+} as const;
+
+export type RarityLevel = keyof typeof RARITY;

@@ -7,8 +7,11 @@ import {
   TYPOGRAPHY,
   SHADOWS,
   BORDER_RADIUS,
+  COMBO_TIERS,
+  RARITY,
   glowColor,
   shadowGlow,
+  getComboTier,
 } from '../tokens';
 
 const HEX_REGEX = /^#[0-9A-Fa-f]{6}$/;
@@ -181,6 +184,88 @@ describe('Design Tokens', () => {
     it('exports stagger delays', () => {
       expect(ANIMATION_CONFIG.stagger.fast).toBeLessThan(ANIMATION_CONFIG.stagger.normal);
       expect(ANIMATION_CONFIG.stagger.normal).toBeLessThan(ANIMATION_CONFIG.stagger.slow);
+    });
+  });
+
+  describe('COMBO_TIERS', () => {
+    it('defines 5 combo tiers', () => {
+      expect(COMBO_TIERS).toHaveLength(5);
+    });
+
+    it('NORMAL tier starts at 0', () => {
+      expect(COMBO_TIERS[0].minCombo).toBe(0);
+      expect(COMBO_TIERS[0].name).toBe('NORMAL');
+    });
+
+    it('LEGENDARY tier starts at 20', () => {
+      expect(COMBO_TIERS[4].minCombo).toBe(20);
+      expect(COMBO_TIERS[4].name).toBe('LEGENDARY');
+    });
+
+    it('tiers are sorted by minCombo ascending', () => {
+      for (let i = 1; i < COMBO_TIERS.length; i++) {
+        expect(COMBO_TIERS[i].minCombo).toBeGreaterThan(COMBO_TIERS[i - 1].minCombo);
+      }
+    });
+
+    it('each tier has required fields', () => {
+      for (const tier of COMBO_TIERS) {
+        expect(tier.name).toBeTruthy();
+        expect(typeof tier.minCombo).toBe('number');
+        expect(tier.color).toBeTruthy();
+        expect(typeof tier.glowColor).toBe('string');
+        expect(typeof tier.borderColor).toBe('string');
+        expect(typeof tier.label).toBe('string');
+      }
+    });
+  });
+
+  describe('getComboTier', () => {
+    it('returns NORMAL for combo 0', () => {
+      expect(getComboTier(0).name).toBe('NORMAL');
+    });
+
+    it('returns GOOD for combo 5', () => {
+      expect(getComboTier(5).name).toBe('GOOD');
+    });
+
+    it('returns FIRE for combo 10', () => {
+      expect(getComboTier(10).name).toBe('FIRE');
+    });
+
+    it('returns SUPER for combo 15', () => {
+      expect(getComboTier(15).name).toBe('SUPER');
+    });
+
+    it('returns LEGENDARY for combo 20', () => {
+      expect(getComboTier(20).name).toBe('LEGENDARY');
+    });
+
+    it('returns LEGENDARY for combo 50', () => {
+      expect(getComboTier(50).name).toBe('LEGENDARY');
+    });
+
+    it('returns GOOD for combo 7 (between tiers)', () => {
+      expect(getComboTier(7).name).toBe('GOOD');
+    });
+  });
+
+  describe('RARITY', () => {
+    it('defines common, rare, epic, legendary rarity', () => {
+      expect(RARITY.common).toBeDefined();
+      expect(RARITY.rare).toBeDefined();
+      expect(RARITY.epic).toBeDefined();
+      expect(RARITY.legendary).toBeDefined();
+    });
+
+    it('each rarity has borderColor, glowColor, label, gradient', () => {
+      for (const key of ['common', 'rare', 'epic', 'legendary'] as const) {
+        const r = RARITY[key];
+        expect(r.borderColor).toBeTruthy();
+        expect(r.glowColor).toBeTruthy();
+        expect(r.label).toBeTruthy();
+        expect(r.gradient).toHaveLength(2);
+      }
     });
   });
 });
