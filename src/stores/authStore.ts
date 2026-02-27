@@ -38,6 +38,8 @@ import { useGemStore } from './gemStore';
 import { useSongStore } from './songStore';
 import { useAchievementStore } from './achievementStore';
 import { useLearnerProfileStore } from './learnerProfileStore';
+import { useSocialStore } from './socialStore';
+import { useLeagueStore } from './leagueStore';
 
 // ============================================================================
 // Types
@@ -84,6 +86,8 @@ function resetAllStores(): void {
     { name: 'achievements', reset: () => useAchievementStore.getState().reset() },
     { name: 'learnerProfile', reset: () => useLearnerProfileStore.getState().reset() },
     { name: 'songs', reset: () => useSongStore.getState().reset() },
+    { name: 'social', reset: () => useSocialStore.getState().reset() },
+    { name: 'league', reset: () => useLeagueStore.getState().reset() },
   ];
 
   for (const { name, reset } of stores) {
