@@ -339,6 +339,39 @@ export function determineStartLesson(roundScores: number[]): string {
   return 'lesson-04';
 }
 
+/**
+ * Prerequisite skills per lesson, mirroring CurriculumEngine's lessonPrereqs.
+ * Used to seed mastered skills when the assessment places a user beyond lesson 1.
+ */
+const LESSON_PREREQS: Record<string, string[]> = {
+  'lesson-01': [],
+  'lesson-02': ['find-middle-c', 'keyboard-geography', 'white-keys'],
+  'lesson-03': ['rh-cde', 'rh-cdefg'],
+  'lesson-04': ['c-position-review', 'lh-scale-descending', 'steady-bass'],
+  'lesson-05': ['both-hands-review'],
+  'lesson-06': ['scale-review', 'both-hands-review'],
+};
+
+/**
+ * Collect all prerequisite skills that should be marked mastered when the
+ * assessment places a user at `startLesson`. Includes prereqs for the target
+ * lesson AND every prior lesson so the LevelMap shows them as unlocked.
+ */
+export function getSkillsToSeedForLesson(startLesson: string): string[] {
+  const lessonNum = parseInt(startLesson.replace('lesson-', ''), 10);
+  if (isNaN(lessonNum) || lessonNum <= 1) return [];
+
+  const skills = new Set<string>();
+  for (let i = 1; i <= lessonNum; i++) {
+    const key = `lesson-${String(i).padStart(2, '0')}`;
+    const prereqs = LESSON_PREREQS[key] ?? [];
+    for (const skill of prereqs) {
+      skills.add(skill);
+    }
+  }
+  return Array.from(skills);
+}
+
 // ---------------------------------------------------------------------------
 // Screen Component
 // ---------------------------------------------------------------------------
@@ -741,17 +774,11 @@ export function SkillAssessmentScreen(): React.ReactElement {
         }
       }
 
-      // Seed mastered skills based on assessment performance.
-      // 80%+ average → mark foundational skills as mastered so
-      // DailySession starts at an appropriate difficulty.
-      if (avgScore >= 0.8) {
-        const earlySkills = ['find-middle-c', 'keyboard-geography', 'white-keys'];
-        for (const skillId of earlySkills) {
-          profileStore.markSkillMastered(skillId);
-        }
-      }
-      if (avgScore >= 0.6) {
-        profileStore.markSkillMastered('find-middle-c');
+      // Seed all prerequisite skills for the determined start lesson so the
+      // LevelMap and CurriculumEngine treat prior lessons as unlocked.
+      const skillsToSeed = getSkillsToSeedForLesson(lesson);
+      for (const skillId of skillsToSeed) {
+        profileStore.markSkillMastered(skillId);
       }
 
       setPhaseSync('complete');
