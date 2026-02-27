@@ -249,12 +249,29 @@ describe('catEvolutionStore', () => {
 
   describe('claimDailyReward', () => {
     it('claims the current day reward after completing daily challenge', () => {
+      // Set weekStartDate to today so calcCurrentDay() returns 1
+      const today = new Date().toISOString().split('T')[0];
+      useCatEvolutionStore.setState({
+        dailyRewards: {
+          weekStartDate: today,
+          days: useCatEvolutionStore.getState().dailyRewards.days.map(d => ({ ...d, claimed: false })),
+          currentDay: 1,
+        },
+      });
       useCatEvolutionStore.getState().completeDailyChallenge();
       const reward = useCatEvolutionStore.getState().claimDailyReward(1);
       expect(reward).toEqual({ type: 'gems', amount: 10 });
     });
 
     it('marks day as claimed', () => {
+      const today = new Date().toISOString().split('T')[0];
+      useCatEvolutionStore.setState({
+        dailyRewards: {
+          weekStartDate: today,
+          days: useCatEvolutionStore.getState().dailyRewards.days.map(d => ({ ...d, claimed: false })),
+          currentDay: 1,
+        },
+      });
       useCatEvolutionStore.getState().completeDailyChallenge();
       useCatEvolutionStore.getState().claimDailyReward(1);
       const day1 = useCatEvolutionStore.getState().dailyRewards.days.find(d => d.day === 1);
@@ -292,7 +309,7 @@ describe('catEvolutionStore', () => {
       expect(reward).toBeNull();
     });
 
-    it('allows claiming past unclaimed days after completing daily challenge', () => {
+    it('rejects claiming past days even after completing daily challenge (expired)', () => {
       // Set weekStartDate to 3 days ago so today is day 4
       const threeDaysAgo = new Date();
       threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
@@ -306,12 +323,38 @@ describe('catEvolutionStore', () => {
       });
       // Complete today's challenge first
       useCatEvolutionStore.getState().completeDailyChallenge();
-      // Now past day 2 is claimable
+      // Past day 2 should NOT be claimable — rewards expire at midnight
       const reward = useCatEvolutionStore.getState().claimDailyReward(2);
-      expect(reward).toEqual({ type: 'gems', amount: 15 });
+      expect(reward).toBeNull();
+    });
+
+    it('allows claiming today after completing daily challenge', () => {
+      // Set weekStartDate to 3 days ago so today is day 4
+      const threeDaysAgo = new Date();
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+      const weekStart = threeDaysAgo.toISOString().split('T')[0];
+      useCatEvolutionStore.setState({
+        dailyRewards: {
+          weekStartDate: weekStart,
+          days: useCatEvolutionStore.getState().dailyRewards.days.map(d => ({ ...d, claimed: false })),
+          currentDay: 4,
+        },
+      });
+      useCatEvolutionStore.getState().completeDailyChallenge();
+      // Today (day 4) IS claimable
+      const reward = useCatEvolutionStore.getState().claimDailyReward(4);
+      expect(reward).toEqual({ type: 'gems', amount: 20 });
     });
 
     it('returns null for already claimed day', () => {
+      const today = new Date().toISOString().split('T')[0];
+      useCatEvolutionStore.setState({
+        dailyRewards: {
+          weekStartDate: today,
+          days: useCatEvolutionStore.getState().dailyRewards.days.map(d => ({ ...d, claimed: false })),
+          currentDay: 1,
+        },
+      });
       useCatEvolutionStore.getState().completeDailyChallenge();
       useCatEvolutionStore.getState().claimDailyReward(1);
       const result = useCatEvolutionStore.getState().claimDailyReward(1);

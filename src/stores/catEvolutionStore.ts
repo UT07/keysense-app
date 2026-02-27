@@ -224,10 +224,9 @@ export const useCatEvolutionStore = create<CatEvolutionStoreState>((set, get) =>
     // Calculate which day it actually is based on the calendar
     const actualDay = calcCurrentDay(state.dailyRewards.weekStartDate);
     if (actualDay === 0) return null; // week expired — need reset first
-    if (day > actualDay) return null; // can't claim future days
+    if (day !== actualDay) return null; // can only claim today's reward (past days expire)
 
-    // Claiming ANY reward (today or past catch-up) requires completing
-    // today's daily challenge first — prevents free-tapping the whole week
+    // Must complete today's daily challenge before claiming
     if (state.lastDailyChallengeDate !== todayISO()) return null;
 
     const dayData = state.dailyRewards.days.find(d => d.day === day);

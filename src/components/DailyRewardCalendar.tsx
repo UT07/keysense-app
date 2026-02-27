@@ -64,8 +64,9 @@ function DayCell({
 }): ReactElement {
   const glowOpacity = useSharedValue(0.3);
 
-  // Both today and past unclaimed days require daily challenge completion
-  const isClaimable = !isClaimed && !disabled && (isToday || isPast);
+  // Only today is claimable — past unclaimed days are missed (expired at midnight)
+  const isMissed = isPast && !isClaimed;
+  const isClaimable = !isClaimed && !disabled && isToday;
 
   // Pulsing glow for claimable rewards
   if (isClaimable) {
@@ -104,21 +105,21 @@ function DayCell({
           isClaimed && styles.dayCellClaimed,
           isToday && !isClaimed && styles.dayCellToday,
           isClaimable && glowStyle,
-          isPast && !isClaimed && styles.dayCellClaimable,
+          isMissed && styles.dayCellMissed,
         ]}
       >
         <Text style={[
           styles.dayLabel,
           isToday && styles.dayLabelToday,
-          isPast && !isClaimed && styles.dayLabelClaimable,
+          isMissed && styles.dayLabelMissed,
         ]}>
           {DAY_LABELS[day.day - 1]}
         </Text>
 
         {isClaimed ? (
           <MaterialCommunityIcons name="check-circle" size={20} color={COLORS.success} />
-        ) : isPast ? (
-          <RewardIcon type={day.reward.type} />
+        ) : isMissed ? (
+          <MaterialCommunityIcons name="close-circle" size={20} color={COLORS.textMuted} />
         ) : (
           <RewardIcon type={day.reward.type} />
         )}
@@ -126,8 +127,10 @@ function DayCell({
         <Text style={[
           styles.rewardAmount,
           isClaimed && styles.rewardAmountClaimed,
+          isMissed && styles.rewardAmountMissed,
         ]}>
-          {day.reward.type === 'xp_boost' ? '2x' :
+          {isMissed ? '—' :
+           day.reward.type === 'xp_boost' ? '2x' :
            day.reward.type === 'streak_freeze' ? '1' :
            day.reward.amount}
         </Text>
@@ -171,11 +174,11 @@ export function DailyRewardCalendar({
           </Text>
         </View>
       )}
-      {dailyChallengeCompleted && days.some(d => d.day < currentDay && !d.claimed) && (
+      {days.some(d => d.day < currentDay && !d.claimed) && (
         <View style={styles.challengeHint}>
-          <MaterialCommunityIcons name="gift" size={12} color={COLORS.success} />
-          <Text style={[styles.challengeHintText, { color: COLORS.success }]}>
-            Tap unclaimed days to redeem before they expire!
+          <MaterialCommunityIcons name="close-circle-outline" size={12} color={COLORS.textMuted} />
+          <Text style={styles.challengeHintText}>
+            Missed days expire at midnight
           </Text>
         </View>
       )}
@@ -225,9 +228,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 215, 0, 0.1)',
     borderWidth: 2,
   },
-  dayCellClaimable: {
-    backgroundColor: 'rgba(76, 175, 80, 0.08)',
-    borderWidth: 2,
+  dayCellMissed: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    opacity: 0.5,
   },
   dayLabel: {
     fontSize: 10,
@@ -239,9 +242,8 @@ const styles = StyleSheet.create({
     color: COLORS.gemGold,
     fontWeight: '800',
   },
-  dayLabelClaimable: {
-    color: COLORS.success,
-    fontWeight: '700',
+  dayLabelMissed: {
+    color: COLORS.textMuted,
   },
   rewardAmount: {
     fontSize: 11,
