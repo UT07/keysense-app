@@ -67,8 +67,7 @@ function getGreeting(): string {
 
 /**
  * Maps a challenge category or type to the best skill ID for AI exercise generation.
- * For category-specific challenges, finds the first unmastered skill in that category.
- * For generic challenges, picks a skill from the user's current learning tier.
+ * Only picks skills within the user's current tier range (not ahead of progress).
  */
 function getSkillIdForChallenge(
   category: SkillCategory | undefined,
@@ -76,19 +75,32 @@ function getSkillIdForChallenge(
 ): string {
   const masteredSet = new Set(masteredSkillIds);
 
-  // Category-specific: find first unmastered skill in that category
+  // Determine the user's current tier ceiling (highest tier with a mastered skill + 1)
+  let maxTier = 1;
+  for (const skill of SKILL_TREE) {
+    if (masteredSet.has(skill.id) && skill.tier > maxTier) {
+      maxTier = skill.tier;
+    }
+  }
+  const tierCeiling = maxTier + 1; // Allow one tier ahead
+
+  // Category-specific: find first unmastered skill in that category within reach
   if (category) {
     const match = SKILL_TREE.find(
-      (s) => s.category === category && !masteredSet.has(s.id),
+      (s) => s.category === category && !masteredSet.has(s.id) && s.tier <= tierCeiling,
     );
     if (match) return match.id;
-    // All mastered in category — pick last one for a review exercise
-    const lastInCat = [...SKILL_TREE].reverse().find((s) => s.category === category);
-    if (lastInCat) return lastInCat.id;
+    // All reachable skills mastered — pick last mastered one for review
+    const lastMastered = [...SKILL_TREE]
+      .reverse()
+      .find((s) => s.category === category && masteredSet.has(s.id));
+    if (lastMastered) return lastMastered.id;
   }
 
-  // Generic challenge: pick from current tier (first unmastered skill overall)
-  const nextSkill = SKILL_TREE.find((s) => !masteredSet.has(s.id));
+  // Generic challenge: pick first unmastered skill within reach
+  const nextSkill = SKILL_TREE.find(
+    (s) => !masteredSet.has(s.id) && s.tier <= tierCeiling,
+  );
   return nextSkill?.id ?? SKILL_TREE[0].id;
 }
 
@@ -451,8 +463,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         {/* Daily Challenge Card */}
         <Animated.View style={[styles.section, staggerStyle(5)]}>
-          <DailyChallengeCard onPress={() => {
-            const challenge = getDailyChallengeForDate(today);
+          <DailyChallengeCard masteredSkills={masteredSkills} onPress={() => {
+            const challenge = getDailyChallengeForDate(today, masteredSkills);
             const skillId = getSkillIdForChallenge(challenge.category, masteredSkills);
             navigation.navigate('Exercise', {
               exerciseId: 'ai-mode',

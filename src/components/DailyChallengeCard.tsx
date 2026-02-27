@@ -37,9 +37,10 @@ function getTimeUntilMidnight(): number {
 
 interface DailyChallengeCardProps {
   onPress: () => void;
+  masteredSkills?: string[];
 }
 
-export function DailyChallengeCard({ onPress }: DailyChallengeCardProps): React.ReactElement | null {
+export function DailyChallengeCard({ onPress, masteredSkills }: DailyChallengeCardProps): React.ReactElement | null {
   const dailyRewards = useCatEvolutionStore((s) => s.dailyRewards);
   const isDailyChallengeCompleted = useCatEvolutionStore((s) => s.isDailyChallengeCompleted);
 
@@ -90,7 +91,7 @@ export function DailyChallengeCard({ onPress }: DailyChallengeCardProps): React.
     return { borderColor };
   });
 
-  const todayChallenge = useMemo(() => getDailyChallengeForDate(today), [today]);
+  const todayChallenge = useMemo(() => getDailyChallengeForDate(today, masteredSkills), [today, masteredSkills]);
 
   return (
     <Animated.View style={[styles.cardBorder, animatedBorderStyle]}>
