@@ -28,10 +28,9 @@
 | Phase 8 | Audio Input (Mic) | **COMPLETE** | YIN pitch detection, polyphonic ONNX Basic Pitch, InputManager, MicSetup, onboarding + Free Play wired |
 | Phase 9 | Music Library | **COMPLETE** | Song types, ABC parser, mastery tiers, Firestore service, Gemini generation, browse/search UI, section-based playback, 6 achievements, 124 songs in Firestore |
 | Phase 9.5 | UX Overhaul | **COMPLETE** | Assessment skill seeding fix, HomeScreen feed-style redesign, MusicLibrarySpotlight, ReviewChallengeCard, challenge→AI exercise wiring, mastery tests for all 15 tiers |
-| Phase 10 | Social & Leaderboards | **PLANNED** | Friends, weekly leagues (Bronze→Diamond), challenges, share cards, push notifications |
+| Phase 10 | Arcade Concert Hall Revamp | **PLANNED** | 3D low-poly cats (Blender + react-three-fiber), 3D-styled gameplay, loot reveals, combo escalation, sound design (30+ assets), screen-by-screen polish |
+| Phase 10.5 | Social & Leaderboards | **PLANNED** | Friends, weekly leagues (Bronze→Diamond), challenges, share cards, push notifications |
 | Phase 11 | QA + Launch + Audit | **PLANNED** | Comprehensive audit, beta testing, App Store submission, monitoring |
-| — | Sound Design | **PLANNED** | UI sounds, celebrations, cat audio (can be done alongside any phase) |
-| — | Rive Animations | **PLANNED** | .riv files (needs Rive editor guidance, nice-to-have) |
 
 ---
 
@@ -122,40 +121,30 @@ All 6 batches completed: skill mastery for AI exercises, GenerationHints for 100
 
 ---
 
-## Sound Design (PLANNED)
+## Phase 10: Arcade Concert Hall Revamp (PLANNED)
 
-**Problem:** App is silent outside piano note playback. No button sounds, celebrations, feedback, or cat sounds.
+**Design doc:** `docs/plans/2026-02-27-arcade-concert-hall-design.md`
 
-### Scope (~20-30 audio assets)
-- Button press sounds (tap, toggle, select)
-- Celebration sounds (star earned, combo hit, exercise complete, level up)
-- Feedback sounds (correct/wrong note, miss)
-- Cat sounds (meow greeting, purr reward)
-- Countdown ticks
+**Goal:** Transform from functional dark-mode Duolingo into Duolingo x Clash Royale hybrid — 3D cats, dramatic game-feel, full sound design, loot reveals.
 
-### Design Direction
-Hybrid approach: piano-derived sounds for gameplay feedback + cat sounds for mascot interactions.
+**Visual target:** Duolingo's clear progression + Clash Royale's dopamine delivery (particles, reveals, screen shake, loot, sound on everything)
 
-### Implementation
-1. Source/create short .wav assets (<1s each)
-2. Create `SoundManager` service (preload + play pattern)
-3. Wire into PressableScale, CompletionModal, AchievementToast, ExerciseBuddy, CountInAnimation
-4. Separate volume control in settings
-5. Respect device silent mode
+### Key Deliverables:
+1. **3D Cat Avatars:** Low-poly Blender models (~5K faces), react-three-fiber runtime, 13 cats, 4 evolution stages, 7 animations
+2. **ExercisePlayer "Arena":** 3D-styled notes (Skia 2D with depth illusion), combo escalation (GOOD→FIRE→SUPER→LEGENDARY), screen effects
+3. **CompletionModal "Loot Reveal":** Clash Royale chest-opening energy — timed reveal sequence, reward chests (Common/Rare/Epic)
+4. **Sound Design (~30 assets):** Piano-derived game sounds + cat voices, SoundManager service, expo-haptics pairing
+5. **Auth "Cinematic Intro":** 3D Salsa playing piano, floating notes particles, shimmer title
+6. **Onboarding "Choose Your Starter":** 3D cats on pedestals, Pokemon-starter energy
+7. **LevelMap "Trophy Road":** Themed environments per tier, 3D-style landmarks, cat walks path
+8. **Screen-by-screen polish:** All screens upgraded with game-card aesthetics, depth, particle effects
 
----
-
-## Rive Animations (PLANNED — Needs Guidance)
-
-**Current state:** SVG composable system with Reanimated poses is functional. `RiveCatAvatar.tsx` placeholder exists but no .riv files.
-
-**What's needed:**
-- Rive editor workflow guidance (user has no experience)
-- Design + animate 3 cat states minimum: idle, celebrate, teach
-- Decision: animate all 12 cats individually vs parameterized rig
-- `rive-react-native` integration
-
-**Not a blocker** — current SVG animations work well. This is a quality multiplier.
+### Technology:
+- react-three-fiber + @react-three/drei (3D rendering)
+- Blender for .glb model creation
+- react-native-skia for particle effects
+- expo-haptics for haptic feedback
+- SoundManager (expo-av based, round-robin pools)
 
 ---
 
@@ -278,10 +267,9 @@ Hybrid approach: piano-derived sounds for gameplay feedback + cat sounds for mas
 [DONE]     Phase 8: Audio Input (Mic)      ✓ (monophonic YIN + polyphonic ONNX Basic Pitch)
 [DONE]     Phase 9: Music Library          ✓ (124 songs in Firestore)
 [DONE]     Phase 9.5: UX Overhaul         ✓ (assessment fix, HomeScreen redesign, mastery tests)
-[NOW]      Phase 10: Social & Leaderboards ← friends, leagues, challenges
+[NOW]      Phase 10: Arcade Concert Hall   ← 3D cats, sound design, game-feel, screen polish
+[NEXT]     Phase 10.5: Social & Leaderboards ← friends, leagues, challenges (after app feels premium)
 [NEXT]     Phase 11: QA + Launch + Audit   ← comprehensive audit, then ship
-[PARALLEL] Sound Design                    ← can prototype alongside any phase
-[PARALLEL] Rive Animations                 ← nice-to-have, SVG system is functional
 ```
 
 ---
@@ -296,14 +284,15 @@ PH6            ████████████        DONE
 PH7                     ████████   DONE
 PH7.5                      ██     DONE
 GEMS+CAT                     █     DONE
-PH8                        ████████     DONE (mono + polyphonic)
-PH9                           ██████     DONE (124 songs uploaded)
-PH9.5                             ██     DONE (UX overhaul)
-PH10                              ████████  ← NOW  Social
-PH11                                    ████████  QA + Launch
+PH8                        ████████     DONE
+PH9                           ██████     DONE
+PH9.5                             ██     DONE
+PH10-ACH                         ████████████  ← NOW  3D + Sound + Polish
+PH10.5-SOC                                ████████  Social & Leaderboards
+PH11                                          ████████  QA + Launch
 ```
 
-We are currently in **Week 6** (Feb 27). Phases 1-9.5 complete. Phase 10 (Social & Leaderboards) is next.
+We are currently in **Week 6** (Feb 27). Phases 1-9.5 complete. Phase 10: Arcade Concert Hall Revamp is next.
 
 ---
 
