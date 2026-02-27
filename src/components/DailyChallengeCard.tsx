@@ -123,7 +123,13 @@ export function DailyChallengeCard({ onPress, masteredSkills }: DailyChallengeCa
               <MaterialCommunityIcons name="check-circle" size={20} color={COLORS.success} />
               <Text style={styles.completedText}>
                 {rewardClaimed && todayReward
-                  ? `+${todayReward.reward.amount} ${todayReward.reward.type === 'gems' ? 'gems' : todayReward.reward.type} claimed!`
+                  ? `+${todayReward.reward.amount} ${
+                      todayReward.reward.type === 'gems' ? 'gems'
+                      : todayReward.reward.type === 'xp_boost' ? 'XP Boost'
+                      : todayReward.reward.type === 'streak_freeze' ? 'Streak Freeze'
+                      : todayReward.reward.type === 'chest' ? 'Chest'
+                      : todayReward.reward.type
+                    } claimed!`
                   : 'Completed!'}
               </Text>
             </View>
