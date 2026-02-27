@@ -393,6 +393,20 @@ describe('catEvolutionStore', () => {
   });
 
   describe('completeDailyChallengeAndClaim', () => {
+    // Set weekStartDate to today so calcCurrentDay() returns 1 (day 1)
+    // regardless of the actual day of the week the test runs on.
+    const todayISO = new Date().toISOString().split('T')[0];
+
+    beforeEach(() => {
+      useCatEvolutionStore.setState({
+        dailyRewards: {
+          weekStartDate: todayISO,
+          days: useCatEvolutionStore.getState().dailyRewards.days.map(d => ({ ...d, claimed: false })),
+          currentDay: 1,
+        },
+      });
+    });
+
     it('marks challenge complete and claims today\'s reward in one call', () => {
       const reward = useCatEvolutionStore.getState().completeDailyChallengeAndClaim();
       expect(useCatEvolutionStore.getState().isDailyChallengeCompleted()).toBe(true);

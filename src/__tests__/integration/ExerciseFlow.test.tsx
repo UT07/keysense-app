@@ -122,6 +122,9 @@ let mockPlaybackState: {
   isAudioReady: boolean;
   hasError: boolean;
   errorMessage: string | null;
+  activeInputMethod: string;
+  lastExternalNoteRef: { current: null };
+  externalNoteCount: number;
 } = {
   isPlaying: false,
   currentBeat: -1,
@@ -136,6 +139,9 @@ let mockPlaybackState: {
   isAudioReady: true,
   hasError: false,
   errorMessage: null,
+  activeInputMethod: 'touch',
+  lastExternalNoteRef: { current: null },
+  externalNoteCount: 0,
 };
 
 jest.mock('../../hooks/useExercisePlayback', () => ({
@@ -443,6 +449,9 @@ describe('Exercise Flow Integration Test', () => {
       isAudioReady: true,
       hasError: false,
       errorMessage: null,
+      activeInputMethod: 'touch',
+      lastExternalNoteRef: { current: null },
+      externalNoteCount: 0,
     };
     const { useExercisePlayback } = require('../../hooks/useExercisePlayback');
     useExercisePlayback.mockImplementation(() => mockPlaybackState);

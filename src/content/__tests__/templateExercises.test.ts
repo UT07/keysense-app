@@ -1,6 +1,21 @@
 import type { Exercise } from '@/core/exercises/types';
 import { getTemplateExercise, getTemplateForSkill } from '../templateExercises';
 
+// Mock SkillTree so getTemplateForSkill can use getGenerationHints
+jest.mock('../../core/curriculum/SkillTree', () => ({
+  getGenerationHints: jest.fn((skillId: string) => {
+    const hints: Record<string, any> = {
+      'find-middle-c': { targetMidi: [60], hand: 'right', minDifficulty: 1, promptHint: 'Play Middle C' },
+      'keyboard-geography': { targetMidi: [60, 62, 64, 65, 67], hand: 'right', keySignature: 'C major', minDifficulty: 1, promptHint: 'Navigate C4-G4' },
+      'white-keys': { targetMidi: [60, 62, 64, 65, 67, 69, 71, 72], hand: 'right', keySignature: 'C major', minDifficulty: 1, promptHint: 'All white keys C4-C5' },
+      'hands-together-basic': { targetMidi: [48, 52, 55, 60, 62, 64], hand: 'both', keySignature: 'C major', minDifficulty: 2, exerciseTypes: ['melody'], promptHint: 'Simple melody in right hand with bass in left' },
+      'scale-technique': { targetMidi: [60, 62, 64, 65, 67, 69, 71, 72], hand: 'right', keySignature: 'C major', minDifficulty: 2, exerciseTypes: ['scale'], promptHint: 'C major scale' },
+    };
+    return hints[skillId] ?? null;
+  }),
+  SKILL_TREE: [],
+}));
+
 describe('templateExercises', () => {
   it('returns a valid Exercise for each difficulty', () => {
     for (const d of [1, 2, 3] as const) {
@@ -32,35 +47,36 @@ describe('templateExercises', () => {
     expect(ex.hands).toBeDefined();
   });
 
-  it('difficulty 1 exercises have tempo 50-60', () => {
+  // Tempo ranges include ±5 BPM variation for anti-repetition
+  it('difficulty 1 exercises have tempo in expected range (±5 variation)', () => {
     for (let i = 0; i < 20; i++) {
       const ex = getTemplateExercise(1);
-      expect(ex.settings.tempo).toBeGreaterThanOrEqual(50);
-      expect(ex.settings.tempo).toBeLessThanOrEqual(60);
+      expect(ex.settings.tempo).toBeGreaterThanOrEqual(45); // 50-5=45
+      expect(ex.settings.tempo).toBeLessThanOrEqual(65);    // 60+5=65
     }
   });
 
-  it('difficulty 2 exercises have tempo 70-80', () => {
+  it('difficulty 2 exercises have tempo in expected range (±5 variation)', () => {
     for (let i = 0; i < 20; i++) {
       const ex = getTemplateExercise(2);
-      expect(ex.settings.tempo).toBeGreaterThanOrEqual(70);
-      expect(ex.settings.tempo).toBeLessThanOrEqual(80);
+      expect(ex.settings.tempo).toBeGreaterThanOrEqual(65); // 70-5=65
+      expect(ex.settings.tempo).toBeLessThanOrEqual(85);    // 80+5=85
     }
   });
 
-  it('difficulty 3 exercises have tempo 90-100', () => {
+  it('difficulty 3 exercises have tempo in expected range (±5 variation)', () => {
     for (let i = 0; i < 20; i++) {
       const ex = getTemplateExercise(3);
-      expect(ex.settings.tempo).toBeGreaterThanOrEqual(90);
-      expect(ex.settings.tempo).toBeLessThanOrEqual(100);
+      expect(ex.settings.tempo).toBeGreaterThanOrEqual(85); // 90-5=85
+      expect(ex.settings.tempo).toBeLessThanOrEqual(105);   // 100+5=105
     }
   });
 
   it('exercises target weak notes when provided', () => {
     const weakNotes = [61, 63]; // Db4, Eb4
     let foundWeak = false;
-    // Run multiple times since template selection has randomness
-    for (let i = 0; i < 30; i++) {
+    // Run multiple times since template selection + transposition have randomness
+    for (let i = 0; i < 50; i++) {
       const ex = getTemplateExercise(1, weakNotes);
       if (ex.notes.some((n) => weakNotes.includes(n.note))) {
         foundWeak = true;
@@ -78,6 +94,17 @@ describe('templateExercises', () => {
     }
     // With 5 templates per tier, repeated random picks should yield at least 2 unique
     expect(ids.size).toBeGreaterThanOrEqual(2);
+  });
+
+  it('produces variety via different template selection on repeated calls', () => {
+    const noteSignatures = new Set<string>();
+    for (let i = 0; i < 30; i++) {
+      const ex = getTemplateExercise(1);
+      const sig = ex.notes.map((n) => n.note).join(',');
+      noteSignatures.add(sig);
+    }
+    // 5 templates per tier + weak-note swapping should yield multiple patterns
+    expect(noteSignatures.size).toBeGreaterThanOrEqual(2);
   });
 
   it('exercise notes have valid MIDI range (36-96)', () => {
@@ -117,38 +144,57 @@ describe('getTemplateForSkill', () => {
     expect(ex.notes.length).toBeGreaterThan(0);
   });
 
-  it('returns a skill-targeted exercise containing expected MIDI notes', () => {
+  it('returns a skill-targeted exercise with correct notes (no transposition)', () => {
+    // find-middle-c template targets MIDI 60 — should always contain it
     const ex = getTemplateForSkill('find-middle-c');
-    // The find-middle-c template targets MIDI 60
     expect(ex.notes.some((n) => n.note === 60)).toBe(true);
   });
 
-  it('returns the keyboard-geography template for that skill', () => {
+  it('returns a valid exercise for keyboard-geography skill with matching notes', () => {
     const ex = getTemplateForSkill('keyboard-geography');
     expect(ex.notes.length).toBeGreaterThan(0);
-    // Keyboard geography template uses C-D-E range
-    const notes = ex.notes.map((n) => n.note);
-    expect(notes).toContain(60);
-    expect(notes).toContain(62);
+    // Notes should be in C position (60-67) since no transposition
+    const expectedNotes = [60, 62, 64, 65, 67];
+    for (const n of ex.notes) {
+      expect(expectedNotes).toContain(n.note);
+    }
   });
 
-  it('falls back to generic template for unknown skill', () => {
+  it('falls back to generic template for unknown skill (no generation hints)', () => {
     const ex = getTemplateForSkill('nonexistent-skill-xyz');
     expect(ex).toBeDefined();
     expect(ex.notes.length).toBeGreaterThan(0);
   });
 
+  it('builds exercise from GENERATION_HINTS for skill without dedicated template', () => {
+    // hands-together-basic has hints but no dedicated template
+    const ex = getTemplateForSkill('hands-together-basic');
+    expect(ex).toBeDefined();
+    expect(ex.id).toMatch(/^tmpl-hints-/);
+    expect(ex.notes.length).toBeGreaterThan(0);
+    // Notes should match targetMidi from hints: [48, 52, 55, 60, 62, 64]
+    const allowedNotes = [48, 52, 55, 60, 62, 64];
+    for (const n of ex.notes) {
+      expect(allowedNotes).toContain(n.note);
+    }
+    // Should have both-hands exercise
+    expect(ex.hands).toBe('both');
+  });
+
   it('applies weak note swapping to skill templates', () => {
     // white-keys template has notes 60-72; swapping in 61 (Db4) should appear
-    let foundSwap = false;
-    for (let i = 0; i < 30; i++) {
-      const ex = getTemplateForSkill('white-keys', [61]);
-      if (ex.notes.some((n) => n.note === 61)) {
-        foundSwap = true;
-        break;
-      }
-    }
-    expect(foundSwap).toBe(true);
+    const ex = getTemplateForSkill('white-keys', [61]);
+    // Without transposition, weak note swap should work reliably
+    expect(ex.notes.some((n) => n.note === 61)).toBe(true);
+  });
+
+  it('skill template notes stay consistent (no transposition)', () => {
+    // Same skill should produce same notes (modulo weak-note swapping)
+    const ex1 = getTemplateForSkill('find-middle-c');
+    const ex2 = getTemplateForSkill('find-middle-c');
+    // Both should contain MIDI 60 (Middle C)
+    expect(ex1.notes.some((n) => n.note === 60)).toBe(true);
+    expect(ex2.notes.some((n) => n.note === 60)).toBe(true);
   });
 
   it('returns valid exercise structure for all tier 1-3 skill templates', () => {

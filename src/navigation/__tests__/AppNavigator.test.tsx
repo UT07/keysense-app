@@ -399,10 +399,12 @@ describe('AppNavigator', () => {
     });
 
     it('should have a Learn tab', () => {
-      const { getByTestId } = render(<AppNavigator />);
+      const { getByTestId, getAllByTestId } = render(<AppNavigator />);
 
       expect(getByTestId('tab-Learn')).toBeTruthy();
-      expect(getByTestId('level-map-screen')).toBeTruthy();
+      // LevelMapScreen is used both as the Learn tab and as a stack screen,
+      // so there may be multiple instances registered in the navigator
+      expect(getAllByTestId('level-map-screen').length).toBeGreaterThanOrEqual(1);
     });
 
     it('should have a Songs tab', () => {

@@ -266,6 +266,7 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
       )}
 
       <ScrollView
+        testID="completion-modal-scroll"
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >

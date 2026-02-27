@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render } from '@testing-library/react-native';
 
 // ---------------------------------------------------------------------------
 // Navigation mock (override global setup mock with controllable jest.fn)
@@ -125,6 +125,17 @@ jest.mock('../../components/DailyChallengeCard', () => {
   };
 });
 
+jest.mock('../../components/DailyRewardCalendar', () => {
+  const React = require('react');
+  const { View, Text } = require('react-native');
+  return {
+    DailyRewardCalendar: (props: any) =>
+      React.createElement(View, { testID: 'daily-reward-calendar', ...props },
+        React.createElement(Text, null, 'Daily Rewards')
+      ),
+  };
+});
+
 jest.mock('../../components/Mascot/CatAvatar', () => {
   const React = require('react');
   const { View } = require('react-native');
@@ -191,6 +202,10 @@ jest.mock('../../content/ContentLoader', () => ({
       metadata: { title: 'Second Exercise' },
     },
   ]),
+  getExercise: jest.fn(() => ({
+    id: 'lesson-01-ex-01',
+    metadata: { title: 'Find Middle C', description: 'Find Middle C on the keyboard' },
+  })),
   isPostCurriculum: jest.fn(() => false),
 }));
 
@@ -205,6 +220,8 @@ let mockLearnerProfileState: any = {
   totalExercisesCompleted: 0,
   lastAssessmentDate: '',
   assessmentScore: 0,
+  skillMasteryData: {},
+  recentExerciseIds: [],
 };
 jest.mock('../../stores/learnerProfileStore', () => ({
   useLearnerProfileStore: Object.assign(
@@ -215,10 +232,18 @@ jest.mock('../../stores/learnerProfileStore', () => ({
 
 jest.mock('../../core/curriculum/CurriculumEngine', () => ({
   getNextSkillToLearn: jest.fn(() => ({ id: 'find-middle-c', name: 'Find Middle C', category: 'note-finding' })),
+  generateSessionPlan: jest.fn(() => ({
+    sessionType: 'new-material',
+    warmUp: [{ exerciseId: 'lesson-01-ex-01', source: 'static', skillNodeId: 'find-middle-c', reason: 'Warm up' }],
+    lesson: [{ exerciseId: 'lesson-01-ex-02', source: 'static', skillNodeId: 'find-middle-c', reason: 'New skill' }],
+    challenge: [],
+    reasoning: ['New material session'],
+  })),
 }));
 
 jest.mock('../../core/curriculum/SkillTree', () => ({
   SKILL_TREE: Array.from({ length: 27 }, (_, i) => ({ id: `skill-${i}`, name: `Skill ${i}` })),
+  getSkillById: jest.fn(() => ({ id: 'find-middle-c', name: 'Find Middle C', category: 'note-finding', tier: 1 })),
 }));
 
 // Gem store mock
@@ -391,22 +416,14 @@ describe('HomeScreen', () => {
     expect(getByText('streak:5')).toBeTruthy();
   });
 
-  it('shows continue learning card with skill-based progress', () => {
+  it('shows today\'s practice section', () => {
     const { getByText } = render(<HomeScreen />);
-    expect(getByText('Continue Learning')).toBeTruthy();
-    expect(getByText('Find Middle C')).toBeTruthy();
-    expect(getByText('0 skills mastered')).toBeTruthy();
+    expect(getByText("Today's Practice")).toBeTruthy();
   });
 
   it('shows daily challenge card', () => {
     const { getByText } = render(<HomeScreen />);
     expect(getByText('Daily Challenge')).toBeTruthy();
-  });
-
-  it('navigates to Learn tab when continue card is pressed', () => {
-    const { getByText } = render(<HomeScreen />);
-    fireEvent.press(getByText('Find Middle C'));
-    expect(mockNavigate).toHaveBeenCalledWith('MainTabs', { screen: 'Learn' });
   });
 
   it('shows XP progress info', () => {
@@ -431,20 +448,6 @@ describe('HomeScreen', () => {
     expect(getByText('Streak')).toBeTruthy();
     expect(getByText('Lessons')).toBeTruthy();
     expect(getByText('Stars')).toBeTruthy();
-  });
-
-  it('shows quick actions grid', () => {
-    const { getByText } = render(<HomeScreen />);
-    expect(getByText('Learn')).toBeTruthy();
-    expect(getByText('Songs')).toBeTruthy();
-    expect(getByText('Free Play')).toBeTruthy();
-    expect(getByText('Collection')).toBeTruthy();
-  });
-
-  it('navigates to DailySession when Learn action card is pressed', () => {
-    const { getByText } = render(<HomeScreen />);
-    fireEvent.press(getByText('Learn'));
-    expect(mockNavigate).toHaveBeenCalledWith('DailySession');
   });
 
   it('does not redirect to onboarding when already completed', () => {
@@ -476,14 +479,6 @@ describe('HomeScreen', () => {
     };
     const { getByText } = render(<HomeScreen />);
     expect(getByText('Goal complete!')).toBeTruthy();
-  });
-
-  it('uses onNavigateToExercise callback prop when provided', () => {
-    const onNav = jest.fn();
-    const { getByText } = render(<HomeScreen onNavigateToExercise={onNav} />);
-    fireEvent.press(getByText('Find Middle C'));
-    expect(onNav).toHaveBeenCalled();
-    expect(mockNavigate).not.toHaveBeenCalledWith('MainTabs', expect.anything());
   });
 
   it('shows gem counter with current balance', () => {

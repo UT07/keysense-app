@@ -148,8 +148,16 @@ export function DailySessionScreen() {
         contentContainerStyle={styles.scrollContent}
         testID="daily-session-scroll"
       >
-        {/* Header — no back button since this is a tab */}
+        {/* Header with back button */}
         <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            testID="daily-session-back"
+          >
+            <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textPrimary} />
+          </TouchableOpacity>
           <View style={styles.headerTextContainer}>
             <View style={styles.headerTitleRow}>
               <Text style={styles.headerTitle}>Today's Practice</Text>
@@ -401,9 +409,16 @@ const styles = StyleSheet.create({
   },
   // Header
   header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.md,
     paddingBottom: SPACING.lg,
+  },
+  backButton: {
+    padding: SPACING.xs,
+    marginRight: SPACING.sm,
+    marginTop: 2,
   },
   headerTextContainer: {
     flex: 1,

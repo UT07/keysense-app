@@ -93,8 +93,10 @@ export async function getNextExerciseForSkill(
     const buffer = await loadBuffer();
     const index = buffer.findIndex((b) => b.targetSkillId === skillId);
     if (index === -1) {
-      // No skill match — fall back to any
-      return getNextExercise();
+      // No skill match — return null so caller uses template fallback.
+      // Previously fell back to getNextExercise() (any skill), causing
+      // mismatched titles/notes when a different-skill exercise was served.
+      return null;
     }
 
     const [entry] = buffer.splice(index, 1);

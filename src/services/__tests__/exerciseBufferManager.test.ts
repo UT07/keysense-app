@@ -118,14 +118,14 @@ describe('exerciseBufferManager', () => {
       expect(saved[1].targetSkillId).toBe('rh-cde');
     });
 
-    it('falls back to any exercise when no skill match', async () => {
+    it('returns null when no skill match (instead of wrong-skill fallback)', async () => {
       const entries = [makeBuffered(1, 'rh-cde'), makeBuffered(2, 'rh-cde')];
       mockGetItem.mockResolvedValue(JSON.stringify(entries));
 
       const result = await getNextExerciseForSkill('white-keys');
 
-      // Should fall back to FIFO (first exercise)
-      expect(result).toEqual(makeExercise(1));
+      // Should return null so caller uses template fallback for correct skill
+      expect(result).toBeNull();
     });
 
     it('returns null when buffer is empty', async () => {

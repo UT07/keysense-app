@@ -4,6 +4,7 @@
  */
 
 import { useProgressStore } from '../progressStore';
+import { useCatEvolutionStore } from '../catEvolutionStore';
 import { PersistenceManager, STORAGE_KEYS } from '../persistence';
 import type { LessonProgress, ExerciseProgress } from '@/core/exercises/types';
 
@@ -22,7 +23,10 @@ describe('Progress Store', () => {
       },
       lessonProgress: {},
       dailyGoalData: {},
+      streakMilestonesClaimed: [],
     });
+    // Mark daily challenge completed to isolate XP tests from challenge multiplier
+    useCatEvolutionStore.setState({ lastDailyChallengeDate: new Date().toISOString().split('T')[0] });
     PersistenceManager.deleteState(STORAGE_KEYS.PROGRESS);
   });
 

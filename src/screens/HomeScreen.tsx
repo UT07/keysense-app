@@ -4,7 +4,7 @@
  * daily goal arc, streak flame, stats pills, and continue learning card
  */
 
-import React, { useMemo, useEffect, useRef } from 'react';
+import React, { useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -13,20 +13,16 @@ import {
   ScrollView,
   TouchableOpacity,
   Animated,
-  Dimensions,
 } from 'react-native';
 import { PressableScale } from '../components/common/PressableScale';
 import { AnimatedProgressBar } from '../components/common/AnimatedProgressBar';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { LinearGradient } from 'expo-linear-gradient';
 import { AnimatedGradientBackground } from '../components/common/AnimatedGradientBackground';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { DailyChallengeCard } from '../components/DailyChallengeCard';
-// WeeklyChallengeCard and MonthlyChallengeCard kept for future re-integration
-// import { WeeklyChallengeCard } from '../components/WeeklyChallengeCard';
-// import { MonthlyChallengeCard } from '../components/MonthlyChallengeCard';
+import { DailyRewardCalendar } from '../components/DailyRewardCalendar';
 import { getDailyChallengeForDate } from '../core/challenges/challengeSystem';
 import type { SkillCategory } from '../core/curriculum/SkillTree';
 import { MusicLibrarySpotlight } from '../components/MusicLibrarySpotlight';
@@ -43,15 +39,16 @@ import { useGemStore } from '../stores/gemStore';
 import { useCatEvolutionStore, xpToNextStage } from '../stores/catEvolutionStore';
 import { EVOLUTION_XP_THRESHOLDS } from '../stores/types';
 import { getLessons } from '../content/ContentLoader';
-import { getNextSkillToLearn } from '../core/curriculum/CurriculumEngine';
-import { SKILL_TREE } from '../core/curriculum/SkillTree';
+import { generateSessionPlan } from '../core/curriculum/CurriculumEngine';
+import type { ExerciseRef } from '../core/curriculum/CurriculumEngine';
+import { SKILL_TREE, getSkillById } from '../core/curriculum/SkillTree';
+import { getExercise } from '../content/ContentLoader';
 import { useLearnerProfileStore } from '../stores/learnerProfileStore';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, glowColor } from '../theme/tokens';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type HomeNavProp = NativeStackNavigationProp<RootStackParamList>;
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
 const GOAL_ARC_SIZE = 140;
 const GOAL_ARC_STROKE = 8;
 const GOAL_ARC_RADIUS = (GOAL_ARC_SIZE - GOAL_ARC_STROKE) / 2;
@@ -105,16 +102,10 @@ function getSkillIdForChallenge(
 }
 
 export interface HomeScreenProps {
-  onNavigateToExercise?: () => void;
-  onNavigateToLesson?: () => void;
-  onNavigateToSongs?: () => void;
   onNavigateToSettings?: () => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
-  onNavigateToExercise,
-  onNavigateToLesson,
-  onNavigateToSongs,
   onNavigateToSettings,
 }) => {
   const navigation = useNavigation<HomeNavProp>();
@@ -143,8 +134,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const totalSkills = SKILL_TREE.length;
   const skillProgress = Math.round((masteredSkills.length / totalSkills) * 100);
 
-  const { nextExerciseTitle, currentLessonLabel, totalCompleted } = useMemo(() => {
-    const nextSkill = getNextSkillToLearn(masteredSkills);
+  const totalCompleted = useMemo(() => {
     const lessons = getLessons();
     let totalDone = 0;
     for (const lesson of lessons) {
@@ -154,13 +144,45 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         : 0;
       totalDone += completedCount;
     }
+    return totalDone;
+  }, [lessonProgress]);
 
-    return {
-      nextExerciseTitle: nextSkill?.name ?? "Today's Practice",
-      currentLessonLabel: `${masteredSkills.length} skills mastered`,
-      totalCompleted: totalDone,
-    };
-  }, [lessonProgress, masteredSkills]);
+  // Today's Practice session plan (mini version of DailySessionScreen)
+  const sessionPlan = useMemo(() => {
+    const profile = useLearnerProfileStore.getState();
+    return generateSessionPlan(
+      {
+        noteAccuracy: profile.noteAccuracy,
+        noteAttempts: profile.noteAttempts,
+        skills: profile.skills,
+        tempoRange: profile.tempoRange,
+        weakNotes: profile.weakNotes,
+        weakSkills: profile.weakSkills,
+        totalExercisesCompleted: profile.totalExercisesCompleted,
+        lastAssessmentDate: profile.lastAssessmentDate,
+        assessmentScore: profile.assessmentScore,
+        masteredSkills: profile.masteredSkills,
+        skillMasteryData: profile.skillMasteryData,
+        recentExerciseIds: profile.recentExerciseIds,
+      },
+      profile.masteredSkills,
+    );
+  }, [masteredSkills]);
+
+  const handleExercisePress = useCallback(
+    (ref: ExerciseRef) => {
+      if (ref.source === 'ai' || ref.source === 'ai-with-fallback') {
+        navigation.navigate('Exercise', {
+          exerciseId: ref.fallbackExerciseId ?? 'ai-mode',
+          aiMode: true,
+          skillId: ref.skillNodeId,
+        });
+      } else {
+        navigation.navigate('Exercise', { exerciseId: ref.exerciseId });
+      }
+    },
+    [navigation],
+  );
 
   // Cat mood & dialogue
   const catMood = useMemo(() => calculateCatMood({
@@ -181,6 +203,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Cat evolution store
   const evolutionData = useCatEvolutionStore((s) => s.evolutionData);
+  const dailyRewards = useCatEvolutionStore((s) => s.dailyRewards);
+  const claimDailyReward = useCatEvolutionStore((s) => s.claimDailyReward);
+  const isDailyChallengeCompleted = useCatEvolutionStore((s) => s.isDailyChallengeCompleted);
+  const advanceDailyRewardDate = useCatEvolutionStore((s) => s.advanceDailyRewardDate);
+
+  // Advance daily rewards calendar on mount
+  useEffect(() => {
+    advanceDailyRewardDate();
+  }, [advanceDailyRewardDate]);
   const activeCatId = selectedCatId ?? 'mini-meowww';
   const activeCatEvolution = evolutionData[activeCatId];
   const evolutionNext = useMemo(
@@ -201,10 +232,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Stagger animation
   const fadeAnims = useRef(
-    Array.from({ length: 8 }, () => new Animated.Value(0))
+    Array.from({ length: 10 }, () => new Animated.Value(0))
   ).current;
   const slideAnims = useRef(
-    Array.from({ length: 8 }, () => new Animated.Value(30))
+    Array.from({ length: 10 }, () => new Animated.Value(30))
   ).current;
 
   useEffect(() => {
@@ -228,8 +259,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [fadeAnims, slideAnims]);
 
   const staggerStyle = (index: number) => ({
-    opacity: fadeAnims[Math.min(index, 7)],
-    transform: [{ translateY: slideAnims[Math.min(index, 7)] }],
+    opacity: fadeAnims[Math.min(index, 9)],
+    transform: [{ translateY: slideAnims[Math.min(index, 9)] }],
   });
 
   // Goal arc offset
@@ -385,8 +416,65 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </AnimatedGradientBackground>
         </Animated.View>
 
-        {/* Music Library Spotlight */}
+        {/* Today's Practice */}
         <Animated.View style={[styles.section, staggerStyle(1)]}>
+          <View style={styles.practiceHeader}>
+            <Text style={styles.sectionTitle}>Today's Practice</Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('DailySession')}
+              style={styles.seeAllBtn}
+            >
+              <Text style={styles.seeAllText}>See All</Text>
+              <MaterialCommunityIcons name="chevron-right" size={16} color={COLORS.primary} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.practiceProgressRow}>
+            <AnimatedProgressBar
+              progress={skillProgress / 100}
+              color={COLORS.primary}
+              height={6}
+              style={{ flex: 1 }}
+            />
+            <Text style={styles.practiceProgressText}>{masteredSkills.length}/{totalSkills} skills</Text>
+          </View>
+          <HomePracticeSections plan={sessionPlan} onExercisePress={handleExercisePress} />
+        </Animated.View>
+
+        {/* Daily Challenge Card */}
+        <Animated.View style={[styles.section, staggerStyle(2)]}>
+          <DailyChallengeCard masteredSkills={masteredSkills} onPress={() => {
+            const challenge = getDailyChallengeForDate(today, masteredSkills);
+            const skillId = getSkillIdForChallenge(challenge.category, masteredSkills);
+            navigation.navigate('Exercise', {
+              exerciseId: 'ai-mode',
+              aiMode: true,
+              skillId,
+            });
+          }} />
+        </Animated.View>
+
+        {/* Daily Reward Calendar */}
+        <Animated.View style={[styles.section, staggerStyle(3)]}>
+          <DailyRewardCalendar
+            days={dailyRewards.days}
+            currentDay={dailyRewards.currentDay}
+            onClaim={(day) => claimDailyReward(day)}
+            dailyChallengeCompleted={isDailyChallengeCompleted()}
+          />
+        </Animated.View>
+
+        {/* Quick Stats Row */}
+        <Animated.View style={[styles.section, staggerStyle(4)]}>
+          <View style={styles.statsPillRow}>
+            <StatPill icon="music-note" label="Exercises" value={totalCompleted} color={COLORS.primary} />
+            <StatPill icon="book-open-variant" label="Lessons" value={Object.values(lessonProgress).filter(l => l.status === 'completed').length} color={COLORS.info} />
+            <StatPill icon="fire" label="Streak" value={streak} color={COLORS.streakFlame} />
+            <StatPill icon="star" label="Stars" value={Object.values(lessonProgress).reduce((sum, l) => sum + Object.values(l.exerciseScores).reduce((s, e) => s + (e.stars ?? 0), 0), 0)} color={COLORS.starGold} />
+          </View>
+        </Animated.View>
+
+        {/* Music Library Spotlight */}
+        <Animated.View style={[styles.section, staggerStyle(5)]}>
           <MusicLibrarySpotlight
             totalSongs={totalSongs}
             totalGenres={genres}
@@ -396,48 +484,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           />
         </Animated.View>
 
-        {/* Continue Learning Card */}
-        <Animated.View style={[styles.section, staggerStyle(2)]}>
-          <Text style={styles.sectionTitle}>Continue Learning</Text>
-          <PressableScale
-            haptic
-            onPress={onNavigateToExercise ?? (() => {
-              navigation.navigate('MainTabs', { screen: 'Learn' } as any);
-            })}
-            testID="home-continue-learning"
-          >
-            <View style={styles.continueCard}>
-              <LinearGradient
-                colors={[COLORS.cardHighlight, COLORS.cardSurface]}
-                style={styles.continueCardInner}
-              >
-                <View style={styles.continueTop}>
-                  <View style={styles.continuePlayIcon}>
-                    <MaterialCommunityIcons name="play" size={24} color={COLORS.textPrimary} />
-                  </View>
-                  <View style={styles.continueInfo}>
-                    <Text style={styles.continueLabel}>{currentLessonLabel}</Text>
-                    <Text style={styles.continueTitle}>{nextExerciseTitle}</Text>
-                  </View>
-                  <MaterialCommunityIcons name="chevron-right" size={24} color={COLORS.textMuted} />
-                </View>
-                <View style={styles.continueProgressRow}>
-                  <AnimatedProgressBar
-                    progress={skillProgress / 100}
-                    color={COLORS.primary}
-                    height={6}
-                    style={styles.continueProgressBar}
-                  />
-                  <Text style={styles.continueProgressText}>{skillProgress}%</Text>
-                </View>
-              </LinearGradient>
-            </View>
-          </PressableScale>
-        </Animated.View>
-
         {/* Review Challenge (conditional — only when skills are decaying) */}
         {decayedSkillIds.length > 0 && (
-          <Animated.View style={[styles.section, staggerStyle(3)]}>
+          <Animated.View style={[styles.section, staggerStyle(7)]}>
             <ReviewChallengeCard
               decayedSkills={decayedSkillIds}
               onStartReview={() => {
@@ -452,67 +501,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         )}
 
         {/* Salsa coach greeting */}
-        <Animated.View style={[styles.section, staggerStyle(4)]}>
+        <Animated.View style={[styles.section, staggerStyle(8)]}>
           <SalsaCoach
             mood={mascotMood}
             size="small"
             showCatchphrase
             catchphrase={catMessage}
           />
-        </Animated.View>
-
-        {/* Daily Challenge Card */}
-        <Animated.View style={[styles.section, staggerStyle(5)]}>
-          <DailyChallengeCard masteredSkills={masteredSkills} onPress={() => {
-            const challenge = getDailyChallengeForDate(today, masteredSkills);
-            const skillId = getSkillIdForChallenge(challenge.category, masteredSkills);
-            navigation.navigate('Exercise', {
-              exerciseId: 'ai-mode',
-              aiMode: true,
-              skillId,
-            });
-          }} />
-        </Animated.View>
-
-        {/* Quick Stats Row */}
-        <Animated.View style={[styles.section, staggerStyle(6)]}>
-          <View style={styles.statsPillRow}>
-            <StatPill icon="music-note" label="Exercises" value={totalCompleted} color={COLORS.primary} />
-            <StatPill icon="book-open-variant" label="Lessons" value={Object.values(lessonProgress).filter(l => l.status === 'completed').length} color={COLORS.info} />
-            <StatPill icon="fire" label="Streak" value={streak} color={COLORS.streakFlame} />
-            <StatPill icon="star" label="Stars" value={Object.values(lessonProgress).reduce((sum, l) => sum + Object.values(l.exerciseScores).reduce((s, e) => s + (e.stars ?? 0), 0), 0)} color={COLORS.starGold} />
-          </View>
-        </Animated.View>
-
-        {/* Quick Actions Grid */}
-        <Animated.View style={[styles.section, staggerStyle(7)]}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.actionsGrid}>
-            <ActionCard
-              icon="book-open-outline"
-              label="Learn"
-              gradient={[COLORS.primaryDark, COLORS.cardSurface]}
-              onPress={onNavigateToLesson ?? (() => navigation.navigate('DailySession'))}
-            />
-            <ActionCard
-              icon="music-note-sixteenth-dotted"
-              label="Songs"
-              gradient={[COLORS.primaryDark, COLORS.cardSurface]}
-              onPress={() => navigation.navigate('MainTabs', { screen: 'Songs' } as any)}
-            />
-            <ActionCard
-              icon="piano"
-              label="Free Play"
-              gradient={[COLORS.cardHighlight, COLORS.cardSurface]}
-              onPress={onNavigateToSongs ?? (() => navigation.navigate('FreePlay'))}
-            />
-            <ActionCard
-              icon="cat"
-              label="Collection"
-              gradient={[COLORS.cardHighlight, COLORS.cardSurface]}
-              onPress={() => navigation.navigate('CatCollection')}
-            />
-          </View>
         </Animated.View>
 
         <View style={{ height: SPACING.xl }} />
@@ -535,16 +530,55 @@ function StatPill({ icon, label, value, color }: { icon: string; label: string; 
 }
 
 /** Action card with gradient background */
-function ActionCard({ icon, label, gradient, onPress }: { icon: string; label: string; gradient: readonly [string, string] | string[]; onPress: () => void }) {
+/** Section colors matching DailySessionScreen */
+const PRACTICE_SECTION_COLORS = {
+  warmUp: { accent: COLORS.warning, bg: glowColor(COLORS.warning, 0.08), border: glowColor(COLORS.warning, 0.2), icon: 'fire' as const, label: 'Warm Up' },
+  lesson: { accent: COLORS.info, bg: glowColor(COLORS.info, 0.08), border: glowColor(COLORS.info, 0.2), icon: 'book-open-variant' as const, label: 'Lesson' },
+  challenge: { accent: COLORS.primaryLight, bg: glowColor(COLORS.primaryLight, 0.08), border: glowColor(COLORS.primaryLight, 0.2), icon: 'lightning-bolt' as const, label: 'Challenge' },
+} as const;
+
+/** Compact practice sections for the HomeScreen dashboard */
+function HomePracticeSections({ plan, onExercisePress }: {
+  plan: { warmUp: ExerciseRef[]; lesson: ExerciseRef[]; challenge: ExerciseRef[] };
+  onExercisePress: (ref: ExerciseRef) => void;
+}) {
   return (
-    <PressableScale haptic onPress={onPress} style={styles.actionCardWrapper}>
-      <View style={styles.actionCard}>
-        <LinearGradient colors={gradient as [string, string]} style={styles.actionCardGradient}>
-          <MaterialCommunityIcons name={icon as any} size={28} color={COLORS.textPrimary} />
-          <Text style={styles.actionLabel}>{label}</Text>
-        </LinearGradient>
-      </View>
-    </PressableScale>
+    <View style={styles.practiceContainer}>
+      {(['warmUp', 'lesson', 'challenge'] as const).map((key) => {
+        const exercises = plan[key];
+        if (exercises.length === 0) return null;
+        const sec = PRACTICE_SECTION_COLORS[key];
+        return (
+          <View key={key} style={styles.practiceSection}>
+            <View style={styles.practiceSectionHeader}>
+              <View style={[styles.practiceSectionIcon, { backgroundColor: sec.bg }]}>
+                <MaterialCommunityIcons name={sec.icon} size={14} color={sec.accent} />
+              </View>
+              <Text style={[styles.practiceSectionLabel, { color: sec.accent }]}>{sec.label}</Text>
+            </View>
+            {exercises.map((ref, i) => {
+              const exercise = ref.source === 'static' ? getExercise(ref.exerciseId) : null;
+              const isAI = ref.source === 'ai' || ref.source === 'ai-with-fallback';
+              const skillNode = isAI ? getSkillById(ref.skillNodeId) : null;
+              const title = exercise?.metadata.title ?? skillNode?.name ?? 'AI Exercise';
+              return (
+                <PressableScale key={`${ref.exerciseId}-${i}`} haptic onPress={() => onExercisePress(ref)}>
+                  <View style={[styles.practiceExerciseCard, { borderColor: sec.border, backgroundColor: sec.bg }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.practiceExerciseTitle} numberOfLines={1}>{title}</Text>
+                      <Text style={styles.practiceExerciseReason} numberOfLines={1}>{ref.reason}</Text>
+                    </View>
+                    <View style={[styles.practicePlayIcon, { backgroundColor: sec.accent }]}>
+                      <MaterialCommunityIcons name="play" size={16} color={COLORS.textPrimary} />
+                    </View>
+                  </View>
+                </PressableScale>
+              );
+            })}
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
@@ -729,63 +763,85 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: SPACING.sm,
   },
-  // Continue Card
-  continueCard: {
-    ...SHADOWS.sm,
-    borderRadius: BORDER_RADIUS.lg,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+  // Today's Practice
+  practiceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  continueCardInner: {
-    padding: SPACING.md,
+  seeAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingBottom: SPACING.sm,
   },
-  continueTop: {
+  seeAllText: {
+    ...TYPOGRAPHY.body.sm,
+    fontWeight: '600' as const,
+    color: COLORS.primary,
+  },
+  practiceProgressRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
   },
-  continuePlayIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  continueInfo: {
-    flex: 1,
-  },
-  continueLabel: {
-    ...TYPOGRAPHY.caption.lg,
-    fontWeight: '500' as const,
-    color: COLORS.textMuted,
-  },
-  continueTitle: {
-    ...TYPOGRAPHY.heading.sm,
-    fontWeight: '700' as const,
-    color: COLORS.textPrimary,
-    marginTop: 2,
-  },
-  continueProgressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  continueProgressBar: {
-    flex: 1,
-  },
-  continueProgressText: {
+  practiceProgressText: {
     ...TYPOGRAPHY.caption.lg,
     fontWeight: '600' as const,
     color: COLORS.textMuted,
-    minWidth: 32,
+    minWidth: 60,
     textAlign: 'right',
+  },
+  practiceContainer: {
+    gap: SPACING.sm,
+  },
+  practiceSection: {
+    gap: SPACING.xs,
+  },
+  practiceSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    marginBottom: 2,
+  },
+  practiceSectionIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  practiceSectionLabel: {
+    ...TYPOGRAPHY.caption.lg,
+    fontWeight: '700' as const,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  practiceExerciseCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    padding: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  practiceExerciseTitle: {
+    ...TYPOGRAPHY.body.md,
+    fontWeight: '600' as const,
+    color: COLORS.textPrimary,
+  },
+  practiceExerciseReason: {
+    ...TYPOGRAPHY.caption.lg,
+    color: COLORS.textSecondary,
+    marginTop: 1,
+  },
+  practicePlayIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   // Stats pills
   statsPillRow: {
@@ -813,29 +869,4 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
   // Actions grid
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.sm,
-  },
-  actionCardWrapper: {
-    width: (SCREEN_WIDTH - SPACING.md * 2 - SPACING.sm) / 2,
-  },
-  actionCard: {
-    ...SHADOWS.sm,
-    borderRadius: BORDER_RADIUS.lg,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-  },
-  actionCardGradient: {
-    paddingVertical: SPACING.lg,
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  actionLabel: {
-    ...TYPOGRAPHY.body.sm,
-    fontWeight: '700' as const,
-    color: COLORS.textPrimary,
-  },
 });

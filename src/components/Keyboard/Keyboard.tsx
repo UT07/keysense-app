@@ -95,6 +95,12 @@ export const Keyboard = React.memo(
     const whiteKeyWidth = keyHeight * 0.7;
     const keyboardWidth = whiteKeys.length * whiteKeyWidth;
 
+    // Track active touches to prevent auto-scroll during user interaction.
+    // Scrolling while the user is touching keys shifts key positions under
+    // their fingers, causing spurious noteOff/noteOn events.
+    const activeTouchCountRef = useRef(0);
+    const pendingScrollRef = useRef<number | null>(null);
+
     // Auto-scroll to center the focusNote when it changes.
     // First mount uses requestAnimationFrame + no animation to ensure
     // the ScrollView content is laid out before scrolling.
@@ -123,6 +129,14 @@ export const Keyboard = React.memo(
         });
         return () => cancelAnimationFrame(raf);
       }
+
+      // If user is actively touching keys, queue the scroll for after release.
+      // Scrolling during touch shifts key positions → spurious noteOff/noteOn.
+      if (activeTouchCountRef.current > 0) {
+        pendingScrollRef.current = clampedX;
+        return undefined;
+      }
+
       scrollViewRef.current.scrollTo({ x: clampedX, animated: true });
       return undefined;
     }, [focusNote, scrollable, startNote, endNote, whiteKeys, whiteKeyWidth, keyboardWidth]);
@@ -267,6 +281,8 @@ export const Keyboard = React.memo(
         }
 
         touchMapRef.current = newTouchMap;
+        // Update active touch count for scroll-queuing logic
+        activeTouchCountRef.current = newTouchMap.size;
         setPressedNotes(newPressedSet);
       },
       [enabled, hitTestConfig, keyboardWidth, scrollable, fireNoteOn, fireNoteOff, hapticEnabled]
@@ -280,7 +296,14 @@ export const Keyboard = React.memo(
         fireNoteOff(midiNote);
       }
       touchMapRef.current.clear();
+      activeTouchCountRef.current = 0;
       setPressedNotes(new Set());
+
+      // Flush any auto-scroll that was queued during active touch
+      if (pendingScrollRef.current !== null && scrollViewRef.current) {
+        scrollViewRef.current.scrollTo({ x: pendingScrollRef.current, animated: true });
+        pendingScrollRef.current = null;
+      }
     }, [fireNoteOff]);
 
     // ── Multi-touch handlers ──────────────────────────────────────────
@@ -307,7 +330,14 @@ export const Keyboard = React.memo(
     );
 
     const handleTouchEnd = useCallback(
-      (event: GestureResponderEvent) => processTouches(event),
+      (event: GestureResponderEvent) => {
+        processTouches(event);
+        // After processing, if no touches remain, flush any pending scroll
+        if (activeTouchCountRef.current === 0 && pendingScrollRef.current !== null && scrollViewRef.current) {
+          scrollViewRef.current.scrollTo({ x: pendingScrollRef.current, animated: true });
+          pendingScrollRef.current = null;
+        }
+      },
       [processTouches]
     );
 
@@ -478,7 +508,6 @@ const styles = StyleSheet.create({
   whiteKeyContainer: {
     flex: 1,
     position: 'relative',
-    minWidth: 48,
   },
   blackKeyOverlay: {
     position: 'absolute',

@@ -26,6 +26,8 @@ const mockNavigation = {
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
   useNavigation: () => mockNavigation,
+  useNavigationState: (selector: (state: any) => any) =>
+    selector({ routes: [{ name: 'LevelMap' }] }),
   useRoute: () => ({ params: {} }),
   NavigationContainer: ({ children }: any) => children,
 }));
@@ -255,15 +257,10 @@ describe('LevelMapScreen', () => {
   // Back button
   // =========================================================================
 
-  it('renders back button', () => {
-    const { getByTestId } = render(<LevelMapScreen />);
-    expect(getByTestId('level-map-back')).toBeTruthy();
-  });
-
-  it('back button calls goBack', () => {
-    const { getByTestId } = render(<LevelMapScreen />);
-    fireEvent.press(getByTestId('level-map-back'));
-    expect(mockGoBack).toHaveBeenCalledTimes(1);
+  it('hides back button when used as tab (single route)', () => {
+    const { queryByTestId } = render(<LevelMapScreen />);
+    // When navigation state has only 1 route (tab context), back button is hidden
+    expect(queryByTestId('level-map-back')).toBeNull();
   });
 
   // =========================================================================

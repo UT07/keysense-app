@@ -588,7 +588,7 @@ export function PlayScreen(): React.JSX.Element {
             hapticEnabled={true}
             showLabels={true}
             scrollable={false}
-            keyHeight={120}
+            keyHeight={140}
             testID="freeplay-keyboard-left"
           />
         </View>
@@ -611,7 +611,7 @@ export function PlayScreen(): React.JSX.Element {
             hapticEnabled={true}
             showLabels={true}
             scrollable={false}
-            keyHeight={120}
+            keyHeight={140}
             testID="freeplay-keyboard-right"
           />
         </View>
@@ -796,6 +796,7 @@ const styles = StyleSheet.create({
   keyboardRow: {
     flex: 1,
     flexDirection: 'row',
+    alignItems: 'center',
   },
   keyboardHalf: {
     flex: 1,

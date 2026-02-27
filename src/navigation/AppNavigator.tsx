@@ -101,7 +101,7 @@ function MainTabs() {
       />
       <Tab.Screen
         name="Learn"
-        component={DailySessionScreen}
+        component={LevelMapScreen}
         options={{ tabBarButtonTestID: 'tab-learn' }}
       />
       <Tab.Screen

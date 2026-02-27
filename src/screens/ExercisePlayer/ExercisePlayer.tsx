@@ -66,6 +66,7 @@ import { DemoPlaybackService } from '../../services/demoPlayback';
 import { ExerciseIntroOverlay } from './ExerciseIntroOverlay';
 import { ExerciseLoadingScreen } from './ExerciseLoadingScreen';
 import { SKILL_TREE, getSkillsForExercise, getSkillById, getGenerationHints } from '../../core/curriculum/SkillTree';
+import type { SkillCategory } from '../../core/curriculum/SkillTree';
 import { getTierMasteryTestSkillId, isTierMasteryTestAvailable, hasTierMasteryTestPassed } from '../../core/curriculum/tierMasteryTest';
 import { adjustDifficulty } from '../../core/curriculum/DifficultyEngine';
 // detectWeakPatterns: kept available for future use but not imported to avoid unused-import errors
@@ -580,8 +581,9 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   const [showExerciseCard, setShowExerciseCard] = useState(false);
   const [exerciseCardFunFact] = useState<FunFact | null>(null);
 
-  // Achievement toast state
-  const [toastData, setToastData] = useState<{ type: AchievementType; value: number | string } | null>(null);
+  // Achievement toast queue — BUG-028 fix: queue multiple toasts instead of showing only the first
+  const [toastQueue, setToastQueue] = useState<Array<{ type: AchievementType; value: number | string }>>([]);
+  const toastData = toastQueue.length > 0 ? toastQueue[0] : null;
 
   // Gamification state — evolution reveal + gem tracking for CompletionModal
   const [evolutionRevealData, setEvolutionRevealData] = useState<{
@@ -610,8 +612,10 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
    * Handle exercise completion (called by useExercisePlayback hook)
    * Persists score, XP, streak, and lesson progress to the progress store
    */
-  const handleExerciseCompletion = useCallback((score: ExerciseScore) => {
+  const handleExerciseCompletion = useCallback((initialScore: ExerciseScore) => {
     if (!mountedRef.current) return;
+    // BUG-001 fix: Work with a mutable copy so we never mutate the original score object
+    let score = { ...initialScore };
     setFinalScore(score);
 
     // Read exercise from ref to avoid stale closure in AI mode
@@ -637,16 +641,16 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     // Capture level BEFORE any XP mutations so we can detect level-ups
     const previousLevel = useProgressStore.getState().level;
 
-    // Apply ability modifiers to score and XP
+    // BUG-001 fix: Clone score before mutation to avoid mutating React state
     const currentAbilityConfig = abilityConfig;
     if (currentAbilityConfig) {
       // Score boost (cap at 100)
       if (currentAbilityConfig.scoreBoostPercent > 0) {
-        score.overall = Math.min(100, score.overall + currentAbilityConfig.scoreBoostPercent);
+        score = { ...score, overall: Math.min(100, score.overall + currentAbilityConfig.scoreBoostPercent) };
       }
       // XP multiplier
       if (currentAbilityConfig.xpMultiplier > 1) {
-        score.xpEarned = Math.round(score.xpEarned * currentAbilityConfig.xpMultiplier);
+        score = { ...score, xpEarned: Math.round(score.xpEarned * currentAbilityConfig.xpMultiplier) };
       }
     }
 
@@ -667,25 +671,35 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       }
     }
 
-    // Look up exercise category from SkillTree
+    // Look up exercise category from SkillTree (fall back to skillIdParam for AI exercises)
+    let exerciseCategory: SkillCategory | undefined;
     const skillTreeNode = SKILL_TREE.find(n =>
       n.targetExerciseIds.includes(ex.id) || n.id === ex.id,
     );
+    if (skillTreeNode) {
+      exerciseCategory = skillTreeNode.category;
+    } else if (skillIdParam) {
+      const paramSkill = getSkillById(skillIdParam);
+      exerciseCategory = paramSkill?.category;
+    }
+
+    // Record practice time BEFORE challenge validation so minutesPracticedToday is accurate
+    let elapsedMinutes = 0;
+    if (playbackStartTimeRef.current > 0) {
+      elapsedMinutes = Math.max(1, Math.round((Date.now() - playbackStartTimeRef.current) / 60000));
+      progressStore.recordPracticeSession(elapsedMinutes);
+    }
+
+    const minutesSoFar = (todayGoalData?.minutesPracticed ?? 0) + elapsedMinutes;
 
     progressStore.recordExerciseCompletion(ex.id, score.overall, score.xpEarned, {
       score: score.overall,
       maxCombo,
       perfectNotes: score.perfectNotes ?? 0,
       playbackSpeed: useSettingsStore.getState().playbackSpeed,
-      category: skillTreeNode?.category,
-      minutesPracticedToday: todayGoalData?.minutesPracticed ?? 0,
+      category: exerciseCategory,
+      minutesPracticedToday: minutesSoFar,
     });
-
-    // Record practice time (convert elapsed ms to minutes)
-    if (playbackStartTimeRef.current > 0) {
-      const elapsedMinutes = (Date.now() - playbackStartTimeRef.current) / 60000;
-      progressStore.recordPracticeSession(Math.max(1, Math.round(elapsedMinutes)));
-    }
 
     // Save exercise score to lesson progress and compute sync data
     const exLessonId = getLessonIdForExercise(ex.id);
@@ -924,21 +938,29 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     const achievementContext = buildAchievementContext(currentProgressState, catsUnlocked);
     const newAchievements = achievementState.checkAndUnlock(achievementContext);
 
-    // Show achievement toast for XP earned
-    if (newAchievements.length > 0) {
-      // Show the first new achievement
-      const firstAchievement = getAchievementById(newAchievements[0].id);
-      if (firstAchievement) {
-        setToastData({ type: 'star', value: firstAchievement.title });
+    // BUG-028 fix: Queue ALL toast notifications (achievements + level-up + XP)
+    // instead of showing only the first one and dropping the rest
+    const toasts: Array<{ type: AchievementType; value: number | string }> = [];
+
+    // Queue all newly unlocked achievements
+    for (const achievement of newAchievements) {
+      const info = getAchievementById(achievement.id);
+      if (info) {
+        toasts.push({ type: 'star', value: info.title });
       }
-    } else if (score.xpEarned > 0) {
-      // Check if user leveled up (previousLevel captured before any XP mutations)
+    }
+
+    // Queue level-up and/or XP toast
+    if (score.xpEarned > 0) {
       const currentLevel = useProgressStore.getState().level;
       if (currentLevel > previousLevel) {
-        setToastData({ type: 'level-up', value: `Level ${currentLevel}!` });
-      } else {
-        setToastData({ type: 'xp', value: score.xpEarned });
+        toasts.push({ type: 'level-up', value: `Level ${currentLevel}!` });
       }
+      toasts.push({ type: 'xp', value: score.xpEarned });
+    }
+
+    if (toasts.length > 0) {
+      setToastQueue(toasts);
     }
 
     // --- Gem earning ---
@@ -981,7 +1003,9 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       const prevStage = catEvolutionStore.evolutionData[activeCatId]?.currentStage;
       catEvolutionStore.addEvolutionXp(activeCatId, score.xpEarned);
       const newStage = useCatEvolutionStore.getState().evolutionData[activeCatId]?.currentStage;
-      if (newStage && prevStage && newStage !== prevStage) {
+      // BUG-025 fix: Only show evolution reveal for genuine stage transitions
+      // Require both stages to be defined and different
+      if (prevStage && newStage && newStage !== prevStage) {
         setEvolutionRevealData({ catId: activeCatId, newStage });
       }
     }
@@ -1240,18 +1264,26 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
 
   /**
    * Start exercise playback
+   * BUG-004 fix: Guard against double-tap starting two concurrent playback loops
    */
+  const isStartingRef = useRef(false);
   const handleStart = useCallback(() => {
+    if (isStartingRef.current || isPlaying) return;
+    isStartingRef.current = true;
+
     playbackStartTimeRef.current = Date.now();
     startPlayback();
     setIsPaused(false);
     setComboCount(0);
 
+    // Reset guard after a tick to allow future starts (e.g. retry)
+    setTimeout(() => { isStartingRef.current = false; }, 100);
+
     // Optional: Announce to screen reader
     if (Platform.OS === 'web') {
       AccessibilityInfo.announceForAccessibility('Exercise started');
     }
-  }, [startPlayback]);
+  }, [startPlayback, isPlaying]);
 
   /**
    * Pause/resume exercise playback
@@ -2080,7 +2112,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         <AchievementToast
           type={toastData.type}
           value={toastData.value}
-          onDismiss={() => setToastData(null)}
+          onDismiss={() => setToastQueue((q) => q.slice(1))}
           autoDismissMs={3000}
         />
       )}

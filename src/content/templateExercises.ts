@@ -4,6 +4,7 @@
  * to target the player's weak notes.
  */
 import type { Exercise, NoteEvent } from '@/core/exercises/types';
+import { getGenerationHints } from '@/core/curriculum/SkillTree';
 
 interface ExerciseTemplate {
   id: string;
@@ -307,13 +308,120 @@ export function getTemplateExercise(
 
   const rawNotes = chosen.buildNotes();
   const swappedNotes = swapNotes(rawNotes, chosen.baseNotes, weakNotes);
-  return templateToExercise(chosen, swappedNotes);
+
+  // No transposition — it breaks the title/keySignature contract
+  // (e.g. "C Position Walk" would contain F# notes after +7 semitones).
+  // Weak-note swapping already provides enough variety.
+  const exercise = templateToExercise(chosen, swappedNotes);
+
+  // Slight tempo variation (±5 BPM) so repeated fallbacks feel different
+  const tempoVariation = Math.floor(Math.random() * 11) - 5;
+  exercise.settings.tempo = Math.max(40, exercise.settings.tempo + tempoVariation);
+
+  return exercise;
 }
 
 /**
  * Get a template exercise targeting a specific skill.
  * Falls back to `getTemplateExercise()` if no skill-specific template exists.
+ *
+ * To prevent repetition when the buffer is empty, templates are randomly
+ * transposed to different keys and given slight tempo variation.
  */
+/**
+ * Build a simple exercise directly from GENERATION_HINTS when no
+ * skill-specific template exists. Uses the targetMidi notes to create
+ * a pattern that actually matches the skill's key and hand.
+ */
+function buildExerciseFromHints(
+  skillId: string,
+  _weakNotes: number[] = [],
+): Exercise | null {
+  const hints = getGenerationHints(skillId);
+  if (!hints || !hints.targetMidi || hints.targetMidi.length === 0) return null;
+
+  const midi = hints.targetMidi;
+  const hand = hints.hand ?? 'right';
+  const difficulty = hints.minDifficulty ?? 1;
+  const keySignature = hints.keySignature ?? 'C major';
+
+  // Build a simple ascending-descending pattern from the available notes
+  const noteSequence: NoteEvent[] = [];
+  let beat = 0;
+
+  // Ascending
+  for (const note of midi) {
+    noteSequence.push({
+      note,
+      startBeat: beat,
+      durationBeats: 1,
+      ...(hand !== 'both' && { hand }),
+      ...(hand === 'both' && { hand: note < 60 ? 'left' as const : 'right' as const }),
+    });
+    beat += 1;
+  }
+
+  // Descending (skip first and last to avoid repetition)
+  if (midi.length > 2) {
+    const descending = [...midi].reverse().slice(1, -1);
+    for (const note of descending) {
+      noteSequence.push({
+        note,
+        startBeat: beat,
+        durationBeats: 1,
+        ...(hand !== 'both' && { hand }),
+        ...(hand === 'both' && { hand: note < 60 ? 'left' as const : 'right' as const }),
+      });
+      beat += 1;
+    }
+  }
+
+  // Derive a title from the keySignature
+  const keyShort = keySignature.replace(' major', '').replace(' minor', 'm');
+  const titleSuffix = hints.exerciseTypes?.[0] === 'chord' ? 'Chord Practice'
+    : hints.exerciseTypes?.[0] === 'scale' ? 'Scale Practice'
+    : hints.exerciseTypes?.[0] === 'rhythm' ? 'Rhythm Practice'
+    : 'Practice';
+  const title = `${keyShort} ${titleSuffix}`;
+
+  // Base tempo from difficulty
+  const baseTempo = difficulty <= 1 ? 55 : difficulty <= 2 ? 65 : 80;
+  const tempoVariation = Math.floor(Math.random() * 11) - 5;
+
+  return {
+    id: `tmpl-hints-${skillId}`,
+    version: 1,
+    metadata: {
+      title: `Practice: ${title}`,
+      description: hints.promptHint ?? 'Practice exercise targeting your current skill',
+      difficulty: Math.min(difficulty, 3) as 1 | 2 | 3 | 4 | 5,
+      estimatedMinutes: 2,
+      skills: ['adaptive', hand === 'both' ? 'two-hands' : `${hand}-hand`],
+      prerequisites: [],
+    },
+    settings: {
+      tempo: Math.max(40, baseTempo + tempoVariation),
+      timeSignature: [4, 4],
+      keySignature,
+      countIn: 4,
+      metronomeEnabled: true,
+    },
+    notes: noteSequence,
+    scoring: {
+      timingToleranceMs: difficulty <= 1 ? 100 : difficulty <= 2 ? 80 : 65,
+      timingGracePeriodMs: 200,
+      passingScore: 60,
+      starThresholds: [70, 85, 95],
+    },
+    hints: {
+      beforeStart: hints.promptHint ?? 'Practice exercise \u2014 play along with the metronome!',
+      commonMistakes: [],
+      successMessage: 'Great practice session!',
+    },
+    hands: hand,
+  };
+}
+
 export function getTemplateForSkill(
   skillId: string,
   weakNotes: number[] = [],
@@ -322,11 +430,16 @@ export function getTemplateForSkill(
   const matches = templates.filter((t) => t.skillId === skillId);
 
   if (matches.length === 0) {
-    // No skill-specific template — fall back to difficulty-based selection
+    // No skill-specific template — try to build from GENERATION_HINTS
+    // so notes/key/hand actually match the skill
+    const hintsExercise = buildExerciseFromHints(skillId, weakNotes);
+    if (hintsExercise) return hintsExercise;
+
+    // Last resort: use difficulty 1 generic template (no transposition)
     return getTemplateExercise(1, weakNotes);
   }
 
-  // Pick the best match based on weak note overlap
+  // Pick the best match based on weak note overlap, with randomization for ties
   const ranked = matches
     .map((t) => ({
       template: t,
@@ -334,8 +447,19 @@ export function getTemplateForSkill(
     }))
     .sort((a, b) => b.overlap - a.overlap);
 
-  const chosen = ranked[0].template;
+  const bestOverlap = ranked[0].overlap;
+  const best = ranked.filter((r) => r.overlap === bestOverlap);
+  const chosen = best[Math.floor(Math.random() * best.length)].template;
+
   const rawNotes = chosen.buildNotes();
   const swappedNotes = swapNotes(rawNotes, chosen.baseNotes, weakNotes);
-  return templateToExercise(chosen, swappedNotes);
+
+  // No transposition — it breaks the title/keySignature contract.
+  const exercise = templateToExercise(chosen, swappedNotes);
+
+  // Apply slight tempo variation (±5 BPM)
+  const tempoVariation = Math.floor(Math.random() * 11) - 5;
+  exercise.settings.tempo = Math.max(40, exercise.settings.tempo + tempoVariation);
+
+  return exercise;
 }

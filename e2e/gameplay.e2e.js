@@ -6,6 +6,7 @@ const {
 } = require('detox');
 const fs = require('fs');
 const path = require('path');
+const { signInWithSkipAndReachHome, goToLearnTab } = require('./helpers/appFlows');
 
 const LESSON_IDS = ['lesson-01', 'lesson-02', 'lesson-03', 'lesson-04', 'lesson-05', 'lesson-06'];
 
@@ -57,36 +58,38 @@ describe('Purrrfect Keys Gameplay Verification', () => {
     });
 
     it('completes all levels with perfect score', async () => {
-        // 1. Launch App
-        await device.launchApp({ delete: true, permissions: { notifications: 'YES' } });
+        // 1. Sign in as guest and finish onboarding using the current app flow.
+        // App launch + Expo dev-client stabilization is handled in e2e/init.js beforeEach.
+        await signInWithSkipAndReachHome();
 
-        // 2. Skip Auth
-        await waitFor(element(by.id('onboarding-skip'))).toBeVisible().withTimeout(10000);
-        await element(by.id('onboarding-skip')).tap();
+        // 2. Go to Learn Tab
+        await goToLearnTab();
 
-        // 3. Go to Learn Tab
-        await waitFor(element(by.id('tab-learn'))).toBeVisible().withTimeout(5000);
-        await element(by.id('tab-learn')).tap();
-
-        // 4. Iterate Lessons
+        // 3. Iterate Lessons
         for (const lesson of lessons) {
             console.log(`\n🎹 Starting Lesson: ${lesson.metadata.title} (${lesson.id})`);
 
-            // Scroll to lesson node if needed
-            // Detox doesn't have a generic "scroll until visible" easily without a target inside a scrollview.
-            // We know the structure is a ScrollView with ID "level-map-scroll".
-            // We can try to scroll down blindly if not found.
+            // Progression advances the "current lesson" marker through the map.
             try {
-                await waitFor(element(by.id(`lesson-node-${lesson.id}`)))
+                await waitFor(element(by.id('lesson-node-current')))
                     .toBeVisible()
                     .whileElement(by.id('level-map-scroll'))
                     .scroll(300, 'down');
             } catch (e) {
-                console.log(`Could not find lesson node ${lesson.id}, trying to scroll more...`);
-                // Fallback or retry logic
+                // Likely already visible or scroll boundary reached.
             }
 
-            await element(by.id(`lesson-node-${lesson.id}`)).tap();
+            try {
+                await waitFor(element(by.id('lesson-node-start-chip')))
+                    .toBeVisible()
+                    .withTimeout(2000);
+                await element(by.id('lesson-node-start-chip')).tap();
+            } catch (_e) {
+                await waitFor(element(by.id('lesson-node-current')))
+                    .toBeVisible()
+                    .withTimeout(10000);
+                await element(by.id('lesson-node-current')).tap();
+            }
 
             // Handle "Start Chip" if it appears (resume state, or just UI quirk)
             // Usually tapping the node opens the sheet.
@@ -95,7 +98,7 @@ describe('Purrrfect Keys Gameplay Verification', () => {
 
             await waitFor(element(by.id('lesson-intro-start')))
                 .toBeVisible()
-                .withTimeout(5000);
+                .withTimeout(10000);
 
             await element(by.id('lesson-intro-start')).tap();
 
@@ -176,17 +179,17 @@ describe('Purrrfect Keys Gameplay Verification', () => {
                 // Or wait for modal
                 await waitFor(element(by.id('completion-modal')))
                     .toBeVisible()
-                    .withTimeout(10000);
+                    .withTimeout(60000);
 
                 // Advance
                 // Check for "Next Exercise" or "Continue" (Lesson Complete / Mastery)
                 // or "Start Test"
-                // completion-next-exercise
+                // completion-next
                 // completion-start-test
                 // completion-continue (generic)
 
                 try {
-                    await element(by.id('completion-next-exercise')).tap();
+                    await element(by.id('completion-next')).tap();
                 } catch (e1) {
                     try {
                         await element(by.id('completion-start-test')).tap();

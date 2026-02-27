@@ -48,6 +48,9 @@ yarn-error.log*
 # Claude Code
 .claude/
 
+# Git worktrees
+.worktrees/
+
 # Secrets (never commit these!)
 secrets/
 *.key

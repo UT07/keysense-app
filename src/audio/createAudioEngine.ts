@@ -68,6 +68,8 @@ export async function ensureAudioModeConfigured(allowRecording = false): Promise
   // Re-configure if recording was requested but not previously enabled
   if (audioModeConfigured && !allowRecording) return;
   if (audioModeConfigured && allowRecording && audioModeRecordingEnabled) return;
+
+  // Track the pending promise to prevent concurrent configuration
   audioModeConfigured = true;
   if (allowRecording) audioModeRecordingEnabled = true;
 
@@ -77,10 +79,20 @@ export async function ensureAudioModeConfigured(allowRecording = false): Promise
       allowsRecordingIOS: allowRecording,
       staysActiveInBackground: false,
       shouldDuckAndroid: true,
+      // Ensure audio plays through speaker even when recording is enabled.
+      // Without this, iOS routes to earpiece in PlayAndRecord mode.
+      ...(allowRecording ? { interruptionModeIOS: 1 } : {}),
     });
-    console.log(`[createAudioEngine] iOS audio mode configured (playsInSilentModeIOS=true, allowsRecordingIOS=${allowRecording})`);
+    console.log(
+      `[createAudioEngine] iOS audio mode configured ` +
+      `(playsInSilentModeIOS=true, allowsRecordingIOS=${allowRecording})`
+    );
   } catch (error) {
     console.warn('[createAudioEngine] Audio mode configuration failed:', error);
+    // Reset flags so a retry can succeed
+    if (allowRecording) {
+      audioModeRecordingEnabled = false;
+    }
   }
 }
 

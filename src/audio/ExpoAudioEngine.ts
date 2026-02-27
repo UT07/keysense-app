@@ -372,11 +372,22 @@ export class ExpoAudioEngine implements IAudioEngine {
   private doRelease(note: number): void {
     this.activeNotes.delete(note);
 
-    // Stop the voice that's playing this note
+    // Fade out before stopping to prevent click artifacts.
+    // Without this, stopAsync() abruptly cuts the waveform at a non-zero
+    // amplitude, producing a DC offset "click" that's especially noticeable
+    // when the mic is active (PlayAndRecord mode amplifies speaker artifacts).
     const voice = this.activeVoices.get(note);
     if (voice) {
       this.activeVoices.delete(note);
-      voice.stopAsync().catch(() => {});
+      // Micro-fade: ramp volume to 0 over 5ms, then stop
+      voice.setVolumeAsync(0).then(() => {
+        setTimeout(() => {
+          voice.stopAsync().catch(() => {});
+        }, 5);
+      }).catch(() => {
+        // Fallback: just stop if volume ramp fails
+        voice.stopAsync().catch(() => {});
+      });
     }
   }
 
@@ -387,7 +398,14 @@ export class ExpoAudioEngine implements IAudioEngine {
   releaseAllNotes(): void {
     for (const [, pool] of this.voicePools) {
       for (const sound of pool.sounds) {
-        sound.stopAsync().catch(() => {});
+        // Micro-fade each voice to prevent clicks
+        sound.setVolumeAsync(0).then(() => {
+          setTimeout(() => {
+            sound.stopAsync().catch(() => {});
+          }, 5);
+        }).catch(() => {
+          sound.stopAsync().catch(() => {});
+        });
       }
     }
     this.activeNotes.clear();

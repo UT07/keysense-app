@@ -41,6 +41,11 @@ async function dismissTransientAlerts() {
 
 async function completeOnboardingBeginnerFlow() {
   const deadline = Date.now() + 120000;
+  const starterCatChooseIds = [
+    'onboarding-choose-mini-meowww',
+    'onboarding-choose-jazzy',
+    'onboarding-choose-luna',
+  ];
 
   while (Date.now() < deadline) {
     if (!(await isVisibleById('onboarding-screen', 1200))) {
@@ -61,8 +66,10 @@ async function completeOnboardingBeginnerFlow() {
     }
 
     if (await isVisibleById('onboarding-step-3', 800)) {
-      await tapIfVisibleById('onboarding-midi-no', 600);
-      if (await tapIfVisibleById('onboarding-midi-next', 600)) {
+      // Current onboarding uses "input" IDs; keep legacy MIDI IDs as fallback.
+      await tapIfVisibleById('onboarding-input-touch', 600) || await tapIfVisibleById('onboarding-midi-no', 600);
+      if ((await tapIfVisibleById('onboarding-input-next', 600))
+        || (await tapIfVisibleById('onboarding-midi-next', 600))) {
         await sleep(450);
       }
       continue;
@@ -70,9 +77,46 @@ async function completeOnboardingBeginnerFlow() {
 
     if (await isVisibleById('onboarding-step-4', 800)) {
       await tapIfVisibleById('onboarding-goal-songs', 600);
-      if (await tapIfVisibleById('onboarding-finish', 600)) {
-        await sleep(1000);
+      if ((await tapIfVisibleById('onboarding-goal-next', 600))
+        || (await tapIfVisibleById('onboarding-finish', 600))) {
+        await sleep(700);
       }
+      continue;
+    }
+
+    if (await isVisibleById('onboarding-step-5', 800)) {
+      for (const chooseId of starterCatChooseIds) {
+        if (await tapIfVisibleById(chooseId, 350)) {
+          break;
+        }
+      }
+
+      if (!(await isVisibleById('onboarding-finish', 500)) && (await isVisibleById('onboarding-scroll', 500))) {
+        try {
+          await waitFor(element(by.id('onboarding-finish')))
+            .toBeVisible()
+            .whileElement(by.id('onboarding-scroll'))
+            .scroll(220, 'down');
+        } catch {
+          // Ignore if already near the bottom or transient animation blocks scrolling.
+        }
+      }
+
+      if (await tapIfVisibleById('onboarding-finish', 800)) {
+        await sleep(1200);
+      } else {
+        await sleep(350);
+      }
+      continue;
+    }
+
+    if (await isVisibleById('onboarding-scroll', 500)) {
+      try {
+        await element(by.id('onboarding-scroll')).scroll(140, 'down');
+      } catch {
+        // Keep the loop alive and let step-specific handlers retry.
+      }
+      await sleep(250);
       continue;
     }
 
@@ -104,6 +148,15 @@ async function completeOnboardingIntermediateToSkillCheck() {
       await tapIfVisibleById('onboarding-experience-intermediate', 500);
       if (await tapIfVisibleById('onboarding-experience-next', 600)) {
         await sleep(900);
+      }
+      continue;
+    }
+
+    if (await isVisibleById('onboarding-step-3', 700)) {
+      await tapIfVisibleById('onboarding-input-touch', 500) || await tapIfVisibleById('onboarding-midi-no', 500);
+      if ((await tapIfVisibleById('onboarding-input-next', 600))
+        || (await tapIfVisibleById('onboarding-midi-next', 600))) {
+        await sleep(1200);
       }
       continue;
     }
@@ -213,9 +266,65 @@ async function signInWithSkipAndReachHome() {
 }
 
 async function goToLearnTab() {
-  await waitFor(element(by.id('tab-learn'))).toBeVisible().withTimeout(15000);
-  await element(by.id('tab-learn')).tap();
-  await waitFor(element(by.id('level-map-screen'))).toBeVisible().withTimeout(20000);
+  const deadline = Date.now() + 60000;
+
+  while (Date.now() < deadline) {
+    if (await isVisibleById('level-map-screen', 1200)) {
+      return;
+    }
+
+    if (await isVisibleById('daily-session-screen', 1200)) {
+      if (!(await isVisibleById('daily-session-browse-lessons', 600))) {
+        try {
+          await waitFor(element(by.id('daily-session-browse-lessons')))
+            .toBeVisible()
+            .whileElement(by.id('daily-session-scroll'))
+            .scroll(400, 'down');
+        } catch {
+          // If scroll fails (boundary or transient), keep retry loop alive.
+        }
+      }
+
+      if (await tapIfVisibleById('daily-session-browse-lessons', 1200)) {
+        await sleep(800);
+        continue;
+      }
+    }
+
+    if (await isVisibleByText('Continue', 600)) {
+      try {
+        await element(by.text('Continue')).tap();
+        await sleep(700);
+        continue;
+      } catch {
+        // Multiple "Continue" labels may exist; keep trying other routes.
+      }
+    }
+
+    if (await tapIfVisibleById('tab-learn', 1200)) {
+      await sleep(700);
+      continue;
+    }
+
+    if (await isVisibleById('tier-intro-screen', 500) && (await tapIfVisibleById('tier-intro-back', 700))) {
+      await sleep(600);
+      continue;
+    }
+
+    if (await isVisibleById('lesson-intro-screen', 500) && (await tapIfVisibleById('lesson-intro-back', 700))) {
+      await sleep(600);
+      continue;
+    }
+
+    if (await isVisibleById('exercise-player', 500) && (await tapIfVisibleById('control-exit', 700))) {
+      await sleep(800);
+      continue;
+    }
+
+    await sleep(500);
+  }
+
+  throw new Error('Timed out navigating to level map from Learn tab');
 }
 
 async function goToPlayTab() {
@@ -351,7 +460,8 @@ async function openCurrentLessonIntro() {
       await element(by.id('lesson-node-current')).tap();
     }
 
-    if (await isVisibleById('lesson-intro-screen', 7000)) {
+    if ((await isVisibleById('lesson-intro-screen', 7000))
+      || (await isVisibleById('tier-intro-screen', 1000))) {
       return;
     }
 
@@ -396,8 +506,13 @@ async function ensureExercisePlaying() {
 
 async function startCurrentLessonExercise() {
   await openCurrentLessonIntro();
-  await waitFor(element(by.id('lesson-intro-start'))).toBeVisible().withTimeout(10000);
-  await element(by.id('lesson-intro-start')).tap();
+  if (await isVisibleById('lesson-intro-screen', 1200)) {
+    await waitFor(element(by.id('lesson-intro-start'))).toBeVisible().withTimeout(10000);
+    await element(by.id('lesson-intro-start')).tap();
+  } else {
+    await waitFor(element(by.id('tier-intro-start'))).toBeVisible().withTimeout(10000);
+    await element(by.id('tier-intro-start')).tap();
+  }
 
   await waitFor(element(by.id('exercise-player'))).toBeVisible().withTimeout(30000);
   await ensureExercisePlaying();

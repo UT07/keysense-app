@@ -23,7 +23,7 @@ import Animated, {
   withTiming,
   FadeInUp,
 } from 'react-native-reanimated';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useNavigationState } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -47,7 +47,8 @@ const NODE_SIZE_NORMAL = 64;
 const NODE_SIZE_LOCKED = 52;
 const VERTICAL_SPACING = 130;
 const SECTION_BANNER_HEIGHT = 50;
-const TOP_PADDING = 24;
+const SALSA_AREA_HEIGHT = 100; // Space reserved for Salsa coach at the top
+const TOP_PADDING = SALSA_AREA_HEIGHT + 12;
 const BOTTOM_PADDING = 140;
 
 /** Zigzag X fractions: center, left, center, right (repeating) */
@@ -192,19 +193,20 @@ function useTierNodes(): TierNodeData[] {
 function useNodePositions(nodes: TierNodeData[], screenWidth: number) {
   return useMemo(() => {
     const usableWidth = screenWidth - SPACING.lg * 2;
-    const positions: NodePosition[] = [];
+    const positions: NodePosition[] = new Array(nodes.length);
     const sectionBannerPositions: { index: number; y: number }[] = [];
     let currentY = TOP_PADDING;
     let patternIndex = 0;
 
-    for (let i = 0; i < nodes.length; i++) {
-      // Check if there's a section banner before this node
-      if (TIER_SECTIONS[i]) {
-        sectionBannerPositions.push({ index: i, y: currentY });
+    // Bottom-to-top: place highest tier at top, tier 1 at bottom
+    for (let ri = nodes.length - 1; ri >= 0; ri--) {
+      // Section banners placed before their first node (in visual order)
+      if (TIER_SECTIONS[ri]) {
+        sectionBannerPositions.push({ index: ri, y: currentY });
         currentY += SECTION_BANNER_HEIGHT;
       }
 
-      const state = nodes[i].state;
+      const state = nodes[ri].state;
       const size = state === 'current' ? NODE_SIZE_CURRENT
         : state === 'locked' ? NODE_SIZE_LOCKED
         : NODE_SIZE_NORMAL;
@@ -212,7 +214,7 @@ function useNodePositions(nodes: TierNodeData[], screenWidth: number) {
       const xFrac = X_PATTERN[patternIndex % X_PATTERN.length];
       const x = SPACING.lg + usableWidth * xFrac;
 
-      positions.push({ x, y: currentY, size });
+      positions[ri] = { x, y: currentY, size };
       currentY += VERTICAL_SPACING;
       patternIndex++;
     }
@@ -557,19 +559,24 @@ function SectionBanner({
 
 export function LevelMapScreen() {
   const navigation = useNavigation<NavProp>();
+  const canGoBack = useNavigationState((s) => s.routes.length > 1);
   const nodes = useTierNodes();
   const scrollRef = useRef<ScrollView>(null);
+  const hasAutoScrolledRef = useRef(false); // BUG-020 fix: only auto-scroll once on mount
   const { width: screenWidth } = useWindowDimensions();
   const gems = useGemStore((s) => s.gems);
   const ownedCats = useCatEvolutionStore((s) => s.ownedCats);
 
   const { positions, sectionBannerPositions, totalHeight } = useNodePositions(nodes, screenWidth);
 
-  // Auto-scroll to current node
+  // Auto-scroll to current node on initial mount only
+  // BUG-020 fix: was re-scrolling on every store update, jumping the user's scroll position
   useEffect(() => {
+    if (hasAutoScrolledRef.current) return;
     const currentIndex = nodes.findIndex((n) => n.state === 'current');
     if (currentIndex >= 0 && positions[currentIndex] && scrollRef.current) {
-      const targetY = Math.max(0, positions[currentIndex].y - 200);
+      hasAutoScrolledRef.current = true;
+      const targetY = Math.max(0, positions[currentIndex].y - 250);
       setTimeout(() => {
         scrollRef.current?.scrollTo({ y: targetY, animated: true });
       }, 400);
@@ -611,9 +618,13 @@ export function LevelMapScreen() {
         style={styles.header}
       >
         <View style={styles.headerTopRow}>
-          <TouchableOpacity onPress={handleGoBack} style={styles.backButton} testID="level-map-back">
-            <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textPrimary} />
-          </TouchableOpacity>
+          {canGoBack ? (
+            <TouchableOpacity onPress={handleGoBack} style={styles.backButton} testID="level-map-back">
+              <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textPrimary} />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.backButton} />
+          )}
           <Text style={styles.title}>Your Journey</Text>
           <View style={styles.backButton} />
         </View>
@@ -678,8 +689,8 @@ export function LevelMapScreen() {
           />
         ))}
 
-        {/* Salsa at the bottom */}
-        <View style={[styles.salsaFooter, { top: totalHeight - BOTTOM_PADDING + SPACING.md }]}>
+        {/* Salsa at the top — cheering you toward the summit */}
+        <View style={[styles.salsaFooter, { top: 0, height: SALSA_AREA_HEIGHT }]}>
           <SalsaCoach mood="encouraging" size="small" showCatchphrase />
         </View>
       </ScrollView>

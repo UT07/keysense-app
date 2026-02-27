@@ -65,9 +65,9 @@ export function MusicLibrarySpotlight({
   onPlayFeatured,
 }: MusicLibrarySpotlightProps): React.JSX.Element {
   return (
-    <View style={[styles.outerContainer, SHADOWS.md]}>
+    <View style={[styles.outerContainer, SHADOWS.sm]}>
       <LinearGradient
-        colors={[COLORS.primaryDark, '#1A1040', COLORS.surface]}
+        colors={[COLORS.cardHighlight, COLORS.cardSurface]}
         style={styles.gradient}
       >
         {/* Header row */}
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   outerContainer: {
     borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1,
-    borderColor: glowColor(COLORS.primary, 0.3),
+    borderColor: COLORS.cardBorder,
     overflow: 'hidden',
   },
   gradient: {

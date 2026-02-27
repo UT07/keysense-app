@@ -29,17 +29,31 @@ export function formatLongDuration(ms: number): string {
 }
 
 /**
- * Get current date as ISO string (YYYY-MM-DD)
+ * Get current date as local ISO string (YYYY-MM-DD).
+ * Uses local timezone so the "day" aligns with the user's wall clock —
+ * prevents streaks from breaking at midnight UTC instead of midnight local.
+ * BUG-008 fix: was using toISOString() which gives UTC dates.
  */
 export function getTodayDateString(): string {
-  return new Date().toISOString().split('T')[0];
+  return getLocalDateString(new Date());
 }
 
 /**
- * Get date string for a given date
+ * Get date string for a given date in local timezone (YYYY-MM-DD).
+ * BUG-008 fix: was using toISOString() which gives UTC dates.
  */
 export function getDateString(date: Date): string {
-  return date.toISOString().split('T')[0];
+  return getLocalDateString(date);
+}
+
+/**
+ * Format a Date as YYYY-MM-DD in the local timezone.
+ */
+function getLocalDateString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /**

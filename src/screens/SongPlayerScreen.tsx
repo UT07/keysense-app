@@ -238,7 +238,9 @@ export function SongPlayerScreen() {
     navigation.navigate('Exercise', { exerciseId: exercise.id });
   }, [song, selectedSectionIndex, layer, loop, setCurrentExercise, navigation]);
 
-  const hasAccompaniment = song?.sections.some((s) => s.layers.accompaniment !== undefined) ?? false;
+  // BUG-027 fix: Check for 'full' layer, not 'accompaniment' — the toggle sets layer='full'
+  // which reads section.layers.full, so the toggle should be enabled when full notes exist
+  const hasFullLayer = song?.sections.some((s) => s.layers.full && s.layers.full.length > 0) ?? false;
 
   // ── Loading state ───────────────────────────────────────────
 
@@ -320,17 +322,17 @@ export function SongPlayerScreen() {
             style={[
               styles.layerToggle,
               layer === 'full' && styles.layerToggleActive,
-              !hasAccompaniment && styles.layerToggleDisabled,
+              !hasFullLayer && styles.layerToggleDisabled,
             ]}
-            onPress={() => hasAccompaniment && setLayer('full')}
-            disabled={!hasAccompaniment}
+            onPress={() => hasFullLayer && setLayer('full')}
+            disabled={!hasFullLayer}
             testID="layer-full"
           >
             <Text
               style={[
                 styles.layerToggleText,
                 layer === 'full' && styles.layerToggleTextActive,
-                !hasAccompaniment && styles.layerToggleTextDisabled,
+                !hasFullLayer && styles.layerToggleTextDisabled,
               ]}
             >
               Full

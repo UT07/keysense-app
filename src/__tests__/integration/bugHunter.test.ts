@@ -109,6 +109,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useProgressStore } from '../../stores/progressStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useLearnerProfileStore } from '../../stores/learnerProfileStore';
+import { useCatEvolutionStore } from '../../stores/catEvolutionStore';
 import { adjustDifficulty } from '../../core/curriculum/DifficultyEngine';
 import { getSkillsForExercise, SKILL_TREE } from '../../core/curriculum/SkillTree';
 import { generateSessionPlan, getNextSkillToLearn } from '../../core/curriculum/CurriculumEngine';
@@ -546,6 +547,8 @@ describe('Bug Hunt: syncAll pulls remote when queue empty', () => {
 describe('Bug Hunt: Progress data integrity', () => {
   beforeEach(() => {
     useProgressStore.getState().reset();
+    // Mark daily challenge as completed to prevent xpMultiplier from doubling XP
+    useCatEvolutionStore.setState({ lastDailyChallengeDate: new Date().toISOString().split('T')[0] });
   });
 
   it('XP and level are consistent after addXp', () => {

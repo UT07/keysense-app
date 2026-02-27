@@ -198,12 +198,13 @@ function calculateBreakdown(
   noteScores: NoteScore[],
   totalExpected: number
 ): ExerciseScoreBreakdown {
-  if (noteScores.length === 0) {
+  // BUG-009 fix: Guard against division by zero when totalExpected is 0
+  if (noteScores.length === 0 || totalExpected === 0) {
     return {
       accuracy: 0,
       timing: 0,
       completeness: 0,
-      extraNotes: 0,
+      extraNotes: noteScores.length === 0 ? 0 : Math.max(0, 100 - noteScores.filter((n) => n.isExtraNote).length * 10),
       duration: 0,
     };
   }

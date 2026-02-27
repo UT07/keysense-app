@@ -5,7 +5,10 @@
  * Pipeline: AudioBuffer → resample to 22050Hz → ONNX inference → note extraction
  */
 
-import { InferenceSession, Tensor } from 'onnxruntime-react-native';
+// onnxruntime-react-native is imported lazily in initialize() to avoid
+// crashing when the native module isn't linked in the current build.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let OnnxRuntime: any = null;
 
 // Basic Pitch model constants
 const MODEL_SAMPLE_RATE = 22050;
@@ -34,7 +37,8 @@ export interface PolyphonicDetectorConfig {
 }
 
 export class PolyphonicDetector {
-  private session: InferenceSession | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private session: any = null;
   private ready = false;
   private readonly config: Required<PolyphonicDetectorConfig>;
   // Pre-allocated resampling buffer
@@ -56,8 +60,66 @@ export class PolyphonicDetector {
   }
 
   async initialize(): Promise<void> {
-    this.session = await InferenceSession.create(this.config.modelPath);
-    this.ready = true;
+    // Lazy-load onnxruntime to avoid crash when native module isn't linked
+    if (!OnnxRuntime) {
+      try {
+        OnnxRuntime = require('onnxruntime-react-native');
+      } catch {
+        throw new Error(
+          'onnxruntime-react-native native module not available. ' +
+          'Install with: npx expo install onnxruntime-react-native'
+        );
+      }
+    }
+
+    // Resolve model path using expo-file-system for runtime file checking.
+    // NOTE: We do NOT use require() for the .onnx file because Metro bundler
+    // resolves require() at build time — if the file is missing, the entire
+    // app crashes with "Unable to resolve module" before any code runs.
+    // Instead, we check for the model at runtime via the filesystem.
+    let modelUri = this.config.modelPath;
+    if (!modelUri.includes('/') && !modelUri.includes(':')) {
+      try {
+        const FileSystem = require('expo-file-system') as typeof import('expo-file-system');
+        const modelDir = FileSystem.documentDirectory + 'models/';
+        const modelFile = modelDir + this.config.modelPath;
+        const info = await FileSystem.getInfoAsync(modelFile);
+        if (info.exists) {
+          modelUri = modelFile;
+        } else {
+          // Also check bundle directory as fallback
+          const bundlePath = FileSystem.bundleDirectory
+            ? FileSystem.bundleDirectory + 'assets/models/' + this.config.modelPath
+            : null;
+          if (bundlePath) {
+            const bundleInfo = await FileSystem.getInfoAsync(bundlePath);
+            if (bundleInfo.exists) {
+              modelUri = bundlePath;
+            } else {
+              throw new Error('not found');
+            }
+          } else {
+            throw new Error('not found');
+          }
+        }
+      } catch {
+        throw new Error(
+          `[PolyphonicDetector] ONNX model '${this.config.modelPath}' not found. ` +
+          'Download basic-pitch.onnx and place in the app documents/models/ directory. ' +
+          'Polyphonic detection disabled — falling back to monophonic mode.'
+        );
+      }
+    }
+
+    try {
+      this.session = await OnnxRuntime.InferenceSession.create(modelUri);
+      this.ready = true;
+    } catch (err) {
+      throw new Error(
+        `Failed to load ONNX model from '${modelUri}'. ` +
+        `Download basic-pitch.onnx and place in assets/models/. Error: ${err}`
+      );
+    }
   }
 
   isReady(): boolean {
@@ -72,7 +134,7 @@ export class PolyphonicDetector {
     if (resampled.length === 0) return [];
 
     // Create input tensor
-    const inputTensor = new Tensor('float32', resampled, [1, resampled.length]);
+    const inputTensor = new OnnxRuntime.Tensor('float32', resampled, [1, resampled.length]);
 
     // Run inference
     const results = await this.session.run({ audio: inputTensor });

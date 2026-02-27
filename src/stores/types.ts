@@ -76,6 +76,7 @@ export interface ProgressStoreState {
   lessonProgress: Record<string, LessonProgress>;
   dailyGoalData: Record<string, DailyGoalData>; // ISO date -> goal data
   tierTestResults: Record<string, TierTestResult>; // "tier-N" -> result
+  streakMilestonesClaimed: number[]; // Streak counts already rewarded (e.g. [7, 30])
 
   // Actions
   addXp: (amount: number) => void;

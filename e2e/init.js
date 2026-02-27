@@ -40,19 +40,21 @@ async function stabilizeExpoRuntime() {
   await maybeDismissExpoDevMenuNux();
 }
 
-beforeEach(async () => {
-  await device.launchApp({
-    newInstance: true,
-    delete: true,
-    permissions: {
-      notifications: 'YES',
-    },
-    launchArgs: {
-      EXDevMenuDisableAutoLaunch: 'YES',
-      EXDevMenuIsOnboardingFinished: 'YES',
-      EXDevMenuShowsAtLaunch: 'NO',
-    },
-  });
-  await device.disableSynchronization();
-  await stabilizeExpoRuntime();
-}, 120000);
+if (process.env.E2E_SKIP_GLOBAL_INIT !== '1') {
+  beforeEach(async () => {
+    await device.launchApp({
+      newInstance: true,
+      delete: true,
+      permissions: {
+        notifications: 'YES',
+      },
+      launchArgs: {
+        EXDevMenuDisableAutoLaunch: 'YES',
+        EXDevMenuIsOnboardingFinished: 'YES',
+        EXDevMenuShowsAtLaunch: 'NO',
+      },
+    });
+    await stabilizeExpoRuntime();
+    await device.disableSynchronization();
+  }, 120000);
+}

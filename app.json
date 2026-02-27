@@ -26,7 +26,8 @@
               "com.googleusercontent.apps.619761780367-tqf3t4srqtkklkigep0clojvoailsteu"
             ]
           }
-        ]
+        ],
+        "NSMicrophoneUsageDescription": "Purrrfect Keys uses your microphone to detect the notes you play on piano, keyboard, or by singing."
       }
     },
     "android": {
@@ -59,7 +60,8 @@
         "react-native-audio-api",
         {
           "iosBackgroundMode": false,
-          "androidForegroundService": false
+          "androidForegroundService": false,
+          "iosMicrophonePermission": "Purrrfect Keys uses your microphone to detect the notes you play on piano, keyboard, or by singing."
         }
       ],
       [

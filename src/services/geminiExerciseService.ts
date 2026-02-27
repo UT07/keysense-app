@@ -81,7 +81,7 @@ const API_KEY_ENV = ['EXPO', 'PUBLIC', 'GEMINI', 'API', 'KEY'].join('_');
 // Validation
 // ============================================================================
 
-export function validateAIExercise(exercise: unknown): exercise is AIExercise {
+export function validateAIExercise(exercise: unknown, allowedMidi?: number[]): exercise is AIExercise {
   if (exercise == null || typeof exercise !== 'object') {
     return false;
   }
@@ -129,6 +129,11 @@ export function validateAIExercise(exercise: unknown): exercise is AIExercise {
     const n = notes[i];
 
     if (typeof n.note !== 'number' || n.note < MIDI_MIN || n.note > MIDI_MAX) {
+      return false;
+    }
+
+    // Reject notes outside the allowed set (from generationHints.targetMidi)
+    if (allowedMidi && allowedMidi.length > 0 && !allowedMidi.includes(n.note as number)) {
       return false;
     }
 
@@ -308,18 +313,22 @@ export async function generateExercise(params: GenerationParams): Promise<AIExer
     });
 
     const prompt = buildPrompt(params);
+    const allowedMidi = params.generationHints?.targetMidi;
 
     // First attempt
-    const exercise = await attemptGeneration(model, prompt);
+    const exercise = await attemptGeneration(model, prompt, allowedMidi);
     if (exercise) {
       return exercise;
     }
 
-    // Retry with additional guidance
+    // Retry with stronger guidance
+    const midiHint = allowedMidi?.length
+      ? ` Use ONLY these MIDI notes: ${JSON.stringify(allowedMidi)}.`
+      : '';
     const retryPrompt =
       prompt +
-      '\n\nPrevious attempt was invalid. Ensure all MIDI notes are 36-96 and intervals are reasonable.';
-    const retryExercise = await attemptGeneration(model, retryPrompt);
+      `\n\nPrevious attempt was invalid. Ensure all MIDI notes are 36-96 and intervals are reasonable.${midiHint}`;
+    const retryExercise = await attemptGeneration(model, retryPrompt, allowedMidi);
     if (retryExercise) {
       return retryExercise;
     }
@@ -347,13 +356,14 @@ interface GenerativeModel {
 
 async function attemptGeneration(
   model: GenerativeModel,
-  prompt: string
+  prompt: string,
+  allowedMidi?: number[],
 ): Promise<AIExercise | null> {
   const result = await model.generateContent(prompt);
   const text = result.response.text();
   const parsed: unknown = JSON.parse(text);
 
-  if (validateAIExercise(parsed)) {
+  if (validateAIExercise(parsed, allowedMidi)) {
     return parsed;
   }
 

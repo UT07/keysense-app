@@ -117,10 +117,22 @@ export function createEmptyStreak(): StreakData {
 }
 
 /**
+ * Get current date as YYYY-MM-DD in local timezone.
+ * BUG-008 fix: was using toISOString() which gives UTC dates, causing
+ * the streak "day" boundary to fall at midnight UTC instead of midnight local.
+ */
+function localDateString(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Check if user practiced today
  */
 export function isPracticedToday(streak: StreakData): boolean {
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateString();
   return streak.lastPracticeDate === today;
 }
 
@@ -132,9 +144,9 @@ export function daysSinceLastPractice(streak: StreakData): number {
     return Infinity;
   }
 
-  const lastDate = new Date(streak.lastPracticeDate + 'T00:00:00');
-  const today = new Date();
-  const todayDate = new Date(today.toISOString().split('T')[0] + 'T00:00:00');
+  const lastDate = new Date(streak.lastPracticeDate + 'T12:00:00');
+  const todayStr = localDateString();
+  const todayDate = new Date(todayStr + 'T12:00:00');
   const diffTime = todayDate.getTime() - lastDate.getTime();
   const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
@@ -146,7 +158,7 @@ export function daysSinceLastPractice(streak: StreakData): number {
  * Updates streak, handles freezes, records daily practice
  */
 export function recordPracticeSession(streak: StreakData): StreakData {
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateString();
   const daysAgo = daysSinceLastPractice(streak);
 
   const updated: StreakData = { ...streak };
@@ -298,7 +310,7 @@ export function isDailyGoalMet(goal: DailyGoal): boolean {
  * Create daily goal
  */
 export function createDailyGoal(minutesTarget: number = 10, exercisesTarget: number = 3): DailyGoal {
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateString();
   return {
     date: today,
     minutesTarget,

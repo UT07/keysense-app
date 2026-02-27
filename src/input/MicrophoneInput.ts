@@ -84,6 +84,7 @@ export class MicrophoneInput {
   private isActive = false;
   private detectionCount = 0;
   private voicedCount = 0;
+  private polyBusy = false; // BUG-016 fix: back-pressure flag for async polyphonic detection
 
   constructor(config?: Partial<MicrophoneInputConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -145,13 +146,20 @@ export class MicrophoneInput {
 
     if (this.mode === 'polyphonic' && this.polyDetector && this.multiTracker) {
       // Wire: AudioCapture → PolyphonicDetector → MultiNoteTracker → callbacks
+      // BUG-016 fix: Drop incoming buffers when ONNX inference is still running
+      // to prevent unbounded promise pile-up and latency growth
       this.unsubCapture = this.capture.onAudioBuffer((samples) => {
         this.detectionCount++;
+        if (this.polyBusy) return; // Drop buffer — previous inference still running
+        this.polyBusy = true;
         this.polyDetector!.detect(samples).then((frames) => {
+          this.polyBusy = false;
           for (const frame of frames) {
             if (frame.notes.length > 0) this.voicedCount++;
             this.multiTracker!.update(frame);
           }
+        }).catch(() => {
+          this.polyBusy = false;
         });
       });
 

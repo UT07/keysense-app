@@ -67,6 +67,15 @@ export interface UseExercisePlaybackReturn {
 
   /** Which input method is currently active (midi/mic/touch) */
   activeInputMethod: ActiveInputMethod;
+
+  /** Ref holding the latest external (MIDI/mic) noteOn event, or null.
+   *  ExercisePlayer reads this to highlight keys and trigger feedback
+   *  for non-touch input sources. */
+  lastExternalNoteRef: React.MutableRefObject<MidiNoteEvent | null>;
+
+  /** Counter that increments each time an external noteOn arrives.
+   *  Use as a useEffect dependency to react to new external events. */
+  externalNoteCount: number;
 }
 
 export function useExercisePlayback({
@@ -85,10 +94,12 @@ export function useExercisePlayback({
   const [activeInputMethod, setActiveInputMethod] = useState<ActiveInputMethod>('touch');
 
   const [isPlaying, setIsPlaying] = useState(false);
+  const isPlayingRef = useRef(false);
   const [currentBeat, setCurrentBeat] = useState(-exercise.settings.countIn);
   const [playedNotes, setPlayedNotes] = useState<MidiNoteEvent[]>([]);
   const [isMidiReady, setIsMidiReady] = useState(false);
   const [isAudioReady, setIsAudioReady] = useState(false);
+  const isAudioReadyRef = useRef(false); // BUG-002 fix: ref for synchronous reads in callbacks
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -104,6 +115,11 @@ export function useExercisePlayback({
   const realtimeBeatRef = useRef(-exercise.settings.countIn); // 60fps beat position for scoring
   // Tracks noteOn indices so noteOff/release can attach durationMs for scoring.
   const noteOnIndexMapRef = useRef<Map<number, number[]>>(new Map());
+
+  // Latest external (MIDI/mic) noteOn — read by ExercisePlayer for keyboard highlighting.
+  // Paired with a counter state so ExercisePlayer can react via useEffect.
+  const lastExternalNoteRef = useRef<MidiNoteEvent | null>(null);
+  const [externalNoteCount, setExternalNoteCount] = useState(0);
 
   const trackNoteOnIndex = useCallback((note: number, index: number) => {
     const stack = noteOnIndexMapRef.current.get(note) ?? [];
@@ -170,6 +186,14 @@ export function useExercisePlayback({
           setActiveInputMethod(manager.activeMethod);
           setIsMidiReady(true);
           console.log(`[useExercisePlayback] Input initialized: ${manager.activeMethod}`);
+
+          // If mic was requested but failed, show the reason to the user
+          const micFailure = manager.getMicFailureReason();
+          if (micFailure && resolvedInputMethod === 'mic') {
+            console.warn(`[useExercisePlayback] Mic failed: ${micFailure}`);
+            setHasError(true);
+            setErrorMessage(micFailure);
+          }
         } else {
           manager.dispose();
         }
@@ -203,7 +227,7 @@ export function useExercisePlayback({
    */
   useEffect(() => {
     if (!enableAudio) {
-      setIsAudioReady(true);
+      isAudioReadyRef.current = true; setIsAudioReady(true);
       return;
     }
 
@@ -213,19 +237,22 @@ export function useExercisePlayback({
       try {
         // Ensure iOS audio session is configured BEFORE engine init.
         // This must complete before any audio plays or iOS may suspend output.
-        await ensureAudioModeConfigured();
+        // If mic input is preferred, configure for recording upfront to avoid
+        // reconfiguring the audio session mid-flight (which can cause audio glitches).
+        const needsRecording = resolvedInputMethod === 'mic';
+        await ensureAudioModeConfigured(needsRecording);
 
         // If already initialized (singleton was kept alive), skip re-init
         if (audioEngine.isReady()) {
           if (mounted) {
-            setIsAudioReady(true);
+            isAudioReadyRef.current = true; setIsAudioReady(true);
             console.log('[useExercisePlayback] Audio engine already initialized');
           }
           return;
         }
         await audioEngine.initialize();
         if (mounted) {
-          setIsAudioReady(true);
+          isAudioReadyRef.current = true; setIsAudioReady(true);
           console.log('[useExercisePlayback] Audio engine initialized');
         }
       } catch (error) {
@@ -233,7 +260,7 @@ export function useExercisePlayback({
         if (mounted) {
           setHasError(true);
           setErrorMessage('Audio initialization failed. No sound will be played.');
-          setIsAudioReady(false);
+          isAudioReadyRef.current = false; setIsAudioReady(false);
         }
       }
     };
@@ -262,7 +289,7 @@ export function useExercisePlayback({
     manager.start().catch(console.error);
 
     const unsubscribe = manager.onNoteEvent((midiEvent) => {
-      if (!mountedRef.current || !isPlaying) return;
+      if (!mountedRef.current || !isPlayingRef.current) return;
 
       // Only record noteOn events for scoring (noteOff would double-count notes)
       if (midiEvent.type === 'noteOn') {
@@ -274,10 +301,16 @@ export function useExercisePlayback({
         trackNoteOnIndex(normalizedEvent.note, noteIndex);
         setPlayedNotes(playedNotesRef.current);
         exerciseStore.addPlayedNote(normalizedEvent);
+
+        // Surface external noteOn for keyboard highlighting in ExercisePlayer.
+        // The ref holds the event data; the counter state triggers the effect.
+        lastExternalNoteRef.current = normalizedEvent;
+        setExternalNoteCount((c) => c + 1);
       }
 
       // Play audio if enabled (for MIDI input — mic has its own audio)
-      if (enableAudio && isAudioReady && midiEvent.type === 'noteOn' && midiEvent.inputSource !== 'mic') {
+      // BUG-002 fix: Use ref instead of state to avoid stale closure dropping early notes
+      if (enableAudio && isAudioReadyRef.current && midiEvent.type === 'noteOn' && midiEvent.inputSource !== 'mic') {
         try {
           const velocity = midiEvent.velocity / 127; // Normalize to 0-1
           const handle = audioEngine.playNote(midiEvent.note, velocity);
@@ -292,7 +325,7 @@ export function useExercisePlayback({
       }
 
       // Release audio if note off (not mic — mic notes have no audio handle)
-      if (enableAudio && isAudioReady && midiEvent.type === 'noteOff' && midiEvent.inputSource !== 'mic') {
+      if (enableAudio && isAudioReadyRef.current && midiEvent.type === 'noteOff' && midiEvent.inputSource !== 'mic') {
         const handle = activeNotesRef.current.get(midiEvent.note);
         if (handle) {
           audioEngine.releaseNote(handle);
@@ -303,14 +336,11 @@ export function useExercisePlayback({
 
     return () => {
       unsubscribe();
-      manager.stop().catch(console.error);
     };
   }, [
     enableMidi,
     enableAudio,
     isMidiReady,
-    isAudioReady,
-    isPlaying,
     audioEngine,
     exerciseStore,
     trackNoteOnIndex,
@@ -331,14 +361,15 @@ export function useExercisePlayback({
 
     const tempo = exercise.settings.tempo;
     const countInBeats = exercise.settings.countIn;
-    const lastNoteBeat = Math.max(
-      ...exercise.notes.map((n) => n.startBeat + n.durationBeats),
-    );
+    // BUG-007 fix: Guard against empty notes array (Math.max(...[]) = -Infinity)
+    const noteEnds = exercise.notes.map((n) => n.startBeat + n.durationBeats);
+    const lastNoteBeat = noteEnds.length > 0 ? Math.max(...noteEnds) : 0;
     // Reduced buffer from +2 to +0.5 beats. Old value caused 2s of dead silence
     // at 60 BPM after the last note ended. Half a beat is enough for the user to
     // register the last note's completion visually before the modal appears.
     const exerciseDuration = lastNoteBeat + 0.5;
     const totalExpectedNotes = exercise.notes.filter((n) => !n.optional).length;
+    const loopEnabled = exercise.settings.loopEnabled ?? false;
 
     playbackIntervalRef.current = setInterval(() => {
       if (!mountedRef.current) {
@@ -380,6 +411,18 @@ export function useExercisePlayback({
 
       // Check for completion (use ref to avoid stale closure)
       if (earlyComplete || beat > exerciseDuration) {
+        // BUG-005 fix: If loopEnabled, restart from beat 0 instead of completing
+        if (loopEnabled) {
+          startTimeRef.current = Date.now();
+          pauseElapsedRef.current = 0;
+          hasCrossedZeroRef.current = false;
+          playedNotesRef.current = [];
+          noteOnIndexMapRef.current.clear();
+          realtimeBeatRef.current = -countInBeats;
+          setPlayedNotes([]);
+          setCurrentBeat(-countInBeats);
+          return; // Don't complete — loop again
+        }
         handleCompletionRef.current();
       }
     }, 16); // 60fps
@@ -401,6 +444,7 @@ export function useExercisePlayback({
     playedNotesRef.current = [];
     noteOnIndexMapRef.current.clear();
     realtimeBeatRef.current = -exercise.settings.countIn;
+    isPlayingRef.current = true;
     setIsPlaying(true);
     setCurrentBeat(-exercise.settings.countIn);
     setPlayedNotes([]);
@@ -417,6 +461,7 @@ export function useExercisePlayback({
     // Adjust startTimeRef so elapsed time calculation continues correctly
     // pauseElapsedRef tracks how much time had passed at the moment of pause
     startTimeRef.current = Date.now() - pauseElapsedRef.current;
+    isPlayingRef.current = true;
     setIsPlaying(true);
     exerciseStore.setIsPlaying(true);
 
@@ -436,6 +481,7 @@ export function useExercisePlayback({
       playbackIntervalRef.current = null;
     }
 
+    isPlayingRef.current = false;
     setIsPlaying(false);
     exerciseStore.setIsPlaying(false);
 
@@ -462,6 +508,7 @@ export function useExercisePlayback({
     }
 
     realtimeBeatRef.current = -exercise.settings.countIn;
+    isPlayingRef.current = false;
     setIsPlaying(false);
     setCurrentBeat(-exercise.settings.countIn);
     exerciseStore.setIsPlaying(false);
@@ -502,11 +549,18 @@ export function useExercisePlayback({
       playbackIntervalRef.current = null;
     }
 
+    isPlayingRef.current = false;
     setIsPlaying(false);
     exerciseStore.setIsPlaying(false);
 
     // Any notes still held at completion are closed at completion time.
     closeAllOpenNoteDurations(Date.now());
+
+    // BUG-006 fix: Release all active audio notes on completion (prevents notes ringing)
+    if (enableAudio && audioEngine) {
+      audioEngine.releaseAllNotes();
+      activeNotesRef.current.clear();
+    }
 
     // Convert played note timestamps from epoch (Date.now()) to relative
     // (ms since beat 0). The scoring engine expects timestamps in the same
@@ -537,7 +591,7 @@ export function useExercisePlayback({
 
     console.log('[useExercisePlayback] Exercise completed:', score);
     onComplete?.(score);
-  }, [exercise, exerciseStore, onComplete, closeAllOpenNoteDurations]);
+  }, [exercise, exerciseStore, onComplete, closeAllOpenNoteDurations, enableAudio, audioEngine]);
 
   // Keep ref in sync so the interval always calls the latest handleCompletion
   useEffect(() => {
@@ -629,5 +683,9 @@ export function useExercisePlayback({
 
     // Input
     activeInputMethod,
+
+    // External note events (MIDI/mic)
+    lastExternalNoteRef,
+    externalNoteCount,
   };
 }

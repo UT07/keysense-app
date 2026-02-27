@@ -6,6 +6,7 @@
 import { useExerciseStore } from '../exerciseStore';
 import { useProgressStore } from '../progressStore';
 import { useSettingsStore } from '../settingsStore';
+import { useCatEvolutionStore } from '../catEvolutionStore';
 import { PersistenceManager } from '../persistence';
 import type { Exercise, MidiNoteEvent } from '@/core/exercises/types';
 
@@ -16,6 +17,10 @@ describe('Store Integration', () => {
     useProgressStore.getState().reset();
     useSettingsStore.getState().reset();
     PersistenceManager.clearAll();
+
+    // Mark daily challenge as already completed so xpMultiplier doesn't interfere
+    // with XP arithmetic in these integration tests
+    useCatEvolutionStore.setState({ lastDailyChallengeDate: new Date().toISOString().split('T')[0] });
   });
 
   describe('Exercise to Progress Flow', () => {

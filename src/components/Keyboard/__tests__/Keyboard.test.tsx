@@ -484,9 +484,9 @@ describe('Keyboard', () => {
     });
   });
 
-  // -- 13. MinWidth 48px on white keys --
-  describe('White key minWidth', () => {
-    it('white key containers have minWidth of 48', () => {
+  // -- 13. White key containers use flex layout --
+  describe('White key layout', () => {
+    it('white key containers use flex: 1 (no fixed minWidth)', () => {
       const { getByTestId } = render(<Keyboard testID="kb" />);
       const keyboard = getByTestId('kb-keyboard');
       const whiteKeyContainers = getWhiteKeyContainers(keyboard);
@@ -494,20 +494,8 @@ describe('Keyboard', () => {
       expect(whiteKeyContainers.length).toBeGreaterThan(0);
       for (const container of whiteKeyContainers) {
         const style = flattenStyle(container.props.style);
-        expect(style.minWidth).toBe(48);
-      }
-    });
-
-    it('minWidth is applied regardless of octaveCount', () => {
-      const { getByTestId } = render(
-        <Keyboard octaveCount={1} testID="kb" />,
-      );
-      const keyboard = getByTestId('kb-keyboard');
-      const whiteKeyContainers = getWhiteKeyContainers(keyboard);
-
-      for (const container of whiteKeyContainers) {
-        const style = flattenStyle(container.props.style);
-        expect(style.minWidth).toBe(48);
+        expect(style.flex).toBe(1);
+        expect(style.minWidth).toBeUndefined();
       }
     });
   });

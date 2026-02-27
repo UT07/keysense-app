@@ -17,8 +17,27 @@ import { PersistenceManager, STORAGE_KEYS, createDebouncedSave } from './persist
 import { levelFromXp } from '@/core/progression/XpSystem';
 import { useGemStore } from './gemStore';
 import { useCatEvolutionStore } from './catEvolutionStore';
-import { getDailyChallengeForDate, isDailyChallengeComplete } from '@/core/challenges/challengeSystem';
+import {
+  getDailyChallengeForDate,
+  isDailyChallengeComplete,
+  getWeeklyChallengeForWeek,
+  isWeeklyChallengeDay,
+  isWeeklyChallengeComplete,
+  getMonthlyChallengeForMonth,
+  isMonthlyChallengeActive,
+} from '@/core/challenges/challengeSystem';
 import type { ExerciseChallengeContext } from '@/core/challenges/challengeSystem';
+import { useLearnerProfileStore } from './learnerProfileStore';
+import { useSettingsStore } from './settingsStore';
+
+// BUG-008 fix: Use local date string so streak day boundary matches user's wall clock
+function localToday(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 const defaultStreakData: StreakData = {
   currentStreak: 0,
@@ -30,7 +49,7 @@ const defaultStreakData: StreakData = {
 };
 
 const defaultDailyGoal: DailyGoalData = {
-  date: new Date().toISOString().split('T')[0],
+  date: localToday(),
   minutesTarget: 10,
   minutesPracticed: 0,
   exercisesTarget: 3,
@@ -41,7 +60,7 @@ const defaultDailyGoal: DailyGoalData = {
 /** Data-only shape of progress state (excludes actions) */
 type ProgressData = Pick<
   ProgressStoreState,
-  'totalXp' | 'level' | 'streakData' | 'lessonProgress' | 'dailyGoalData' | 'tierTestResults'
+  'totalXp' | 'level' | 'streakData' | 'lessonProgress' | 'dailyGoalData' | 'tierTestResults' | 'streakMilestonesClaimed'
 >;
 
 const defaultData: ProgressData = {
@@ -51,6 +70,7 @@ const defaultData: ProgressData = {
   lessonProgress: {},
   dailyGoalData: {},
   tierTestResults: {},
+  streakMilestonesClaimed: [],
 };
 
 // Create debounced save function
@@ -134,21 +154,27 @@ export const useProgressStore = create<ProgressStoreState>((set, get) => ({
   },
 
   recordPracticeSession: (duration: number) => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = localToday();
+    // BUG-011/024 fix: Read user's preferred daily goal from settings
+    const userMinutesTarget = useSettingsStore.getState().dailyGoalMinutes ?? 10;
     set((state) => {
       const dailyGoal = state.dailyGoalData[today] || {
         ...defaultDailyGoal,
         date: today,
+        minutesTarget: userMinutesTarget,
       };
+      // Ensure existing entries also use updated target
+      const minutesTarget = dailyGoal.minutesTarget || userMinutesTarget;
 
       return {
         dailyGoalData: {
           ...state.dailyGoalData,
           [today]: {
             ...dailyGoal,
+            minutesTarget,
             minutesPracticed: dailyGoal.minutesPracticed + duration,
             isComplete:
-              dailyGoal.minutesPracticed + duration >= dailyGoal.minutesTarget &&
+              dailyGoal.minutesPracticed + duration >= minutesTarget &&
               dailyGoal.exercisesCompleted >= dailyGoal.exercisesTarget,
           },
         },
@@ -158,47 +184,16 @@ export const useProgressStore = create<ProgressStoreState>((set, get) => ({
   },
 
   recordExerciseCompletion: (_exerciseId: string, _score: number, xpEarned: number, challengeContext?: ExerciseChallengeContext) => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = localToday();
+    const userMinutesTarget = useSettingsStore.getState().dailyGoalMinutes ?? 10;
 
-    // Capture pre-update state inside set() to avoid race conditions.
-    // The previous approach read state before set() and after set() separately,
-    // which could miss or double-count the daily goal transition.
-    let dailyGoalJustCompleted = false;
-    let challengeAlreadyDone = false;
+    // ── Daily challenge check (before XP so we can apply xpMultiplier) ──
+    const challengeAlreadyDone = useCatEvolutionStore.getState().isDailyChallengeCompleted();
+    let xpMultiplier = 1;
 
-    set((state) => {
-      const dailyGoal = state.dailyGoalData[today] || {
-        ...defaultDailyGoal,
-        date: today,
-      };
-      const wasDailyGoalComplete = dailyGoal.isComplete;
-      const newTotalXp = state.totalXp + xpEarned;
-      const newExercisesCompleted = dailyGoal.exercisesCompleted + 1;
-      const nowComplete =
-        dailyGoal.minutesPracticed >= dailyGoal.minutesTarget &&
-        newExercisesCompleted >= dailyGoal.exercisesTarget;
-
-      dailyGoalJustCompleted = nowComplete && !wasDailyGoalComplete;
-      challengeAlreadyDone = useCatEvolutionStore.getState().isDailyChallengeCompleted();
-
-      return {
-        totalXp: newTotalXp,
-        level: levelFromXp(newTotalXp),
-        dailyGoalData: {
-          ...state.dailyGoalData,
-          [today]: {
-            ...dailyGoal,
-            exercisesCompleted: newExercisesCompleted,
-            isComplete: nowComplete,
-          },
-        },
-      };
-    });
-
-    // Daily challenge validation: check if this exercise satisfies the challenge condition.
-    // If no challengeContext is provided (backward compat), auto-complete on any exercise.
     if (!challengeAlreadyDone) {
-      const challenge = getDailyChallengeForDate(today);
+      const masteredSkills = useLearnerProfileStore.getState().masteredSkills ?? [];
+      const challenge = getDailyChallengeForDate(today, masteredSkills);
       const ctx: ExerciseChallengeContext = challengeContext ?? {
         score: _score,
         maxCombo: 0,
@@ -208,20 +203,113 @@ export const useProgressStore = create<ProgressStoreState>((set, get) => ({
       };
       if (isDailyChallengeComplete(challenge, ctx)) {
         useCatEvolutionStore.getState().completeDailyChallengeAndClaim();
+        if (challenge.reward.gems > 0) {
+          useGemStore.getState().earnGems(challenge.reward.gems, 'daily-challenge');
+        }
+        // BUG-010 fix: actually apply the xpMultiplier from challenge reward
+        xpMultiplier = Math.max(xpMultiplier, challenge.reward.xpMultiplier ?? 1);
       }
     }
+
+    // ── BUG-014 fix: Weekly challenge validation ──
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon...
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + mondayOffset);
+    const weekStartISO = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+
+    if (isWeeklyChallengeDay(weekStartISO)) {
+      const weeklyChallenge = getWeeklyChallengeForWeek(weekStartISO);
+      const ctx: ExerciseChallengeContext = challengeContext ?? {
+        score: _score, maxCombo: 0, perfectNotes: 0, playbackSpeed: 1.0, minutesPracticedToday: 0,
+      };
+      if (isWeeklyChallengeComplete(weeklyChallenge, ctx)) {
+        // Award weekly gems (only if not already claimed — use gem source as idempotency key)
+        const weeklyKey = `weekly-${weekStartISO}`;
+        const gemState = useGemStore.getState();
+        const alreadyClaimed = gemState.transactions?.some((t) => t.source === weeklyKey);
+        if (!alreadyClaimed) {
+          gemState.earnGems(weeklyChallenge.reward.gems, weeklyKey);
+          xpMultiplier = Math.max(xpMultiplier, weeklyChallenge.reward.xpMultiplier ?? 1);
+        }
+      }
+    }
+
+    // ── BUG-014 fix: Monthly challenge validation ──
+    const monthISO = today.slice(0, 7); // "2026-02"
+    if (isMonthlyChallengeActive(monthISO)) {
+      const monthlyChallenge = getMonthlyChallengeForMonth(monthISO);
+      // Monthly requires N exercises within 48h window — count today's completions
+      const monthlyKey = `monthly-${monthISO}`;
+      const gemState = useGemStore.getState();
+      const alreadyClaimed = gemState.transactions?.some((t) => t.source === monthlyKey);
+      if (!alreadyClaimed) {
+        // Count exercises completed today toward monthly goal
+        const todayGoal = get().dailyGoalData[today];
+        const exercisesToday = (todayGoal?.exercisesCompleted ?? 0) + 1;
+        if (exercisesToday >= monthlyChallenge.exercisesRequired) {
+          gemState.earnGems(monthlyChallenge.reward.gems, monthlyKey);
+          xpMultiplier = Math.max(xpMultiplier, monthlyChallenge.reward.xpMultiplier ?? 1);
+        }
+      }
+    }
+
+    // ── Apply XP with multiplier ──
+    const effectiveXp = Math.round(xpEarned * xpMultiplier);
+
+    let dailyGoalJustCompleted = false;
+
+    set((state) => {
+      const dailyGoal = state.dailyGoalData[today] || {
+        ...defaultDailyGoal,
+        date: today,
+        minutesTarget: userMinutesTarget,
+      };
+      const minutesTarget = dailyGoal.minutesTarget || userMinutesTarget;
+      const wasDailyGoalComplete = dailyGoal.isComplete;
+      const newTotalXp = state.totalXp + effectiveXp;
+      const newExercisesCompleted = dailyGoal.exercisesCompleted + 1;
+      const nowComplete =
+        dailyGoal.minutesPracticed >= minutesTarget &&
+        newExercisesCompleted >= dailyGoal.exercisesTarget;
+
+      dailyGoalJustCompleted = nowComplete && !wasDailyGoalComplete;
+
+      return {
+        totalXp: newTotalXp,
+        level: levelFromXp(newTotalXp),
+        dailyGoalData: {
+          ...state.dailyGoalData,
+          [today]: {
+            ...dailyGoal,
+            minutesTarget,
+            exercisesCompleted: newExercisesCompleted,
+            isComplete: nowComplete,
+          },
+        },
+      };
+    });
 
     // Bonus gems when the full daily goal (minutes + exercises) is met
     if (dailyGoalJustCompleted) {
       useGemStore.getState().earnGems(10, 'daily-goal');
     }
 
-    // Gem rewards: streak milestones
+    // BUG-023 fix: Streak gem milestones — only award once per milestone
     const streak = get().streakData.currentStreak;
-    if (streak === 7) {
-      useGemStore.getState().earnGems(50, '7-day-streak');
-    } else if (streak === 30) {
-      useGemStore.getState().earnGems(200, '30-day-streak');
+    const claimed = get().streakMilestonesClaimed ?? [];
+    const STREAK_MILESTONES: { streak: number; gems: number }[] = [
+      { streak: 7, gems: 50 },
+      { streak: 30, gems: 200 },
+    ];
+    for (const m of STREAK_MILESTONES) {
+      if (streak >= m.streak && !claimed.includes(m.streak)) {
+        useGemStore.getState().earnGems(m.gems, `${m.streak}-day-streak`);
+        set((state) => ({
+          streakMilestonesClaimed: [...(state.streakMilestonesClaimed ?? []), m.streak],
+        }));
+      }
     }
 
     debouncedSave(get());
@@ -266,6 +354,7 @@ export const useProgressStore = create<ProgressStoreState>((set, get) => ({
       lessonProgress: {},
       dailyGoalData: {},
       tierTestResults: {},
+      streakMilestonesClaimed: [],
     });
     PersistenceManager.deleteState(STORAGE_KEYS.PROGRESS);
   },
