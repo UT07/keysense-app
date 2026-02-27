@@ -114,6 +114,15 @@ jest.mock('../../components/common/AnimatedGradientBackground', () => {
   };
 });
 
+jest.mock('../../components/common/GameCard', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    GameCard: (props: any) =>
+      React.createElement(View, { testID: props.testID, ...props }, props.children),
+  };
+});
+
 jest.mock('../../components/DailyChallengeCard', () => {
   const React = require('react');
   const { View, Text } = require('react-native');

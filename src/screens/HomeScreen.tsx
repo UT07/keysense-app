@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { PressableScale } from '../components/common/PressableScale';
 import { AnimatedProgressBar } from '../components/common/AnimatedProgressBar';
+import { GameCard } from '../components/common/GameCard';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AnimatedGradientBackground } from '../components/common/AnimatedGradientBackground';
@@ -230,6 +231,40 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return Math.min(100, Math.round(((currentXp - stageStart) / range) * 100));
   }, [activeCatEvolution, evolutionNext]);
 
+  // Pulsing animation for the Continue Learning / Today's Practice card
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.02, duration: 1500, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
+      ])
+    ).start();
+  }, [pulseAnim]);
+
+  // Shake animation for the Daily Challenge card (subtle horizontal shake every 5s)
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const shake = () => {
+      Animated.sequence([
+        Animated.timing(shakeAnim, { toValue: 3, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -3, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 2, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -2, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 1, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
+      ]).start();
+    };
+    // Initial shake after a short delay
+    const initialTimeout = setTimeout(shake, 1000);
+    // Repeat every 5 seconds
+    const interval = setInterval(shake, 5000);
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
+  }, [shakeAnim]);
+
   // Stagger animation
   const fadeAnims = useRef(
     Array.from({ length: 10 }, () => new Animated.Value(0))
@@ -417,40 +452,44 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </Animated.View>
 
         {/* Today's Practice */}
-        <Animated.View style={[styles.section, staggerStyle(1)]}>
-          <View style={styles.practiceHeader}>
-            <Text style={styles.sectionTitle}>Today's Practice</Text>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('DailySession')}
-              style={styles.seeAllBtn}
-            >
-              <Text style={styles.seeAllText}>See All</Text>
-              <MaterialCommunityIcons name="chevron-right" size={16} color={COLORS.primary} />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.practiceProgressRow}>
-            <AnimatedProgressBar
-              progress={skillProgress / 100}
-              color={COLORS.primary}
-              height={6}
-              style={{ flex: 1 }}
-            />
-            <Text style={styles.practiceProgressText}>{masteredSkills.length}/{totalSkills} skills</Text>
-          </View>
-          <HomePracticeSections plan={sessionPlan} onExercisePress={handleExercisePress} />
+        <Animated.View style={[styles.section, staggerStyle(1), { transform: [{ scale: pulseAnim }] }]}>
+          <GameCard rarity="rare" testID="practice-game-card">
+            <View style={styles.practiceHeader}>
+              <Text style={styles.sectionTitle}>Today's Practice</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('DailySession')}
+                style={styles.seeAllBtn}
+              >
+                <Text style={styles.seeAllText}>See All</Text>
+                <MaterialCommunityIcons name="chevron-right" size={16} color={COLORS.primary} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.practiceProgressRow}>
+              <AnimatedProgressBar
+                progress={skillProgress / 100}
+                color={COLORS.primary}
+                height={6}
+                style={{ flex: 1 }}
+              />
+              <Text style={styles.practiceProgressText}>{masteredSkills.length}/{totalSkills} skills</Text>
+            </View>
+            <HomePracticeSections plan={sessionPlan} onExercisePress={handleExercisePress} />
+          </GameCard>
         </Animated.View>
 
         {/* Daily Challenge Card */}
-        <Animated.View style={[styles.section, staggerStyle(2)]}>
-          <DailyChallengeCard masteredSkills={masteredSkills} onPress={() => {
-            const challenge = getDailyChallengeForDate(today, masteredSkills);
-            const skillId = getSkillIdForChallenge(challenge.category, masteredSkills);
-            navigation.navigate('Exercise', {
-              exerciseId: 'ai-mode',
-              aiMode: true,
-              skillId,
-            });
-          }} />
+        <Animated.View style={[styles.section, staggerStyle(2), { transform: [{ translateX: shakeAnim }] }]}>
+          <GameCard rarity="epic" testID="challenge-game-card">
+            <DailyChallengeCard masteredSkills={masteredSkills} onPress={() => {
+              const challenge = getDailyChallengeForDate(today, masteredSkills);
+              const skillId = getSkillIdForChallenge(challenge.category, masteredSkills);
+              navigation.navigate('Exercise', {
+                exerciseId: 'ai-mode',
+                aiMode: true,
+                skillId,
+              });
+            }} />
+          </GameCard>
         </Animated.View>
 
         {/* Daily Reward Calendar */}
@@ -475,28 +514,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         {/* Music Library Spotlight */}
         <Animated.View style={[styles.section, staggerStyle(5)]}>
-          <MusicLibrarySpotlight
-            totalSongs={totalSongs}
-            totalGenres={genres}
-            featuredSong={featuredSong}
-            onBrowse={() => navigation.navigate('MainTabs', { screen: 'Songs' } as any)}
-            onPlayFeatured={() => navigation.navigate('MainTabs', { screen: 'Songs' } as any)}
-          />
+          <GameCard rarity="common" testID="music-library-game-card">
+            <MusicLibrarySpotlight
+              totalSongs={totalSongs}
+              totalGenres={genres}
+              featuredSong={featuredSong}
+              onBrowse={() => navigation.navigate('MainTabs', { screen: 'Songs' } as any)}
+              onPlayFeatured={() => navigation.navigate('MainTabs', { screen: 'Songs' } as any)}
+            />
+          </GameCard>
         </Animated.View>
 
         {/* Review Challenge (conditional — only when skills are decaying) */}
         {decayedSkillIds.length > 0 && (
           <Animated.View style={[styles.section, staggerStyle(7)]}>
-            <ReviewChallengeCard
-              decayedSkills={decayedSkillIds}
-              onStartReview={() => {
-                navigation.navigate('Exercise', {
-                  exerciseId: 'ai-mode',
-                  aiMode: true,
-                  skillId: decayedSkillIds[0],
-                });
-              }}
-            />
+            <GameCard rarity="rare" testID="review-game-card">
+              <ReviewChallengeCard
+                decayedSkills={decayedSkillIds}
+                onStartReview={() => {
+                  navigation.navigate('Exercise', {
+                    exerciseId: 'ai-mode',
+                    aiMode: true,
+                    skillId: decayedSkillIds[0],
+                  });
+                }}
+              />
+            </GameCard>
           </Animated.View>
         )}
 
