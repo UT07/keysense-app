@@ -331,7 +331,7 @@ describe('Keyboard', () => {
         <Keyboard highlightedNotes={highlighted} testID="kb" />,
       );
       const tree = safeStringify(toJSON());
-      expect(tree).toContain('#FFE6CC');
+      expect(tree).toContain('rgba(76, 175, 80, 0.25)');
     });
 
     it('does not show highlight style when no notes highlighted', () => {
@@ -340,8 +340,8 @@ describe('Keyboard', () => {
         <Keyboard highlightedNotes={highlighted} testID="kb" />,
       );
       const tree = safeStringify(toJSON());
-      expect(tree).not.toContain('#FFE6CC');
-      expect(tree).not.toContain('#B8860B');
+      expect(tree).not.toContain('rgba(76, 175, 80, 0.25)');
+      expect(tree).not.toContain('#8B6914');
     });
 
     it('renders highlight style for highlighted black notes', () => {
@@ -350,7 +350,7 @@ describe('Keyboard', () => {
         <Keyboard highlightedNotes={highlighted} testID="kb" />,
       );
       const tree = safeStringify(toJSON());
-      expect(tree).toContain('#B8860B');
+      expect(tree).toContain('#8B6914');
     });
   });
 
@@ -531,7 +531,7 @@ describe('Keyboard', () => {
         />,
       );
       const tree = safeStringify(toJSON());
-      expect(tree).toContain('#FFE6CC');
+      expect(tree).toContain('rgba(76, 175, 80, 0.25)');
       expect(tree).toContain('#C8E6C9');
     });
 
