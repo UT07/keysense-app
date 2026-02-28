@@ -93,6 +93,7 @@ interface FeedbackState {
   type: 'perfect' | 'good' | 'ok' | 'early' | 'late' | 'miss' | null;
   noteIndex: number;
   timestamp: number;
+  timingOffsetMs: number;
 }
 
 function getFeedbackColor(type: string | null): string {
@@ -453,7 +454,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   // Responsive layout — supports both portrait and landscape
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const isPortrait = screenHeight > screenWidth;
-  const singleKeyHeight = isPortrait ? 120 : 90;
+  const singleKeyHeight = isPortrait ? 120 : 70;
   const topBarHeight = isPortrait ? 76 : 40;
 
   const hasAutoSetSpeed = useRef(false);
@@ -1142,6 +1143,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     type: null,
     noteIndex: -1,
     timestamp: 0,
+    timingOffsetMs: 0,
   });
   const [comboCount, setComboCount] = useState(0);
 
@@ -1328,7 +1330,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     setIsPaused(false);
     setHighlightedKeys(new Set());
     setComboCount(0);
-    setFeedback({ type: null, noteIndex: -1, timestamp: 0 });
+    setFeedback({ type: null, noteIndex: -1, timestamp: 0, timingOffsetMs: 0 });
     consumedNoteIndicesRef.current.clear();
 
     if (Platform.OS === 'web') {
@@ -1496,6 +1498,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
           type: feedbackType,
           noteIndex: bestMatch.index,
           timestamp: Date.now(),
+          timingOffsetMs: bestMatch.beatDiffSigned * msPerBeat,
         });
 
         // Animate combo
@@ -1518,6 +1521,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
           type: 'miss',
           noteIndex: -1,
           timestamp: Date.now(),
+          timingOffsetMs: 0,
         });
 
         // Warning haptic for incorrect
@@ -1529,7 +1533,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         clearTimeout(feedbackTimeoutRef.current);
       }
       feedbackTimeoutRef.current = setTimeout(() => {
-        setFeedback({ type: null, noteIndex: -1, timestamp: 0 });
+        setFeedback({ type: null, noteIndex: -1, timestamp: 0, timingOffsetMs: 0 });
       }, 500);
     },
     [
@@ -1626,18 +1630,18 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         else feedbackType = 'ok';
 
         setComboCount((prev) => prev + 1);
-        setFeedback({ type: feedbackType, noteIndex: bestMatch.index, timestamp: Date.now() });
+        setFeedback({ type: feedbackType, noteIndex: bestMatch.index, timestamp: Date.now(), timingOffsetMs: bestMatch.beatDiffSigned * msPerBeat });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       } else {
         setComboCount(0);
-        setFeedback({ type: 'miss', noteIndex: -1, timestamp: Date.now() });
+        setFeedback({ type: 'miss', noteIndex: -1, timestamp: Date.now(), timingOffsetMs: 0 });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
       }
 
       // Clear feedback after delay
       if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
       feedbackTimeoutRef.current = setTimeout(() => {
-        setFeedback({ type: null, noteIndex: -1, timestamp: 0 });
+        setFeedback({ type: null, noteIndex: -1, timestamp: 0, timingOffsetMs: 0 });
       }, 500);
     }
 
@@ -1960,6 +1964,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
               isPlaying={isPlaying}
               countInComplete={countInComplete}
               feedback={feedback.type}
+              timingOffsetMs={feedback.timingOffsetMs}
               compact
             />
 
@@ -2161,6 +2166,10 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
             setShowIntro(false);
             handleStart();
           }}
+          onWatchFirst={() => {
+            setShowIntro(false);
+            startDemo();
+          }}
           skillTarget={skillTarget}
           testID="exercise-intro"
         />
@@ -2187,6 +2196,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
           chestGems={chestGemsForModal}
           sessionMinutes={Math.max(1, Math.round((Date.now() - sessionStartTime) / 60000))}
           tempoChange={tempoChangeForModal}
+          failCount={failCount}
         />
       )}
 
@@ -2247,6 +2257,7 @@ const styles = StyleSheet.create({
   },
   pianoRollContainer: {
     flex: 1,
+    minHeight: 180,
     marginTop: 4,
     marginHorizontal: 4,
   },

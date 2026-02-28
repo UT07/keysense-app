@@ -1,5 +1,6 @@
 import { Audio } from 'expo-av';
-import type { AVPlaybackSource } from 'expo-av';
+
+import { generateAllSoundUris } from './generateUiSounds';
 
 let Haptics: typeof import('expo-haptics') | null = null;
 try {
@@ -78,13 +79,7 @@ const SOUND_HAPTICS: Record<SoundName, HapticType> = {
   meow_celebrate: 'medium',
 };
 
-/**
- * Map sound names to asset sources.
- * Sounds that don't have an asset yet map to null (haptic-only).
- */
-const SOUND_ASSETS: Partial<Record<SoundName, AVPlaybackSource>> = {
-  // Assets will be added as .wav files are created
-};
+// Sound URIs are generated procedurally at preload time (no .wav files needed)
 
 interface LoadedSound {
   sound: Audio.Sound;
@@ -124,13 +119,16 @@ export class SoundManager {
       staysActiveInBackground: false,
     });
 
-    const entries = Object.entries(SOUND_ASSETS) as [SoundName, AVPlaybackSource][];
+    // Generate all sound URIs procedurally (no .wav files needed)
+    const uris = generateAllSoundUris();
+    const entries = Object.entries(uris) as [SoundName, string][];
+
     const results = await Promise.allSettled(
-      entries.map(async ([name, source]) => {
-        const { sound } = await Audio.Sound.createAsync(source, {
-          volume: this.volume,
-          shouldPlay: false,
-        });
+      entries.map(async ([name, uri]) => {
+        const { sound } = await Audio.Sound.createAsync(
+          { uri },
+          { volume: this.volume, shouldPlay: false },
+        );
         this.sounds.set(name, { sound });
       }),
     );

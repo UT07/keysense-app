@@ -22,64 +22,6 @@ export interface CatQuest {
   xpMultiplier: number; // 1.0 = normal, 1.5 = bonus
 }
 
-/** Signature exercises per cat — short themed pieces */
-export interface SignatureExercise {
-  catId: string;
-  exerciseId: string; // placeholder for future content — sig-* exercises are not yet in ContentLoader
-  title: string;
-  description: string;
-}
-
-const SIGNATURE_EXERCISES: SignatureExercise[] = [
-  {
-    catId: 'mini-meowww',
-    exerciseId: 'sig-mini-meowww', // placeholder for future content
-    title: 'Tiny Serenade',
-    description: 'A delicate melody played one note at a time — Mini Meowww style.',
-  },
-  {
-    catId: 'jazzy',
-    exerciseId: 'sig-jazzy', // placeholder for future content
-    title: 'Midnight Jazz',
-    description: 'A smooth jazz riff from the rooftops of New Orleans.',
-  },
-  {
-    catId: 'chonky-monke',
-    exerciseId: 'sig-chonky', // placeholder for future content
-    title: 'Belly Slam Fortissimo',
-    description: 'Big notes, big energy. Chonky\'s signature power chords.',
-  },
-  {
-    catId: 'luna',
-    exerciseId: 'sig-luna', // placeholder for future content
-    title: 'Moonlight Whisper',
-    description: 'A haunting melody that Luna plays only under the full moon.',
-  },
-  {
-    catId: 'biscuit',
-    exerciseId: 'sig-biscuit', // placeholder for future content
-    title: 'Cookie Crumble Waltz',
-    description: 'A warm C major waltz — cozy as fresh cookies.',
-  },
-  {
-    catId: 'ballymakawww',
-    exerciseId: 'sig-ballymakawww', // placeholder for future content
-    title: 'The Cork Reel',
-    description: 'A rollicking Irish jig learned in a Cork pub — played at twice the speed anyone thinks possible.',
-  },
-  {
-    catId: 'aria',
-    exerciseId: 'sig-aria', // placeholder for future content
-    title: 'La Scala Cadenza',
-    description: 'An elegant run that Aria perfected at the Milan opera house.',
-  },
-  {
-    catId: 'tempo',
-    exerciseId: 'sig-tempo', // placeholder for future content
-    title: 'Speed Demon Sprint',
-    description: 'Can you keep up? Tempo plays everything at double speed.',
-  },
-];
 
 /** Note number to name mapping for quest descriptions */
 function midiNoteName(midi: number): string {
@@ -203,20 +145,6 @@ export function generateDailyQuest(
     targetValue,
     xpMultiplier: targetType === 'general' ? 1.0 : 1.5,
   };
-}
-
-/**
- * Get the signature exercise for a cat.
- */
-export function getSignatureExercise(catId: string): SignatureExercise | undefined {
-  return SIGNATURE_EXERCISES.find((se) => se.catId === catId);
-}
-
-/**
- * Get all signature exercises.
- */
-export function getAllSignatureExercises(): SignatureExercise[] {
-  return [...SIGNATURE_EXERCISES];
 }
 
 /** Simple string hash for deterministic daily rotation */

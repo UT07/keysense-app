@@ -108,6 +108,8 @@ export interface CompletionModalProps {
   sessionMinutes?: number;
   tempoChange?: number;
   skipAnimation?: boolean;
+  /** Number of consecutive failures at this exercise */
+  failCount?: number;
 }
 
 export const CompletionModal: React.FC<CompletionModalProps> = ({
@@ -126,6 +128,7 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
   sessionMinutes,
   tempoChange = 0,
   skipAnimation = false,
+  failCount = 0,
 }) => {
   // ---------------------------------------------------------------------------
   // Phase state
@@ -687,6 +690,11 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
                   </TouchableOpacity>
                 </View>
               )}
+
+              {/* Practice strategy card — shown after 2+ consecutive failures */}
+              {!score.isPassed && failCount >= 2 && (
+                <PracticeStrategyCard score={score} exercise={exercise} />
+              )}
             </Reanimated.View>
           )}
 
@@ -745,6 +753,75 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
     </View>
   );
 };
+
+/** Practice strategy card — shows specific advice based on score breakdown */
+function PracticeStrategyCard({ score, exercise }: { score: ExerciseScore; exercise: Exercise }) {
+  // Determine the weakest area and give targeted advice
+  const strategy = useMemo(() => {
+    const { breakdown } = score;
+    const weakest = Object.entries(breakdown)
+      .filter(([key]) => key !== 'extraNotes')
+      .sort(([, a], [, b]) => a - b)[0];
+
+    // Check if any commonMistakes match
+    const matchingMistake = exercise.hints?.commonMistakes?.find((m) => {
+      if (m.triggerCondition?.type === 'timing' && breakdown.timing < 60) return true;
+      if (m.triggerCondition?.type === 'pitch' && breakdown.accuracy < 60) return true;
+      return false;
+    });
+
+    if (matchingMistake) {
+      return {
+        title: 'Practice Tip',
+        advice: matchingMistake.advice,
+        icon: 'lightbulb-on' as const,
+      };
+    }
+
+    switch (weakest?.[0]) {
+      case 'timing':
+        return {
+          title: 'Timing Strategy',
+          advice: 'Try playing at a slower tempo first. Once you can play it perfectly at 50% speed, gradually increase. Count "1-2-3-4" out loud with the metronome to build internal rhythm.',
+          icon: 'metronome' as const,
+        };
+      case 'accuracy':
+        return {
+          title: 'Note Accuracy Strategy',
+          advice: 'Watch the demo to see which keys to press, then try playing just the first few notes until they feel natural. Add more notes one at a time rather than playing the whole exercise.',
+          icon: 'bullseye-arrow' as const,
+        };
+      case 'completeness':
+        return {
+          title: 'Completeness Strategy',
+          advice: 'Some notes are being missed. Focus on following the falling notes in the piano roll — play each note as it crosses the line, even if your timing isn\'t perfect yet.',
+          icon: 'checkbox-marked-circle-outline' as const,
+        };
+      case 'duration':
+        return {
+          title: 'Note Length Strategy',
+          advice: 'Hold each key down for the full length shown in the piano roll. Short taps give less points — try to sustain notes until the next one arrives.',
+          icon: 'arrow-expand-horizontal' as const,
+        };
+      default:
+        return {
+          title: 'Practice Strategy',
+          advice: 'Break the exercise into smaller sections. Master the first few notes before trying the whole thing. Slow, accurate practice builds speed faster than rushing.',
+          icon: 'puzzle' as const,
+        };
+    }
+  }, [score, exercise]);
+
+  return (
+    <View style={styles.practiceStrategy} testID="practice-strategy">
+      <View style={styles.practiceStrategyHeader}>
+        <MaterialCommunityIcons name={strategy.icon} size={18} color={COLORS.warning} />
+        <Text style={styles.practiceStrategyTitle}>{strategy.title}</Text>
+      </View>
+      <Text style={styles.practiceStrategyText}>{strategy.advice}</Text>
+    </View>
+  );
+}
 
 /** Animated breakdown bar */
 function BreakdownBar({ label, value, color, skipAnimation = false }: { label: string; value: number; color: string; skipAnimation?: boolean }) {
@@ -1050,6 +1127,31 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.body.md,
     fontWeight: '700',
     color: COLORS.textPrimary,
+  },
+  // Practice strategy
+  practiceStrategy: {
+    backgroundColor: glowColor(COLORS.warning, 0.1),
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.warning,
+    marginTop: SPACING.sm,
+  },
+  practiceStrategyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    marginBottom: SPACING.xs,
+  },
+  practiceStrategyTitle: {
+    ...TYPOGRAPHY.body.md,
+    fontWeight: '700',
+    color: COLORS.warning,
+  },
+  practiceStrategyText: {
+    ...TYPOGRAPHY.body.sm,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
   },
 });
 

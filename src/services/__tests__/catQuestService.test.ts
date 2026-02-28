@@ -1,12 +1,10 @@
 /**
  * Cat Quest Service Tests
- * Tests quest generation, signature exercises, and deterministic daily rotation.
+ * Tests quest generation and deterministic daily rotation.
  */
 
 import {
   generateDailyQuest,
-  getSignatureExercise,
-  getAllSignatureExercises,
 } from '../catQuestService';
 import type { CatQuest } from '../catQuestService';
 import type { Skills } from '../../stores/types';
@@ -83,37 +81,6 @@ describe('Cat Quest Service', () => {
         expect(quest.catId).toBe(catId);
         expect(quest.title.length).toBeGreaterThan(0);
       }
-    });
-  });
-
-  describe('getSignatureExercise', () => {
-    it('should return a signature exercise for each cat', () => {
-      const catIds = ['mini-meowww', 'jazzy', 'chonky-monke', 'luna', 'biscuit', 'ballymakawww', 'aria', 'tempo'];
-      for (const catId of catIds) {
-        const sig = getSignatureExercise(catId);
-        expect(sig).toBeDefined();
-        expect(sig!.catId).toBe(catId);
-        expect(sig!.exerciseId).toMatch(/^sig-/);
-        expect(sig!.title.length).toBeGreaterThan(0);
-        expect(sig!.description.length).toBeGreaterThan(0);
-      }
-    });
-
-    it('should return undefined for unknown cat', () => {
-      expect(getSignatureExercise('unknown')).toBeUndefined();
-    });
-  });
-
-  describe('getAllSignatureExercises', () => {
-    it('should return 8 signature exercises', () => {
-      const all = getAllSignatureExercises();
-      expect(all.length).toBe(8);
-    });
-
-    it('should have unique exercise IDs', () => {
-      const all = getAllSignatureExercises();
-      const ids = new Set(all.map(se => se.exerciseId));
-      expect(ids.size).toBe(8);
     });
   });
 });

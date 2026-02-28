@@ -99,6 +99,9 @@ function persistableData(state: SongStoreState): SongData {
 type PageCursor = Awaited<ReturnType<typeof getSongSummaries>>['lastDoc'];
 let lastDocCursor: PageCursor = null;
 
+/** Guards against stale Firestore responses overwriting newer results */
+let loadRequestId = 0;
+
 export const useSongStore = create<SongStoreState>((set, get) => ({
   ...defaultData,
   ...defaultTransient,
@@ -107,19 +110,23 @@ export const useSongStore = create<SongStoreState>((set, get) => ({
 
   loadSummaries: async (reset = true) => {
     if (reset) lastDocCursor = null;
+    const thisRequest = ++loadRequestId;
     set({ isLoadingSummaries: true });
     try {
       const { summaries, lastDoc } = await getSongSummaries(get().filter, 20);
+      if (thisRequest !== loadRequestId) return; // stale response — discard
       lastDocCursor = lastDoc;
       set({ summaries, isLoadingSummaries: false });
     } catch (err) {
+      if (thisRequest !== loadRequestId) return; // stale
       console.warn('[SongStore] loadSummaries failed:', err);
-      set({ isLoadingSummaries: false });
+      set({ summaries: [], isLoadingSummaries: false });
     }
   },
 
   loadMoreSummaries: async () => {
     if (!lastDocCursor || get().isLoadingSummaries) return;
+    const thisRequest = ++loadRequestId;
     set({ isLoadingSummaries: true });
     try {
       const { summaries: more, lastDoc } = await getSongSummaries(
@@ -127,9 +134,11 @@ export const useSongStore = create<SongStoreState>((set, get) => ({
         20,
         lastDocCursor ?? undefined,
       );
+      if (thisRequest !== loadRequestId) return; // stale
       lastDocCursor = lastDoc;
       set((s) => ({ summaries: [...s.summaries, ...more], isLoadingSummaries: false }));
     } catch (err) {
+      if (thisRequest !== loadRequestId) return; // stale
       console.warn('[SongStore] loadMoreSummaries failed:', err);
       set({ isLoadingSummaries: false });
     }

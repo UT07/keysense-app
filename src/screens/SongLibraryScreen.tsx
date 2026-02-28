@@ -6,7 +6,7 @@
  * and a FAB to request AI-generated songs.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -384,14 +384,19 @@ export function SongLibraryScreen() {
 
   const [requestModalVisible, setRequestModalVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const isInitialMount = useRef(true);
 
   // Load on mount
   useEffect(() => {
     loadSummaries();
   }, []);
 
-  // Debounced search
+  // Debounced search — skip initial mount (already loaded above)
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     const timer = setTimeout(() => {
       setFilter({ searchQuery: searchText || undefined });
       loadSummaries();

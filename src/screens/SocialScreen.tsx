@@ -137,6 +137,7 @@ function LeagueCard(): React.JSX.Element {
       <PressableScale
         onPress={handleViewLeaderboard}
         style={[styles.actionButton, { backgroundColor: config.color + '20' }]}
+        testID="social-view-leaderboard"
       >
         <MaterialCommunityIcons name="trophy" size={18} color={config.color} />
         <Text style={[styles.actionButtonText, { color: config.color }]}>
@@ -202,6 +203,7 @@ function FriendsSection(): React.JSX.Element {
         <PressableScale
           onPress={handleViewFriends}
           style={[styles.actionButton, styles.friendsActionButton]}
+          testID="social-view-friends"
         >
           <MaterialCommunityIcons
             name="account-group"
@@ -216,6 +218,7 @@ function FriendsSection(): React.JSX.Element {
         <PressableScale
           onPress={handleAddFriend}
           style={[styles.actionButton, styles.addFriendButton]}
+          testID="social-add-friend"
         >
           <MaterialCommunityIcons
             name="account-plus"
@@ -359,11 +362,12 @@ export function SocialScreen(): React.JSX.Element {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} testID="social-screen">
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        testID="social-scroll"
       >
         <Text style={styles.screenTitle}>Social</Text>
 

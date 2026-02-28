@@ -4,23 +4,37 @@
  * Tests the pure utility functions in socialService:
  * - generateFriendCode() character set and length
  * - Code uniqueness across many generations
+ * - Batch operations for friend requests / removal
  */
 
-// Mock firebase/firestore
-jest.mock('firebase/firestore', () => ({
-  doc: jest.fn(),
-  collection: jest.fn(),
-  getDoc: jest.fn(),
-  setDoc: jest.fn(),
-  updateDoc: jest.fn(),
-  deleteDoc: jest.fn(),
-  getDocs: jest.fn(),
-  query: jest.fn(),
-  where: jest.fn(),
-  orderBy: jest.fn(),
-  limit: jest.fn(),
-  serverTimestamp: jest.fn(() => 'SERVER_TIMESTAMP'),
-}));
+// Mock firebase/firestore with writeBatch support
+jest.mock('firebase/firestore', () => {
+  const batchSet = jest.fn();
+  const batchUpdate = jest.fn();
+  const batchDelete = jest.fn();
+  const batchCommit = jest.fn().mockResolvedValue(undefined);
+
+  return {
+    doc: jest.fn(),
+    collection: jest.fn(),
+    getDoc: jest.fn(),
+    setDoc: jest.fn(),
+    updateDoc: jest.fn(),
+    getDocs: jest.fn(),
+    query: jest.fn(),
+    where: jest.fn(),
+    orderBy: jest.fn(),
+    limit: jest.fn(),
+    serverTimestamp: jest.fn(() => 'SERVER_TIMESTAMP'),
+    writeBatch: jest.fn(() => ({
+      set: batchSet,
+      update: batchUpdate,
+      delete: batchDelete,
+      commit: batchCommit,
+    })),
+    __mockBatch: { set: batchSet, update: batchUpdate, delete: batchDelete, commit: batchCommit },
+  };
+});
 
 jest.mock('../config', () => ({
   db: {},
@@ -36,7 +50,16 @@ import {
   removeFriendConnection,
   getFriends,
 } from '../socialService';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, getDocs, writeBatch } from 'firebase/firestore';
+
+// Access the batch mock helpers
+const firestoreMock = jest.requireMock('firebase/firestore');
+const mockBatch = firestoreMock.__mockBatch as {
+  set: jest.Mock;
+  update: jest.Mock;
+  delete: jest.Mock;
+  commit: jest.Mock;
+};
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -159,23 +182,25 @@ describe('socialService', () => {
   });
 
   describe('sendFriendRequest', () => {
-    it('writes to both users friend subcollections', async () => {
-      (setDoc as jest.Mock).mockResolvedValue(undefined);
-
+    it('uses a batch to write both friend subcollections atomically', async () => {
       await sendFriendRequest(
         'user-a', 'user-b',
         'Alice', 'luna',
         'Bob', 'jazzy',
       );
 
-      expect(setDoc).toHaveBeenCalledTimes(2);
+      // Should create a writeBatch and commit it
+      expect(writeBatch).toHaveBeenCalledTimes(1);
+      expect(mockBatch.set).toHaveBeenCalledTimes(2);
+      expect(mockBatch.commit).toHaveBeenCalledTimes(1);
+
       // Verify outgoing connection (first call)
-      const outgoingData = (setDoc as jest.Mock).mock.calls[0][1];
+      const outgoingData = mockBatch.set.mock.calls[0][1];
       expect(outgoingData.uid).toBe('user-b');
       expect(outgoingData.status).toBe('pending_outgoing');
       expect(outgoingData.displayName).toBe('Bob');
       // Verify incoming connection (second call)
-      const incomingData = (setDoc as jest.Mock).mock.calls[1][1];
+      const incomingData = mockBatch.set.mock.calls[1][1];
       expect(incomingData.uid).toBe('user-a');
       expect(incomingData.status).toBe('pending_incoming');
       expect(incomingData.displayName).toBe('Alice');
@@ -183,26 +208,27 @@ describe('socialService', () => {
   });
 
   describe('acceptFriendRequest', () => {
-    it('updates both sides to accepted', async () => {
-      (updateDoc as jest.Mock).mockResolvedValue(undefined);
-
+    it('uses a batch to update both sides atomically', async () => {
       await acceptFriendRequest('my-uid', 'friend-uid');
 
-      expect(updateDoc).toHaveBeenCalledTimes(2);
-      const call1 = (updateDoc as jest.Mock).mock.calls[0][1];
-      const call2 = (updateDoc as jest.Mock).mock.calls[1][1];
+      expect(writeBatch).toHaveBeenCalledTimes(1);
+      expect(mockBatch.update).toHaveBeenCalledTimes(2);
+      expect(mockBatch.commit).toHaveBeenCalledTimes(1);
+
+      const call1 = mockBatch.update.mock.calls[0][1];
+      const call2 = mockBatch.update.mock.calls[1][1];
       expect(call1.status).toBe('accepted');
       expect(call2.status).toBe('accepted');
     });
   });
 
   describe('removeFriendConnection', () => {
-    it('deletes documents on both sides', async () => {
-      (deleteDoc as jest.Mock).mockResolvedValue(undefined);
-
+    it('uses a batch to delete both sides atomically', async () => {
       await removeFriendConnection('my-uid', 'friend-uid');
 
-      expect(deleteDoc).toHaveBeenCalledTimes(2);
+      expect(writeBatch).toHaveBeenCalledTimes(1);
+      expect(mockBatch.delete).toHaveBeenCalledTimes(2);
+      expect(mockBatch.commit).toHaveBeenCalledTimes(1);
     });
   });
 

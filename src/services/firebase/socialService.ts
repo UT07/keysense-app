@@ -14,12 +14,12 @@ import {
   getDoc,
   setDoc,
   updateDoc,
-  deleteDoc,
   getDocs,
   query,
   where,
   orderBy,
   limit,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from './config';
 import type { FriendConnection, ActivityFeedItem, FriendChallenge } from '../../stores/types';
@@ -39,11 +39,15 @@ const MAX_CODE_RETRIES = 5;
 /**
  * Generate a random 6-character alphanumeric friend code.
  * Uses a restricted alphabet (no I/O/0/1) to avoid ambiguity.
+ * Uses crypto.getRandomValues() for cryptographic randomness.
  */
 export function generateFriendCode(): string {
+  const randomBytes = new Uint8Array(FRIEND_CODE_LENGTH);
+  crypto.getRandomValues(randomBytes);
+
   let code = '';
   for (let i = 0; i < FRIEND_CODE_LENGTH; i++) {
-    const index = Math.floor(Math.random() * FRIEND_CODE_ALPHABET.length);
+    const index = randomBytes[i] % FRIEND_CODE_ALPHABET.length;
     code += FRIEND_CODE_ALPHABET[index];
   }
   return code;
@@ -122,8 +126,10 @@ export async function sendFriendRequest(
     connectedAt: now,
   };
 
-  await setDoc(outgoingRef, outgoing);
-  await setDoc(incomingRef, incoming);
+  const batch = writeBatch(db);
+  batch.set(outgoingRef, outgoing);
+  batch.set(incomingRef, incoming);
+  await batch.commit();
 }
 
 /**
@@ -138,8 +144,10 @@ export async function acceptFriendRequest(
 
   const now = Date.now();
 
-  await updateDoc(myRef, { status: 'accepted', connectedAt: now });
-  await updateDoc(friendRef, { status: 'accepted', connectedAt: now });
+  const batch = writeBatch(db);
+  batch.update(myRef, { status: 'accepted', connectedAt: now });
+  batch.update(friendRef, { status: 'accepted', connectedAt: now });
+  await batch.commit();
 }
 
 /**
@@ -152,8 +160,10 @@ export async function removeFriendConnection(
   const myRef = doc(db, 'users', myUid, 'friends', friendUid);
   const friendRef = doc(db, 'users', friendUid, 'friends', myUid);
 
-  await deleteDoc(myRef);
-  await deleteDoc(friendRef);
+  const batch = writeBatch(db);
+  batch.delete(myRef);
+  batch.delete(friendRef);
+  await batch.commit();
 }
 
 /**

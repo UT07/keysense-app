@@ -33,7 +33,7 @@ export function GameCard({
   style,
   testID,
 }: GameCardProps): React.JSX.Element {
-  const rarityConfig = RARITY[rarity];
+  const rarityConfig = RARITY[rarity] ?? RARITY.common;
 
   const cardStyle: ViewStyle = {
     borderWidth: 1.5,

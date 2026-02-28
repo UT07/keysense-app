@@ -1,5 +1,9 @@
 /* eslint-disable no-undef */
 
+// ---------------------------------------------------------------------------
+// Utility helpers
+// ---------------------------------------------------------------------------
+
 async function sleep(ms) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -38,6 +42,10 @@ async function dismissTransientAlerts() {
   }
   return false;
 }
+
+// ---------------------------------------------------------------------------
+// Onboarding flows
+// ---------------------------------------------------------------------------
 
 async function completeOnboardingBeginnerFlow() {
   const deadline = Date.now() + 120000;
@@ -167,6 +175,10 @@ async function completeOnboardingIntermediateToSkillCheck() {
   throw new Error('Timed out while navigating onboarding intermediate flow to Skill Check');
 }
 
+// ---------------------------------------------------------------------------
+// Auth flows
+// ---------------------------------------------------------------------------
+
 async function openEmailAuthAndReturn() {
   if (!(await isVisibleById('auth-screen', 12000))) return;
 
@@ -192,14 +204,17 @@ async function signInAndReachHome(options = {}) {
         await sleep(800);
         continue;
       }
-      if (await isVisibleByText('Go home', 500)) {
-        await element(by.text('Go home')).tap();
-        await sleep(800);
-        continue;
-      }
       if (await isVisibleById('home-screen', 700)) {
-        // Ensure bottom tabs are mounted before considering navigation stable.
-        if (await isVisibleById('tab-home', 700)) {
+        // Tab bar may take several seconds to mount after the onboarding
+        // modal dismisses, or after the navigation stack switches from
+        // auth to authenticated. Wait up to 10s for tabs to appear.
+        if (await isVisibleById('tab-home', 8000)) {
+          return;
+        }
+        // Even without tabs visible, if home-screen persists it may be
+        // a layout/animation delay — accept it after 2 extra seconds.
+        await sleep(2000);
+        if (await isVisibleById('home-screen', 1000)) {
           return;
         }
       }
@@ -249,12 +264,6 @@ async function signInAndReachHome(options = {}) {
       continue;
     }
 
-    if (await isVisibleByText('Go home', 600)) {
-      await element(by.text('Go home')).tap();
-      await sleep(900);
-      continue;
-    }
-
     await sleep(500);
   }
 
@@ -264,6 +273,11 @@ async function signInAndReachHome(options = {}) {
 async function signInWithSkipAndReachHome() {
   return signInAndReachHome({ preferSkip: true });
 }
+
+// ---------------------------------------------------------------------------
+// Tab navigation
+// Current tabs: Home | Learn | Songs | Social | Profile
+// ---------------------------------------------------------------------------
 
 async function goToLearnTab() {
   const deadline = Date.now() + 60000;
@@ -327,19 +341,71 @@ async function goToLearnTab() {
   throw new Error('Timed out navigating to level map from Learn tab');
 }
 
-async function goToPlayTab() {
+async function goToSongsTab() {
   const deadline = Date.now() + 45000;
 
   while (Date.now() < deadline) {
-    if (await isVisibleById('play-screen', 1200)) {
+    if (await isVisibleById('song-library-screen', 1200)) {
       return;
     }
 
-    if (await tapIfVisibleById('tab-play', 1200)) {
+    if (await tapIfVisibleById('tab-songs', 1200)) {
       await sleep(700);
-      if (await isVisibleById('play-screen', 2000)) {
+      if (await isVisibleById('song-library-screen', 2000)) {
         return;
       }
+    }
+
+    // Dismiss any blocking overlays
+    if (await tapIfVisibleById('lesson-intro-back', 500)) {
+      await sleep(500);
+      continue;
+    }
+
+    if (await isVisibleById('exercise-player', 500) && (await tapIfVisibleById('control-exit', 500))) {
+      await sleep(800);
+      continue;
+    }
+
+    if (await tapIfVisibleById('tab-home', 500)) {
+      await sleep(500);
+    } else {
+      await sleep(500);
+    }
+  }
+
+  throw new Error('Timed out navigating to Songs tab');
+}
+
+async function goToSocialTab() {
+  const deadline = Date.now() + 45000;
+
+  while (Date.now() < deadline) {
+    if (await isVisibleById('social-screen', 1200)) {
+      return;
+    }
+
+    if (await tapIfVisibleById('tab-social', 1200)) {
+      await sleep(700);
+      if (await isVisibleById('social-screen', 2000)) {
+        return;
+      }
+    }
+
+    // Dismiss blocking stack screens
+    if (await isVisibleById('leaderboard-screen', 500) && (await tapIfVisibleById('leaderboard-back', 700))) {
+      await sleep(600);
+      continue;
+    }
+
+    if (await isVisibleById('friends-screen', 500) && (await tapIfVisibleById('friends-back', 700))) {
+      await sleep(600);
+      continue;
+    }
+
+    if (await isVisibleById('add-friend-screen', 500) && (await tapIfVisibleById('add-friend-back', 700))) {
+      await sleep(600);
+      continue;
     }
 
     if (await tapIfVisibleById('lesson-intro-back', 500)) {
@@ -359,7 +425,58 @@ async function goToPlayTab() {
     }
   }
 
-  throw new Error('Timed out navigating to play tab');
+  throw new Error('Timed out navigating to Social tab');
+}
+
+/**
+ * Navigate to Free Play screen.
+ * Free Play moved from tab to HomeScreen card in Phase 10.5.
+ * Route: HomeScreen → tap free-play-card → FreePlay (PlayScreen)
+ */
+async function goToFreePlay() {
+  const deadline = Date.now() + 45000;
+
+  while (Date.now() < deadline) {
+    if (await isVisibleById('play-screen', 1200)) {
+      return;
+    }
+
+    // If we're on home, tap the free play card
+    if (await isVisibleById('home-screen', 800)) {
+      if (await tapIfVisibleById('free-play-card', 1200)) {
+        await sleep(700);
+        if (await isVisibleById('play-screen', 3000)) {
+          return;
+        }
+      }
+    }
+
+    // Navigate to home first
+    if (await tapIfVisibleById('tab-home', 1200)) {
+      await sleep(700);
+      continue;
+    }
+
+    // Dismiss blocking overlays
+    if (await tapIfVisibleById('lesson-intro-back', 500)) {
+      await sleep(500);
+      continue;
+    }
+
+    if (await isVisibleById('exercise-player', 500) && (await tapIfVisibleById('control-exit', 500))) {
+      await sleep(800);
+      continue;
+    }
+
+    if (await tapIfVisibleById('freeplay-back', 500)) {
+      await sleep(500);
+      continue;
+    }
+
+    await sleep(500);
+  }
+
+  throw new Error('Timed out navigating to Free Play screen');
 }
 
 async function goToProfileTab() {
@@ -448,6 +565,10 @@ async function goToProfileTab() {
   throw new Error('Timed out navigating to profile tab');
 }
 
+// ---------------------------------------------------------------------------
+// Exercise flows
+// ---------------------------------------------------------------------------
+
 async function openCurrentLessonIntro() {
   await goToLearnTab();
 
@@ -486,6 +607,13 @@ async function ensureExercisePlaying() {
       return;
     }
 
+    // Handle new "Watch First" + "Ready" intro overlay
+    if (await isVisibleById('intro-ready', 1000)) {
+      await element(by.id('intro-ready')).tap();
+      await sleep(700);
+      continue;
+    }
+
     if (await isVisibleById('exercise-intro-ready', 1000)) {
       await element(by.id('exercise-intro-ready')).tap();
       await sleep(700);
@@ -518,20 +646,29 @@ async function startCurrentLessonExercise() {
   await ensureExercisePlaying();
 }
 
+// ---------------------------------------------------------------------------
+// Exports
+// ---------------------------------------------------------------------------
+
 module.exports = {
   sleep,
   isVisibleById,
   isVisibleByText,
   tapIfVisibleById,
+  dismissTransientAlerts,
   openEmailAuthAndReturn,
   signInAndReachHome,
   signInWithSkipAndReachHome,
   completeOnboardingBeginnerFlow,
   completeOnboardingIntermediateToSkillCheck,
   goToLearnTab,
-  goToPlayTab,
+  goToSongsTab,
+  goToSocialTab,
+  goToFreePlay,
   goToProfileTab,
   openCurrentLessonIntro,
   ensureExercisePlaying,
   startCurrentLessonExercise,
+  // Legacy alias — some old tests may reference this
+  goToPlayTab: goToFreePlay,
 };

@@ -1,19 +1,17 @@
 /**
  * MIDI input abstraction layer
  * Handles MIDI device connection and event processing
- * Ultra-low latency implementation with native module integration
+ * Ultra-low latency implementation via @motiz88/react-native-midi (Web MIDI API)
  *
  * Architecture:
- * - NativeModule (react-native-midi): <2ms
- * - JS Event Handler (MidiEventHandler): <3ms
+ * - requestMIDIAccess() → MIDIAccess (Expo native module)
+ * - MIDIInput.onmidimessage → raw MIDI bytes → parsed MidiNoteEvent
  * - Total latency target: <5ms
  */
 
-import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import type { MidiNoteEvent } from '@/core/exercises/types';
 export type { MidiNoteEvent } from '@/core/exercises/types';
-
-const { RNMidi } = NativeModules;
 
 export interface MidiDevice {
   id: string;
@@ -57,7 +55,7 @@ export interface MidiInput {
 
 /**
  * Native MIDI Input Implementation
- * Integrates with react-native-midi for USB and Bluetooth MIDI
+ * Uses @motiz88/react-native-midi which provides the Web MIDI API
  */
 export class NativeMidiInput implements MidiInput {
   state: MidiInputState = {
@@ -69,8 +67,10 @@ export class NativeMidiInput implements MidiInput {
   private noteCallbacks: MidiNoteCallback[] = [];
   private connectionCallbacks: MidiConnectionCallback[] = [];
   private controlChangeCallbacks: MidiControlChangeCallback[] = [];
-  private midiEmitter: NativeEventEmitter | null = null;
-  private eventSubscriptions: any[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private midiAccess: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private activeInput: any = null;
 
   async initialize(): Promise<void> {
     if (this.state.isInitialized) {
@@ -78,21 +78,17 @@ export class NativeMidiInput implements MidiInput {
     }
 
     try {
-      // Initialize native MIDI module
-      if (RNMidi && RNMidi.initialize) {
-        await RNMidi.initialize();
-        console.log('[MIDI] Native module initialized');
-      }
+      // Import the Web MIDI API polyfill from @motiz88/react-native-midi
+      const { requestMIDIAccess } = require('@motiz88/react-native-midi');
+      this.midiAccess = await requestMIDIAccess();
+      console.log('[MIDI] Web MIDI access granted');
 
-      // Set up event emitter
-      if (RNMidi) {
-        this.midiEmitter = new NativeEventEmitter(RNMidi);
-        this._setupNativeListeners();
-      }
+      // Listen for device connection/disconnection
+      this.midiAccess.onstatechange = this._handleStateChange.bind(this);
 
       // Get initial device list
-      const devices = await this.getConnectedDevices();
-      console.log(`[MIDI] Found ${devices.length} connected devices`);
+      await this.getConnectedDevices();
+      console.log(`[MIDI] Found ${this.state.connectedDevices.length} connected devices`);
 
       this.state.isInitialized = true;
     } catch (error) {
@@ -103,15 +99,20 @@ export class NativeMidiInput implements MidiInput {
 
   async dispose(): Promise<void> {
     try {
-      if (RNMidi && RNMidi.shutdown) {
-        await RNMidi.shutdown();
+      // Disconnect active input
+      if (this.activeInput) {
+        this.activeInput.onmidimessage = null;
+        this.activeInput = null;
       }
 
-      // Clean up subscriptions
-      this.eventSubscriptions.forEach((sub) => sub?.remove?.());
-      this.eventSubscriptions = [];
+      if (this.midiAccess) {
+        this.midiAccess.onstatechange = null;
+        this.midiAccess = null;
+      }
 
       this.state.isInitialized = false;
+      this.state.connectedDevices = [];
+      this.state.activeDeviceId = null;
       this.noteCallbacks = [];
       this.connectionCallbacks = [];
       this.controlChangeCallbacks = [];
@@ -122,44 +123,62 @@ export class NativeMidiInput implements MidiInput {
   }
 
   async getConnectedDevices(): Promise<MidiDevice[]> {
-    try {
-      if (!RNMidi || !RNMidi.getDevices) {
-        return [];
-      }
+    if (!this.midiAccess) return [];
 
-      const devices = await RNMidi.getDevices();
-      const midiDevices: MidiDevice[] = devices.map((d: any) => ({
-        id: d.id,
-        name: d.name || 'Unknown Device',
-        manufacturer: d.manufacturer,
-        type: d.type || 'input',
-        connected: d.connected ?? true,
-        connectionTime: d.connectionTime,
-      }));
+    const devices: MidiDevice[] = [];
+    // Web MIDI API: midiAccess.inputs is a Map-like of MIDIInput objects
+    this.midiAccess.inputs.forEach((input: { id: string; name: string; manufacturer: string; state: string }) => {
+      devices.push({
+        id: input.id,
+        name: input.name || 'Unknown Device',
+        manufacturer: input.manufacturer,
+        type: 'input',
+        connected: input.state === 'connected',
+      });
+    });
 
-      this.state.connectedDevices = midiDevices;
-      return midiDevices;
-    } catch (error) {
-      console.error('[MIDI] Error getting devices:', error);
-      return [];
-    }
+    this.state.connectedDevices = devices;
+    return devices;
   }
 
   async connectDevice(deviceId: string): Promise<void> {
+    if (!this.midiAccess) return;
+
+    // Disconnect current device if any
+    if (this.activeInput) {
+      this.activeInput.onmidimessage = null;
+      this.activeInput = null;
+    }
+
+    const input = this.midiAccess.inputs.get(deviceId);
+    if (!input) {
+      console.warn(`[MIDI] Device ${deviceId} not found`);
+      return;
+    }
+
+    // Set up MIDI message listener on this input
+    input.onmidimessage = this._handleMidiMessage.bind(this);
+    this.activeInput = input;
+    this.state.activeDeviceId = deviceId;
+
+    console.log(`[MIDI] Connected to device: ${input.name}`);
     const device = this.state.connectedDevices.find((d) => d.id === deviceId);
     if (device) {
-      this.state.activeDeviceId = deviceId;
-      console.log(`[MIDI] Connected to device: ${device.name}`);
       this.connectionCallbacks.forEach((cb) => cb(device, true));
     }
   }
 
   async disconnectDevice(deviceId: string): Promise<void> {
-    const device = this.state.connectedDevices.find((d) => d.id === deviceId);
-    if (device && this.state.activeDeviceId === deviceId) {
+    if (this.activeInput && this.state.activeDeviceId === deviceId) {
+      this.activeInput.onmidimessage = null;
+      this.activeInput = null;
       this.state.activeDeviceId = null;
-      console.log(`[MIDI] Disconnected from device: ${device.name}`);
-      this.connectionCallbacks.forEach((cb) => cb(device, false));
+
+      const device = this.state.connectedDevices.find((d) => d.id === deviceId);
+      console.log(`[MIDI] Disconnected from device: ${device?.name}`);
+      if (device) {
+        this.connectionCallbacks.forEach((cb) => cb(device, false));
+      }
     }
   }
 
@@ -195,87 +214,113 @@ export class NativeMidiInput implements MidiInput {
     return this.state.isInitialized;
   }
 
-  private _setupNativeListeners(): void {
-    if (!this.midiEmitter) return;
+  /**
+   * Parse raw MIDI message bytes from Web MIDI API
+   * Status byte format: [message type (4 bits) | channel (4 bits)]
+   */
+  private _handleMidiMessage(event: { data: Uint8Array; timeStamp: number }): void {
+    const [status, data1, data2] = event.data;
+    const channel = status & 0x0f;
+    const messageType = status & 0xf0;
 
-    // MIDI Note Events
-    const noteSub = this.midiEmitter.addListener('midiNote', (event: any) => {
-      const midiEvent: MidiNoteEvent = {
-        type: event.type === 'noteOn' ? 'noteOn' : 'noteOff',
-        note: event.note,
-        velocity: event.velocity,
-        timestamp: event.timestamp ?? Date.now(),
-        channel: event.channel ?? 0,
-      };
-
-      this.state.lastNoteTime = Date.now();
-      this.noteCallbacks.forEach((cb) => {
-        try {
-          cb(midiEvent);
-        } catch (error) {
-          console.error('[MIDI] Error in note callback:', error);
-        }
-      });
-    });
-
-    // Control Change Events
-    const ccSub = this.midiEmitter.addListener('midiControlChange', (event: any) => {
-      this.controlChangeCallbacks.forEach((cb) => {
-        try {
-          cb(event.cc, event.value, event.channel ?? 0);
-        } catch (error) {
-          console.error('[MIDI] Error in CC callback:', error);
-        }
-      });
-    });
-
-    // Device Connected
-    const connectedSub = this.midiEmitter.addListener(
-      'midiDeviceConnected',
-      async (event: any) => {
-        const device: MidiDevice = {
-          id: event.id,
-          name: event.name || 'Unknown Device',
-          manufacturer: event.manufacturer,
-          type: event.type || 'input',
-          connected: true,
-          connectionTime: Date.now(),
+    switch (messageType) {
+      case 0x90: {
+        // Note On (velocity 0 = Note Off per MIDI running status)
+        const noteEvent: MidiNoteEvent = {
+          type: data2 > 0 ? 'noteOn' : 'noteOff',
+          note: data1,
+          velocity: data2,
+          timestamp: Date.now(), // Normalize to JS time domain
+          channel,
         };
+        this.state.lastNoteTime = Date.now();
+        this.noteCallbacks.forEach((cb) => {
+          try {
+            cb(noteEvent);
+          } catch (error) {
+            console.error('[MIDI] Error in note callback:', error);
+          }
+        });
+        break;
+      }
+      case 0x80: {
+        // Note Off
+        const noteOffEvent: MidiNoteEvent = {
+          type: 'noteOff',
+          note: data1,
+          velocity: data2,
+          timestamp: Date.now(),
+          channel,
+        };
+        this.noteCallbacks.forEach((cb) => {
+          try {
+            cb(noteOffEvent);
+          } catch (error) {
+            console.error('[MIDI] Error in note callback:', error);
+          }
+        });
+        break;
+      }
+      case 0xb0: {
+        // Control Change
+        this.controlChangeCallbacks.forEach((cb) => {
+          try {
+            cb(data1, data2, channel);
+          } catch (error) {
+            console.error('[MIDI] Error in CC callback:', error);
+          }
+        });
+        break;
+      }
+    }
+  }
 
+  /**
+   * Handle Web MIDI API state change events (device connect/disconnect)
+   */
+  private _handleStateChange(event: { port: { id: string; name: string; manufacturer: string; type: string; state: string } }): void {
+    const port = event.port;
+    if (port.type !== 'input') return;
+
+    if (port.state === 'connected') {
+      const device: MidiDevice = {
+        id: port.id,
+        name: port.name || 'Unknown Device',
+        manufacturer: port.manufacturer,
+        type: 'input',
+        connected: true,
+        connectionTime: Date.now(),
+      };
+      if (!this.state.connectedDevices.find((d) => d.id === device.id)) {
         this.state.connectedDevices.push(device);
+      }
+      this.connectionCallbacks.forEach((cb) => {
+        try {
+          cb(device, true);
+        } catch (error) {
+          console.error('[MIDI] Error in connection callback:', error);
+        }
+      });
+    } else if (port.state === 'disconnected') {
+      const index = this.state.connectedDevices.findIndex((d) => d.id === port.id);
+      if (index !== -1) {
+        const [device] = this.state.connectedDevices.splice(index, 1);
+        if (this.state.activeDeviceId === device.id) {
+          this.state.activeDeviceId = null;
+          if (this.activeInput) {
+            this.activeInput.onmidimessage = null;
+            this.activeInput = null;
+          }
+        }
         this.connectionCallbacks.forEach((cb) => {
           try {
-            cb(device, true);
+            cb(device, false);
           } catch (error) {
-            console.error('[MIDI] Error in connection callback:', error);
+            console.error('[MIDI] Error in disconnection callback:', error);
           }
         });
       }
-    );
-
-    // Device Disconnected
-    const disconnectedSub = this.midiEmitter.addListener(
-      'midiDeviceDisconnected',
-      (event: any) => {
-        const index = this.state.connectedDevices.findIndex((d) => d.id === event.id);
-        if (index !== -1) {
-          const [device] = this.state.connectedDevices.splice(index, 1);
-          if (this.state.activeDeviceId === device.id) {
-            this.state.activeDeviceId = null;
-          }
-
-          this.connectionCallbacks.forEach((cb) => {
-            try {
-              cb(device, false);
-            } catch (error) {
-              console.error('[MIDI] Error in disconnection callback:', error);
-            }
-          });
-        }
-      }
-    );
-
-    this.eventSubscriptions = [noteSub, ccSub, connectedSub, disconnectedSub];
+    }
   }
 
   // For testing
@@ -381,16 +426,13 @@ export class NoOpMidiInput implements MidiInput {
 
   _simulateDeviceConnection(device: MidiDevice, connected: boolean): void {
     if (connected) {
-      // Add device to connected list if not already present
       if (!this.state.connectedDevices.find((d) => d.id === device.id)) {
         this.state.connectedDevices.push(device);
       }
     } else {
-      // Remove device from connected list
       this.state.connectedDevices = this.state.connectedDevices.filter(
         (d) => d.id !== device.id
       );
-      // Clear active device if it was the disconnected one
       if (this.state.activeDeviceId === device.id) {
         this.state.activeDeviceId = null;
       }
@@ -404,11 +446,19 @@ let midiInputInstance: MidiInput | null = null;
 
 export function getMidiInput(): MidiInput {
   if (!midiInputInstance) {
-    // Try to use native implementation if MIDI module is available
-    const useNative = Platform.OS !== 'web' && RNMidi !== undefined;
+    // Try to use native Web MIDI API if @motiz88/react-native-midi is available
+    let useNative = false;
+    if (Platform.OS !== 'web') {
+      try {
+        require('@motiz88/react-native-midi');
+        useNative = true;
+      } catch {
+        // Native MIDI module not linked in this build
+      }
+    }
     midiInputInstance = useNative ? new NativeMidiInput() : new NoOpMidiInput();
     console.log(
-      `[MIDI] Using ${useNative ? 'native' : 'no-op'} MIDI input implementation`
+      `[MIDI] Using ${useNative ? 'native (Web MIDI API)' : 'no-op'} MIDI input implementation`
     );
   }
   return midiInputInstance;

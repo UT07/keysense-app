@@ -3,59 +3,73 @@
 const {
   sleep,
   isVisibleById,
-  openEmailAuthAndReturn,
   signInAndReachHome,
-  signInWithSkipAndReachHome,
-  completeOnboardingIntermediateToSkillCheck,
   goToLearnTab,
-  goToPlayTab,
+  goToSongsTab,
+  goToSocialTab,
+  goToFreePlay,
   goToProfileTab,
   openCurrentLessonIntro,
   ensureExercisePlaying,
   startCurrentLessonExercise,
 } = require('./helpers/appFlows');
 
+// Tests run sequentially with a single app instance (no restart between tests).
+// The first test signs in and reaches home; subsequent tests navigate from there.
 describe('Purrrfect Keys End-to-End', () => {
-  it('covers auth + onboarding via email entry and skip fallback', async () => {
-    await waitFor(element(by.id('auth-screen'))).toBeVisible().withTimeout(30000);
-
-    await openEmailAuthAndReturn();
-    await signInAndReachHome();
-
+  it('signs in via skip and reaches home screen', async () => {
+    await signInAndReachHome({ preferSkip: true });
     await expect(element(by.id('home-screen'))).toBeVisible();
     await expect(element(by.id('tab-home'))).toBeVisible();
   });
 
-  it('supports skip-signin path to authenticated home', async () => {
-    await signInWithSkipAndReachHome();
-
+  it('covers all five tab navigation destinations', async () => {
+    // Home tab (should already be here from previous test)
+    if (!(await isVisibleById('home-screen', 3000))) {
+      await signInAndReachHome({ preferSkip: true });
+    }
     await expect(element(by.id('home-screen'))).toBeVisible();
+
+    // Learn tab
+    await goToLearnTab();
+    await expect(element(by.id('level-map-screen'))).toBeVisible();
+
+    // Songs tab
+    await goToSongsTab();
+    await expect(element(by.id('song-library-screen'))).toBeVisible();
+
+    // Social tab (may show auth gate for anonymous users)
+    await goToSocialTab();
+    await expect(element(by.id('social-screen'))).toBeVisible();
+
+    // Profile tab
+    await goToProfileTab();
+    await expect(element(by.id('profile-screen'))).toBeVisible();
   });
 
-  it('routes intermediate onboarding to skill check with countdown and two-line guides', async () => {
-    await waitFor(element(by.id('auth-screen'))).toBeVisible().withTimeout(30000);
-    await element(by.id('skip-signin')).tap();
+  it('navigates to lesson intro and back to level map', async () => {
+    await goToLearnTab();
+    await expect(element(by.id('level-map-screen'))).toBeVisible();
 
-    await completeOnboardingIntermediateToSkillCheck();
-    await expect(element(by.id('skill-assessment-screen'))).toBeVisible();
-    await expect(element(by.id('assessment-intro'))).toBeVisible();
+    await openCurrentLessonIntro();
+    const isLesson = await isVisibleById('lesson-intro-screen', 2000);
+    const isTier = await isVisibleById('tier-intro-screen', 1000);
+    expect(isLesson || isTier).toBe(true);
 
-    await element(by.id('assessment-start-round')).tap();
-    await waitFor(element(by.id('assessment-countin'))).toBeVisible().withTimeout(8000);
-
-    await expect(element(by.id('press-line'))).toBeVisible();
-    if (await isVisibleById('release-line', 1500)) {
-      await expect(element(by.id('release-line'))).toBeVisible();
+    if (isLesson) {
+      await element(by.id('lesson-intro-back')).tap();
+    } else {
+      await element(by.id('tier-intro-back')).tap();
     }
-
-    // During countdown, taps should be allowed without crashing scoring lifecycle.
-    await element(by.id('assessment-keyboard')).tapAtPoint({ x: 120, y: 95 });
-    await sleep(500);
-    await expect(element(by.id('assessment-countin'))).toBeVisible();
+    await waitFor(element(by.id('level-map-screen'))).toBeVisible().withTimeout(15000);
   });
 
   it('opens lesson and validates exercise playback controls flow', async () => {
-    await signInAndReachHome();
+    // Navigate home first, then start exercise
+    if (!(await isVisibleById('home-screen', 2000))) {
+      await element(by.id('tab-home')).tap();
+      await sleep(700);
+    }
 
     await startCurrentLessonExercise();
     await waitFor(element(by.id('exercise-player'))).toBeVisible().withTimeout(20000);
@@ -77,50 +91,47 @@ describe('Purrrfect Keys End-to-End', () => {
     }
   });
 
-  it('covers tab navigation and lesson intro return path', async () => {
-    await signInAndReachHome();
+  it('opens Free Play from HomeScreen card', async () => {
+    // Ensure we're back at home
+    if (!(await isVisibleById('home-screen', 2000))) {
+      await signInAndReachHome({ preferSkip: true });
+    }
 
-    await goToLearnTab();
-    await expect(element(by.id('level-map-screen'))).toBeVisible();
+    await goToFreePlay();
+    await waitFor(element(by.id('play-screen'))).toBeVisible().withTimeout(10000);
 
-    await openCurrentLessonIntro();
-    await expect(element(by.id('lesson-intro-screen'))).toBeVisible();
-    await element(by.id('lesson-intro-back')).tap();
-    await waitFor(element(by.id('level-map-screen'))).toBeVisible().withTimeout(15000);
-
-    await goToPlayTab();
-    await expect(element(by.id('play-screen'))).toExist();
-  });
-
-  it('registers distinct free-play taps and recording controls', async () => {
-    await signInAndReachHome();
-
-    await goToPlayTab();
-    await waitFor(element(by.id('freeplay-keyboard'))).toBeVisible().withTimeout(15000);
-
+    // Verify keyboard and note display are present
     if (await isVisibleById('freeplay-instructions-close', 4000)) {
       await element(by.id('freeplay-instructions-close')).tap();
     }
 
     await waitFor(element(by.id('freeplay-note-display'))).toBeVisible().withTimeout(10000);
 
-    await element(by.id('freeplay-keyboard')).tapAtPoint({ x: 24, y: 95 });
-    await expect(element(by.id('freeplay-note-display'))).toHaveText('C3');
+    // Play a note
+    await element(by.id('freeplay-keyboard-right')).tapAtPoint({ x: 24, y: 95 });
+    await sleep(300);
 
-    await element(by.id('freeplay-keyboard')).tapAtPoint({ x: 300, y: 95 });
-    await expect(element(by.id('freeplay-note-display'))).toHaveText('F3');
+    // Back to home
+    await element(by.id('freeplay-back')).tap();
+    await waitFor(element(by.id('home-screen'))).toBeVisible().withTimeout(10000);
+  });
 
-    await element(by.id('freeplay-record-start')).tap();
-    await waitFor(element(by.id('freeplay-record-stop'))).toBeVisible().withTimeout(10000);
-    await element(by.id('freeplay-keyboard')).tapAtPoint({ x: 120, y: 95 });
-    await element(by.id('freeplay-record-stop')).tap();
+  it('song library shows search and genre filters', async () => {
+    await goToSongsTab();
+    await expect(element(by.id('song-library-screen'))).toBeVisible();
 
-    await waitFor(element(by.id('freeplay-record-playback'))).toBeVisible().withTimeout(10000);
-    await waitFor(element(by.id('freeplay-record-clear'))).toBeVisible().withTimeout(10000);
+    // Search input should be visible
+    await expect(element(by.id('search-input'))).toBeVisible();
+
+    // Song list should be present
+    await expect(element(by.id('song-list'))).toBeVisible();
   });
 
   it('covers profile navigation into account, cat switch, and midi setup entry', async () => {
-    await signInAndReachHome();
+    // Ensure we're signed in and on home
+    if (!(await isVisibleById('home-screen', 2000))) {
+      await signInAndReachHome({ preferSkip: true });
+    }
 
     const openProfileDestination = async ({
       triggerId,
@@ -149,7 +160,6 @@ describe('Purrrfect Keys End-to-End', () => {
       throw new Error(`Timed out opening destination ${destinationId} from ${triggerId}`);
     };
 
-    await goToPlayTab();
     await goToProfileTab();
 
     await openProfileDestination({

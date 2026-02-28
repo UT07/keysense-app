@@ -16,6 +16,8 @@ import { COLORS, BORDER_RADIUS, SPACING, glowColor } from '@/theme/tokens';
 interface ExerciseIntroOverlayProps {
   exercise: Exercise;
   onReady: () => void;
+  /** Shows a "Watch First" button to preview the exercise at slow speed */
+  onWatchFirst?: () => void;
   skillTarget?: string;
   testID?: string;
 }
@@ -23,6 +25,7 @@ interface ExerciseIntroOverlayProps {
 export function ExerciseIntroOverlay({
   exercise,
   onReady,
+  onWatchFirst,
   skillTarget,
   testID,
 }: ExerciseIntroOverlayProps): React.ReactElement {
@@ -98,14 +101,26 @@ export function ExerciseIntroOverlay({
           </View>
         )}
 
-        <TouchableOpacity
-          style={styles.readyButton}
-          onPress={onReady}
-          testID={testID ? `${testID}-ready` : 'intro-ready'}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.readyButtonText}>Ready</Text>
-        </TouchableOpacity>
+        <View style={styles.buttonRow}>
+          {onWatchFirst && (
+            <TouchableOpacity
+              style={styles.watchButton}
+              onPress={() => { onWatchFirst(); }}
+              testID={testID ? `${testID}-watch` : 'intro-watch'}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.watchButtonText}>Watch First</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[styles.readyButton, onWatchFirst ? styles.readyButtonWithWatch : null]}
+            onPress={onReady}
+            testID={testID ? `${testID}-ready` : 'intro-ready'}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.readyButtonText}>Ready</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -224,6 +239,26 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontStyle: 'italic',
   },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  watchButton: {
+    flex: 1,
+    backgroundColor: COLORS.cardHighlight,
+    borderRadius: BORDER_RADIUS.lg,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+  },
+  watchButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    letterSpacing: 0.3,
+  },
   readyButton: {
     backgroundColor: COLORS.primary,
     borderRadius: BORDER_RADIUS.lg,
@@ -231,6 +266,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 48,
     width: '100%',
     alignItems: 'center',
+  },
+  readyButtonWithWatch: {
+    flex: 1,
+    width: undefined,
+    paddingHorizontal: 20,
   },
   readyButtonText: {
     fontSize: 18,

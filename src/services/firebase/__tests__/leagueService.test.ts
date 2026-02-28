@@ -3,22 +3,39 @@
  *
  * Tests the pure utility functions in leagueService:
  * - getCurrentWeekMonday() date format and correctness
+ * - assignToLeague() — transaction-based league assignment
+ * - getLeagueStandings() — ranked member list
+ * - addLeagueXp() — atomic XP increment
  */
 
-// Mock firebase/firestore
-jest.mock('firebase/firestore', () => ({
-  doc: jest.fn(),
-  collection: jest.fn(),
-  getDoc: jest.fn(),
-  setDoc: jest.fn(),
-  getDocs: jest.fn(),
-  query: jest.fn(),
-  where: jest.fn(),
-  orderBy: jest.fn(),
-  limit: jest.fn(),
-  updateDoc: jest.fn(),
-  increment: jest.fn((n: number) => n),
-}));
+// Mock firebase/firestore with runTransaction support
+jest.mock('firebase/firestore', () => {
+  const transactionGet = jest.fn();
+  const transactionSet = jest.fn();
+  const transactionUpdate = jest.fn();
+
+  return {
+    doc: jest.fn((...args: string[]) => ({ id: args[args.length - 1] || 'mock-id' })),
+    collection: jest.fn(),
+    getDoc: jest.fn(),
+    getDocs: jest.fn(),
+    query: jest.fn(),
+    where: jest.fn(),
+    orderBy: jest.fn(),
+    limit: jest.fn(),
+    updateDoc: jest.fn(),
+    increment: jest.fn((n: number) => n),
+    runTransaction: jest.fn(async (_db: unknown, fn: (t: unknown) => Promise<unknown>) => {
+      const transaction = {
+        get: transactionGet,
+        set: transactionSet,
+        update: transactionUpdate,
+      };
+      return fn(transaction);
+    }),
+    __mockTransaction: { get: transactionGet, set: transactionSet, update: transactionUpdate },
+  };
+});
 
 jest.mock('../config', () => ({
   db: {},
@@ -31,7 +48,15 @@ import {
   getLeagueStandings,
   addLeagueXp,
 } from '../leagueService';
-import { doc, setDoc, getDocs, updateDoc, increment, collection } from 'firebase/firestore';
+import { getDocs, updateDoc, increment, runTransaction } from 'firebase/firestore';
+
+// Access the transaction mock helpers
+const firestoreMock = jest.requireMock('firebase/firestore');
+const mockTx = firestoreMock.__mockTransaction as {
+  get: jest.Mock;
+  set: jest.Mock;
+  update: jest.Mock;
+};
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -82,26 +107,21 @@ describe('leagueService', () => {
   });
 
   describe('assignToLeague', () => {
-    it('creates a new league when none have space', async () => {
+    it('creates a new league via transaction when none have space', async () => {
       // No open leagues found
       (getDocs as jest.Mock).mockResolvedValue({ empty: true, docs: [] });
-      // Mock collection() to return a ref with an id
-      (collection as jest.Mock).mockReturnValue('leagues-col');
-      (doc as jest.Mock).mockReturnValue({ id: 'new-league-123' });
-      (setDoc as jest.Mock).mockResolvedValue(undefined);
-      (updateDoc as jest.Mock).mockResolvedValue(undefined);
 
       const membership = await assignToLeague('user-1', 'Alice', 'luna', 'bronze');
 
       expect(membership.tier).toBe('bronze');
       expect(membership.weeklyXp).toBe(0);
-      // setDoc called twice: once for league doc, once for member doc
-      expect(setDoc).toHaveBeenCalledTimes(2);
-      // updateDoc called once: increment memberCount
-      expect(updateDoc).toHaveBeenCalledTimes(1);
+      // Transaction used
+      expect(runTransaction).toHaveBeenCalledTimes(1);
+      // transaction.set called twice: league doc + member doc
+      expect(mockTx.set).toHaveBeenCalledTimes(2);
     });
 
-    it('joins existing league with space', async () => {
+    it('joins existing league via transaction when space available', async () => {
       const mockLeagueSnap = {
         empty: false,
         docs: [
@@ -117,16 +137,57 @@ describe('leagueService', () => {
         ],
       };
       (getDocs as jest.Mock).mockResolvedValue(mockLeagueSnap);
-      (doc as jest.Mock).mockReturnValue({ id: 'existing-league' });
-      (setDoc as jest.Mock).mockResolvedValue(undefined);
-      (updateDoc as jest.Mock).mockResolvedValue(undefined);
+      mockTx.get.mockResolvedValue({
+        exists: () => true,
+        data: () => ({
+          tier: 'bronze',
+          weekStart: getCurrentWeekMonday(),
+          memberCount: 15,
+          createdAt: Date.now(),
+        }),
+      });
 
       const membership = await assignToLeague('user-2', 'Bob', 'jazzy');
 
-      expect(membership.leagueId).toBe('existing-league');
       expect(membership.rank).toBe(16); // memberCount + 1
-      // setDoc called once: member doc (no league creation)
-      expect(setDoc).toHaveBeenCalledTimes(1);
+      expect(runTransaction).toHaveBeenCalledTimes(1);
+      // transaction.set for member doc, transaction.update for memberCount increment
+      expect(mockTx.set).toHaveBeenCalledTimes(1);
+      expect(mockTx.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('creates new league when candidate is full at transaction time', async () => {
+      const mockLeagueSnap = {
+        empty: false,
+        docs: [
+          {
+            id: 'full-league',
+            data: () => ({
+              tier: 'bronze',
+              weekStart: getCurrentWeekMonday(),
+              memberCount: 28,
+              createdAt: Date.now(),
+            }),
+          },
+        ],
+      };
+      (getDocs as jest.Mock).mockResolvedValue(mockLeagueSnap);
+      // At transaction time, league is full
+      mockTx.get.mockResolvedValue({
+        exists: () => true,
+        data: () => ({
+          tier: 'bronze',
+          weekStart: getCurrentWeekMonday(),
+          memberCount: 30,
+          createdAt: Date.now(),
+        }),
+      });
+
+      const membership = await assignToLeague('user-3', 'Carol', 'mini-meowww');
+
+      expect(membership.rank).toBe(1); // First in new league
+      // Creates new league + member
+      expect(mockTx.set).toHaveBeenCalledTimes(2);
     });
   });
 

@@ -34,17 +34,22 @@ async function maybeCloseExpoDevMenuPanel() {
 }
 
 async function stabilizeExpoRuntime() {
-  // Keep startup stabilization lightweight to avoid long beforeEach stalls.
+  // Expo Dev Client has recurring timers that block Detox synchronization.
+  // Disable sync first so we can interact with the dev client UI.
+  await device.disableSynchronization();
   await maybeOpenExpoDevServer();
   await maybeCloseExpoDevMenuPanel();
   await maybeDismissExpoDevMenuNux();
 }
 
 if (process.env.E2E_SKIP_GLOBAL_INIT !== '1') {
-  beforeEach(async () => {
+  // Launch the app ONCE per test file. Expo Dev Client creates recurring
+  // native timers that prevent Detox from receiving the isReady signal on
+  // subsequent launches with newInstance:true. Using beforeAll avoids the
+  // Metro-reconnection deadlock; tests within a file share the app instance.
+  beforeAll(async () => {
     await device.launchApp({
       newInstance: true,
-      delete: true,
       permissions: {
         notifications: 'YES',
       },
@@ -55,6 +60,5 @@ if (process.env.E2E_SKIP_GLOBAL_INIT !== '1') {
       },
     });
     await stabilizeExpoRuntime();
-    await device.disableSynchronization();
   }, 120000);
 }

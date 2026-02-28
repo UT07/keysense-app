@@ -1,10 +1,11 @@
 /**
  * Hint Display Component
- * Shows contextual tips and common mistake warnings
- * Changes based on exercise state
+ * Shows contextual tips and common mistake warnings.
+ * When error patterns match exercise-specific commonMistakes, shows
+ * the targeted advice instead of generic feedback text.
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,30 +13,81 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../../theme/tokens';
-import type { ExerciseHints } from '../../core/exercises/types';
+import type { ExerciseHints, CommonMistake } from '../../core/exercises/types';
 
 export interface HintDisplayProps {
   hints: ExerciseHints;
   isPlaying: boolean;
   countInComplete: boolean;
   feedback: 'perfect' | 'good' | 'ok' | 'early' | 'late' | 'miss' | null;
+  /** Latest timing offset in ms (negative=early, positive=late) */
+  timingOffsetMs?: number;
   compact?: boolean;
   testID?: string;
 }
 
+/** Check if a feedback type matches a CommonMistake triggerCondition */
+function matchesMistake(
+  mistake: CommonMistake,
+  feedback: string,
+  timingOffsetMs: number,
+  consecutiveErrors: number,
+): boolean {
+  const cond = mistake.triggerCondition;
+  if (!cond) {
+    // Pattern-only mistakes: match after 3+ consecutive errors of the same type
+    if (consecutiveErrors >= 3) return true;
+    return false;
+  }
+
+  if (cond.type === 'timing') {
+    // Threshold is negative for early, positive for late
+    if (cond.threshold < 0 && feedback === 'early' && timingOffsetMs <= cond.threshold) return true;
+    if (cond.threshold > 0 && feedback === 'late' && timingOffsetMs >= cond.threshold) return true;
+    // Generic timing threshold — applies to any timing error direction
+    if (cond.threshold > 0 && (feedback === 'early' || feedback === 'late') && Math.abs(timingOffsetMs) >= cond.threshold) return true;
+  }
+
+  if (cond.type === 'pitch' && feedback === 'miss') return true;
+
+  if (cond.type === 'sequence' && consecutiveErrors >= (cond.threshold || 2)) return true;
+
+  return false;
+}
+
 /**
- * HintDisplay - Shows contextual hints and advice
- * Displays tips before start, feedback messages during play,
- * and success/error messages as player progresses
+ * HintDisplay - Shows contextual hints and advice.
+ * Displays the beforeStart tip before play, and during play shows
+ * exercise-specific commonMistake advice when error patterns match,
+ * falling back to generic feedback messages.
  */
 export const HintDisplay: React.FC<HintDisplayProps> = ({
   hints,
   isPlaying,
   countInComplete,
   feedback,
+  timingOffsetMs = 0,
   compact = false,
   testID,
 }) => {
+  // Track consecutive errors of the same type to trigger pattern-based hints
+  const consecutiveErrorsRef = useRef(0);
+  const lastErrorTypeRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!feedback || feedback === 'perfect' || feedback === 'good') {
+      consecutiveErrorsRef.current = 0;
+      lastErrorTypeRef.current = null;
+    } else {
+      if (feedback === lastErrorTypeRef.current) {
+        consecutiveErrorsRef.current++;
+      } else {
+        consecutiveErrorsRef.current = 1;
+        lastErrorTypeRef.current = feedback;
+      }
+    }
+  }, [feedback]);
+
   // Determine which hint to show
   const currentHint = useMemo(() => {
     if (!isPlaying) {
@@ -52,6 +104,19 @@ export const HintDisplay: React.FC<HintDisplayProps> = ({
         text: 'Get ready...',
         color: COLORS.warning,
       };
+    }
+
+    // Check if any commonMistake matches the current error pattern
+    if (feedback && feedback !== 'perfect' && feedback !== 'good' && hints.commonMistakes?.length) {
+      for (const mistake of hints.commonMistakes) {
+        if (matchesMistake(mistake, feedback, timingOffsetMs, consecutiveErrorsRef.current)) {
+          return {
+            icon: 'lightbulb-on',
+            text: mistake.advice,
+            color: COLORS.warning,
+          };
+        }
+      }
     }
 
     switch (feedback) {
@@ -98,7 +163,7 @@ export const HintDisplay: React.FC<HintDisplayProps> = ({
           color: COLORS.feedbackDefault,
         };
     }
-  }, [isPlaying, countInComplete, feedback, hints.beforeStart]);
+  }, [isPlaying, countInComplete, feedback, timingOffsetMs, hints]);
 
   if (compact) {
     return (

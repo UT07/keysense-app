@@ -10,7 +10,6 @@ import {
   doc,
   collection,
   getDoc,
-  setDoc,
   getDocs,
   query,
   where,
@@ -18,6 +17,7 @@ import {
   limit,
   updateDoc,
   increment,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from './config';
 import type { LeagueTier, LeagueMembership } from '../../stores/types';
@@ -87,7 +87,8 @@ export async function assignToLeague(
 ): Promise<LeagueMembership> {
   const weekStart = getCurrentWeekMonday();
 
-  // Look for a league with space
+  // Find a candidate league with space (query outside transaction — Firestore
+  // transactions don't support queries, but the transaction body verifies capacity)
   const leaguesCol = collection(db, 'leagues');
   const openLeagueQuery = query(
     leaguesCol,
@@ -96,54 +97,84 @@ export async function assignToLeague(
     where('memberCount', '<', MAX_LEAGUE_SIZE),
     limit(1),
   );
-
   const openSnap = await getDocs(openLeagueQuery);
-  let leagueId: string;
-  let memberCount: number;
 
-  if (openSnap.empty) {
-    // Create a new league
-    const newLeagueRef = doc(collection(db, 'leagues'));
-    leagueId = newLeagueRef.id;
-    memberCount = 0;
+  // Use a transaction for the read-then-write to prevent race conditions
+  const result = await runTransaction(db, async (transaction) => {
+    let leagueId: string;
+    let memberCount: number;
 
-    const leagueDoc: LeagueDocument = {
+    if (openSnap.empty) {
+      // Create a new league
+      const newLeagueRef = doc(collection(db, 'leagues'));
+      leagueId = newLeagueRef.id;
+      memberCount = 0;
+
+      const leagueDoc: LeagueDocument = {
+        tier,
+        weekStart,
+        memberCount: 1, // We're the first member
+        createdAt: Date.now(),
+      };
+      transaction.set(newLeagueRef, leagueDoc);
+    } else {
+      const candidateRef = doc(db, 'leagues', openSnap.docs[0].id);
+      const freshSnap = await transaction.get(candidateRef);
+
+      if (!freshSnap.exists()) {
+        // League was deleted between query and transaction — create new
+        const newLeagueRef = doc(collection(db, 'leagues'));
+        leagueId = newLeagueRef.id;
+        memberCount = 0;
+        transaction.set(newLeagueRef, {
+          tier,
+          weekStart,
+          memberCount: 1,
+          createdAt: Date.now(),
+        } as LeagueDocument);
+      } else {
+        const leagueData = freshSnap.data() as LeagueDocument;
+        if (leagueData.memberCount >= MAX_LEAGUE_SIZE) {
+          // League filled up between query and transaction — create new
+          const newLeagueRef = doc(collection(db, 'leagues'));
+          leagueId = newLeagueRef.id;
+          memberCount = 0;
+          transaction.set(newLeagueRef, {
+            tier,
+            weekStart,
+            memberCount: 1,
+            createdAt: Date.now(),
+          } as LeagueDocument);
+        } else {
+          leagueId = candidateRef.id;
+          memberCount = leagueData.memberCount;
+          transaction.update(candidateRef, { memberCount: increment(1) });
+        }
+      }
+    }
+
+    // Add user as a member
+    const memberRef = doc(db, 'leagues', leagueId, 'members', uid);
+    const memberDoc: LeagueMemberDocument = {
+      uid,
+      displayName,
+      selectedCatId,
+      weeklyXp: 0,
+      joinedAt: Date.now(),
+    };
+    transaction.set(memberRef, memberDoc);
+
+    return {
+      leagueId,
       tier,
       weekStart,
-      memberCount: 0,
-      createdAt: Date.now(),
-    };
-    await setDoc(newLeagueRef, leagueDoc);
-  } else {
-    const leagueSnap = openSnap.docs[0];
-    leagueId = leagueSnap.id;
-    const leagueData = leagueSnap.data() as LeagueDocument;
-    memberCount = leagueData.memberCount;
-  }
+      weeklyXp: 0,
+      rank: memberCount + 1,
+      totalMembers: memberCount + 1,
+    } as LeagueMembership;
+  });
 
-  // Add user as a member
-  const memberRef = doc(db, 'leagues', leagueId, 'members', uid);
-  const memberDoc: LeagueMemberDocument = {
-    uid,
-    displayName,
-    selectedCatId,
-    weeklyXp: 0,
-    joinedAt: Date.now(),
-  };
-  await setDoc(memberRef, memberDoc);
-
-  // Increment member count
-  const leagueRef = doc(db, 'leagues', leagueId);
-  await updateDoc(leagueRef, { memberCount: increment(1) });
-
-  return {
-    leagueId,
-    tier,
-    weekStart,
-    weeklyXp: 0,
-    rank: memberCount + 1, // Tentative rank (last place until XP earned)
-    totalMembers: memberCount + 1,
-  };
+  return result;
 }
 
 // ---------------------------------------------------------------------------

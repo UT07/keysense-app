@@ -17,9 +17,6 @@ export type { MascotTip, MascotMood, TipCategory } from './mascotTips';
 export { CatAvatar } from './CatAvatar';
 export type { CatAvatarSize } from './CatAvatar';
 
-export { RiveCatAvatar, RIVE_MOOD_MAP } from './RiveCatAvatar';
-export type { RiveMood } from './RiveCatAvatar';
-
 export { ExerciseBuddy } from './ExerciseBuddy';
 export type { BuddyReaction } from './ExerciseBuddy';
 

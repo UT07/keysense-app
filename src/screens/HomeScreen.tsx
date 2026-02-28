@@ -234,12 +234,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Pulsing animation for the Continue Learning / Today's Practice card
   const pulseAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
-    Animated.loop(
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.02, duration: 1500, useNativeDriver: true }),
         Animated.timing(pulseAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
       ])
-    ).start();
+    );
+    loop.start();
+    return () => loop.stop();
   }, [pulseAnim]);
 
   // Shake animation for the Daily Challenge card (subtle horizontal shake every 5s)

@@ -232,10 +232,10 @@ export function LeaderboardScreen(): React.JSX.Element {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} testID="leaderboard-screen">
       {/* Header */}
       <View style={styles.header}>
-        <PressableScale onPress={handleGoBack} style={styles.backButton}>
+        <PressableScale onPress={handleGoBack} style={styles.backButton} testID="leaderboard-back">
           <MaterialCommunityIcons
             name="arrow-left"
             size={24}

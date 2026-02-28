@@ -1,5 +1,13 @@
 import { SoundManager } from '../SoundManager';
 
+// Mock procedural sound generator
+jest.mock('../generateUiSounds', () => ({
+  generateAllSoundUris: jest.fn(() => ({
+    button_press: 'data:audio/wav;base64,AAAA',
+    note_correct: 'data:audio/wav;base64,AAAA',
+  })),
+}));
+
 // Mock expo-av
 jest.mock('expo-av', () => ({
   Audio: {

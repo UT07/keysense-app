@@ -61,6 +61,68 @@ const SKILL_COLORS = [
   { bg: 'rgba(249, 168, 37, 0.15)', text: '#FFD54F' },
 ];
 
+/** Educational concept cards — actual music theory explanations per tier */
+const TIER_CONCEPTS: Record<number, { title: string; icon: string; body: string }[]> = {
+  1: [
+    { title: 'The Musical Alphabet', icon: 'alphabetical-variant', body: 'Music uses 7 letters: A B C D E F G, then repeats. These are the white keys on the piano. Middle C is your home base — find the two black keys grouped together, and C is just to the left.' },
+    { title: 'Why Finger Numbers?', icon: 'hand-back-right', body: 'Each finger has a number: thumb = 1, pinky = 5. Using the right fingers builds muscle memory so you can play faster and more accurately as music gets harder.' },
+  ],
+  2: [
+    { title: 'What Is a Scale?', icon: 'stairs', body: 'A scale is a set of notes played in order, like climbing stairs. C major uses all white keys: C D E F G A B C. Scales are the building blocks of melodies — almost every song is built from them.' },
+    { title: 'Reading Rhythm', icon: 'metronome', body: 'Each beat is one tick of the metronome. A quarter note lasts 1 beat, a half note lasts 2, and a whole note lasts 4. Count "1-2-3-4" with the clicks to stay in time.' },
+  ],
+  3: [
+    { title: 'Bass Clef Basics', icon: 'music-clef-bass', body: 'The left hand usually plays lower notes in the bass clef. These notes provide the foundation of the music — the bass line and harmony that supports the melody above.' },
+    { title: 'Hand Independence', icon: 'hand-clap', body: 'Playing with two hands separately first, then combining them, is how every pianist learns. Your brain needs time to automate each hand before coordinating both.' },
+  ],
+  4: [
+    { title: 'Hands Together', icon: 'merge', body: 'When both hands play together, start very slowly — much slower than you think! Each hand has its own pattern. Practice each hand alone until it feels automatic, then combine at half speed.' },
+    { title: 'Posture Matters', icon: 'human', body: 'Sit at the edge of the bench, feet flat on the floor. Keep your wrists level with the keys — not drooping or raised. Curved fingers, relaxed shoulders. Good posture prevents injury and helps you play better.' },
+  ],
+  5: [
+    { title: 'Thumb Under Technique', icon: 'swap-horizontal', body: 'To play more than 5 notes in a row, your thumb crosses under your hand to reach the next key. This lets you play scales and melodies smoothly without running out of fingers.' },
+    { title: 'Why Practice Slowly?', icon: 'tortoise', body: 'Playing slowly trains your brain to make the right movements. Speed comes from accuracy, not force. If you practice slowly and correctly 10 times, you\'ll play faster than if you rush 50 times with mistakes.' },
+  ],
+  6: [
+    { title: 'Sharps and Flats', icon: 'music-accidental-sharp', body: 'Black keys are sharps (#) or flats (b). F# is the black key to the right of F. Bb is the black key to the left of B. Same key, two names — it depends on the musical context.' },
+    { title: 'The Chromatic Scale', icon: 'dots-horizontal', body: 'Playing every key in order (black and white) gives you the chromatic scale — 12 notes total. All of Western music is built from these 12 notes combined in different ways.' },
+  ],
+  7: [
+    { title: 'What Is a Key Signature?', icon: 'key-variant', body: 'A key signature tells you which notes are sharp or flat throughout a piece. G major has one sharp (F#). F major has one flat (Bb). The key signature saves you from writing # or b on every note.' },
+    { title: 'Transposing', icon: 'transfer', body: 'Once you learn a melody in C major, you can play it in G major by starting on G and using the G major scale. Same pattern of steps, different starting note — this is called transposing.' },
+  ],
+  8: [
+    { title: 'Major vs. Minor', icon: 'compare', body: 'Major keys sound bright and happy. Minor keys sound dark and emotional. The difference? In a minor scale, the 3rd note is lowered by a half step. C major: C D E... C minor: C D Eb... That one note changes everything.' },
+    { title: 'Harmonic Minor', icon: 'wave', body: 'The harmonic minor scale raises the 7th note back up, creating a distinctive, slightly exotic sound. Many classical and movie themes use harmonic minor for its dramatic quality.' },
+  ],
+  9: [
+    { title: 'What Is a Chord?', icon: 'cards', body: 'A chord is 3 or more notes played together. The most basic chord is a triad: root + 3rd + 5th. C major chord = C E G. Chords create harmony — they\'re the color and emotion behind the melody.' },
+    { title: 'The I-IV-V Progression', icon: 'repeat', body: 'In C major: I = C major, IV = F major, V = G major. This three-chord pattern powers thousands of songs from "Twist and Shout" to "Let It Be." Learn these three chords and you can accompany almost anything.' },
+    { title: 'Inversions', icon: 'swap-vertical', body: 'C E G, E G C, and G C E are all C major chord — just rearranged. These are called inversions. Using inversions keeps your hand close to the same position instead of jumping around the keyboard.' },
+  ],
+  10: [
+    { title: 'Song Structure', icon: 'format-list-bulleted', body: 'Most songs follow a pattern: Verse - Chorus - Verse - Chorus - Bridge - Chorus. Recognizing the structure helps you learn faster — you only need to memorize a few unique sections.' },
+    { title: 'Playing by Ear', icon: 'ear-hearing', body: 'Listen to a melody, then try to find the notes on the keyboard. Start with simple songs you know well. This trains your ear-to-hand connection, one of the most valuable skills a musician can develop.' },
+  ],
+  11: [
+    { title: 'Syncopation', icon: 'music-note-off', body: 'Syncopation means accenting notes between the main beats instead of on them. It creates a sense of surprise and groove. Jazz, funk, and Latin music all rely heavily on syncopation.' },
+    { title: 'Time Signatures', icon: 'clock-outline', body: '4/4 means 4 beats per measure (most common). 3/4 is waltz time (1-2-3, 1-2-3). 6/8 has a rolling, compound feel. The time signature is the rhythmic skeleton of the music.' },
+  ],
+  12: [
+    { title: 'What Are Arpeggios?', icon: 'wave', body: 'An arpeggio is a chord played one note at a time: C, E, G, C instead of all together. They create flowing, harp-like patterns. Many beautiful piano passages are built from arpeggios.' },
+  ],
+  13: [
+    { title: 'Dynamics', icon: 'volume-high', body: 'Piano (p) means soft, forte (f) means loud. Crescendo means getting louder, diminuendo means getting softer. Dynamics turn flat, robotic playing into expressive music that tells a story.' },
+    { title: 'Articulation', icon: 'gesture-tap', body: 'Legato means smooth and connected. Staccato means short and detached. How you press and release the keys changes the character of the music just as much as which keys you press.' },
+  ],
+  14: [
+    { title: 'Sight Reading Tips', icon: 'eye', body: 'Look ahead, not at your hands. Read in patterns (chords, scales) not individual notes. Start at half the written tempo. Sight reading is a skill that improves dramatically with daily practice — even 5 minutes a day.' },
+  ],
+  15: [
+    { title: 'Performance Mindset', icon: 'trophy', body: 'Performing is different from practicing. Choose pieces you can play at 90% effort, not 100%. Small mistakes are normal and audiences rarely notice them. The most important thing is musical expression and confidence.' },
+  ],
+};
+
 const MASCOT_MESSAGES: Record<number, string[]> = {
   1: [
     "Let's start from the very beginning! I'll guide you through it.",
@@ -141,6 +203,20 @@ function getTierDifficulty(skills: SkillNode[]): number {
 /** Estimated minutes per tier */
 function getTierEstimatedMinutes(skills: SkillNode[]): number {
   return Math.max(5, skills.length * 3);
+}
+
+function ConceptCard({ title, icon, body }: { title: string; icon: string; body: string }) {
+  return (
+    <View style={styles.conceptCard}>
+      <View style={styles.conceptHeader}>
+        <View style={styles.conceptIconBadge}>
+          <MaterialCommunityIcons name={icon as any} size={18} color={COLORS.primary} />
+        </View>
+        <Text style={styles.conceptTitle}>{title}</Text>
+      </View>
+      <Text style={styles.conceptBody}>{body}</Text>
+    </View>
+  );
 }
 
 function DifficultyBars({ difficulty }: { difficulty: number }) {
@@ -314,6 +390,16 @@ export function TierIntroScreen() {
       >
         <Text style={styles.description}>{meta.description}</Text>
 
+        {/* Theory concept cards */}
+        {TIER_CONCEPTS[tier]?.length > 0 && (
+          <View style={styles.conceptsSection}>
+            <Text style={styles.sectionTitle}>What You'll Learn</Text>
+            {TIER_CONCEPTS[tier].map((concept, i) => (
+              <ConceptCard key={i} title={concept.title} icon={concept.icon} body={concept.body} />
+            ))}
+          </View>
+        )}
+
         {/* Info row */}
         <View style={styles.infoRow}>
           <DifficultyBars difficulty={difficulty} />
@@ -453,6 +539,33 @@ const styles = StyleSheet.create({
   description: {
     ...TYPOGRAPHY.body.lg, fontSize: 15,
     color: COLORS.textSecondary, marginBottom: SPACING.md,
+  },
+  // Concept cards
+  conceptsSection: { marginBottom: SPACING.lg },
+  conceptCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary,
+  },
+  conceptHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.sm,
+    marginBottom: SPACING.xs,
+  },
+  conceptIconBadge: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(220, 20, 60, 0.1)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  conceptTitle: {
+    ...TYPOGRAPHY.body.lg, fontWeight: '700',
+    color: COLORS.textPrimary, flex: 1,
+  },
+  conceptBody: {
+    ...TYPOGRAPHY.body.md, fontSize: 14,
+    color: COLORS.textSecondary, lineHeight: 21,
   },
   // Info row
   infoRow: {
