@@ -14,7 +14,6 @@ import {
   query,
   where,
   orderBy,
-  limit,
   updateDoc,
   increment,
   runTransaction,
@@ -87,17 +86,23 @@ export async function assignToLeague(
 ): Promise<LeagueMembership> {
   const weekStart = getCurrentWeekMonday();
 
-  // Find a candidate league with space (query outside transaction — Firestore
-  // transactions don't support queries, but the transaction body verifies capacity)
+  // Find a candidate league with space.
+  // Query by weekStart only (auto-indexed single field) to avoid needing a
+  // deployed composite index. Filter tier + capacity client-side.
   const leaguesCol = collection(db, 'leagues');
-  const openLeagueQuery = query(
+  const weekQuery = query(
     leaguesCol,
-    where('tier', '==', tier),
     where('weekStart', '==', weekStart),
-    where('memberCount', '<', MAX_LEAGUE_SIZE),
-    limit(1),
   );
-  const openSnap = await getDocs(openLeagueQuery);
+  const weekSnap = await getDocs(weekQuery);
+
+  // Client-side filter: match tier + has space
+  const openDocs = weekSnap.docs.filter((d) => {
+    const data = d.data() as LeagueDocument;
+    return data.tier === tier && data.memberCount < MAX_LEAGUE_SIZE;
+  });
+  // Wrap in a format compatible with the rest of the code
+  const openSnap = { empty: openDocs.length === 0, docs: openDocs };
 
   // Use a transaction for the read-then-write to prevent race conditions
   const result = await runTransaction(db, async (transaction) => {

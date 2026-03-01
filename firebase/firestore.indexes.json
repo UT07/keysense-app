@@ -29,30 +29,8 @@
       "collectionGroup": "leagues",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "tier", "order": "ASCENDING" },
         { "fieldPath": "weekStart", "order": "ASCENDING" },
-        { "fieldPath": "memberCount", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "members",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "weeklyXp", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "activity",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "timestamp", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "syncLog",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "timestamp", "order": "ASCENDING" }
+        { "fieldPath": "tier", "order": "ASCENDING" }
       ]
     }
   ],

@@ -106,7 +106,8 @@ function LeagueCard(): React.JSX.Element {
         );
       }
       setMembership(m);
-    } catch {
+    } catch (err) {
+      console.error('[SocialScreen] League join failed:', err);
       setJoinError('Failed to join league. Check your connection and try again.');
     } finally {
       setIsJoining(false);
