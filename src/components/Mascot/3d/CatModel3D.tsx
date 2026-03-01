@@ -122,6 +122,8 @@ function applyMaterials(scene: THREE.Group, materials: Cat3DMaterials, hasBlush:
       if (mat instanceof THREE.MeshStandardMaterial) {
         const cloned = mat.clone();
         cloned.color = hexToColor(colorHex);
+        cloned.roughness = 0.35;   // Shinier anime look (was ~0.7 default)
+        cloned.metalness = 0.05;   // Slight specular sheen
         if (Array.isArray(node.material)) {
           node.material[i] = cloned;
         } else {
@@ -153,8 +155,8 @@ function applyMaterials(scene: THREE.Group, materials: Cat3DMaterials, hasBlush:
 
       const newMat = new THREE.MeshStandardMaterial({
         color,
-        roughness: 0.7,
-        metalness: 0.0,
+        roughness: 0.35,   // Shinier anime look
+        metalness: 0.05,   // Slight specular sheen
       });
       node.material = newMat;
     });
@@ -228,8 +230,8 @@ function CatModel3DInner({
   // Apply materials to the original scene (clone caused bounding box issues on device).
   // Use hardcoded scale — all 4 GLB models are ~5.4 Blender units tall.
   // Camera at z=5, FOV 50° sees ~4.66 units. Scale 0.35 → model ~1.89 units → fits with margin.
-  const HARDCODED_SCALE = 0.35;
-  const HARDCODED_Y_OFFSET = -0.95; // -5.4/2 * 0.35 ≈ -0.945 (centers model vertically)
+  const HARDCODED_SCALE = 0.385;  // +10% from 0.35 for more presence
+  const HARDCODED_Y_OFFSET = -1.04; // -5.4/2 * 0.385 ≈ -1.04 (centers model vertically)
 
   useMemo(() => {
     applyMaterials(scene, config.materials, config.hasBlush);

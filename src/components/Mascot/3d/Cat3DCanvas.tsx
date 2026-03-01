@@ -234,9 +234,12 @@ export const Cat3DCanvas = React.memo(function Cat3DCanvas({
             }}
             style={styles.canvas}
           >
-            <ambientLight intensity={0.8} />
-            <directionalLight position={[2, 3, 4]} intensity={0.6} />
-            <directionalLight position={[-1, 1, -2]} intensity={0.3} color="#B0C4FF" />
+            <ambientLight intensity={1.2} />
+            <directionalLight position={[2, 3, 4]} intensity={0.8} />
+            {/* Rim light — backlight for silhouette definition */}
+            <directionalLight position={[-2, 1, -3]} intensity={0.5} color="#B0C4FF" />
+            {/* Fill light from below for anime-style uplighting */}
+            <directionalLight position={[0, -2, 2]} intensity={0.2} color="#FFE0FF" />
 
             <ModelComponent
               catId={catId}

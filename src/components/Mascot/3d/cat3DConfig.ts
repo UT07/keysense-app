@@ -89,7 +89,7 @@ const CAT_3D_CONFIGS: Record<string, Cat3DConfig> = {
     bodyType: 'slim',
     hasBlush: true,
     materials: {
-      body: '#1A1A1A',
+      body: '#2D2D2D',  // Brightened from #1A1A1A (+30%)
       belly: '#F5F5F5',
       earInner: '#DC143C',
       eye: '#2ECC71',
@@ -114,8 +114,8 @@ const CAT_3D_CONFIGS: Record<string, Cat3DConfig> = {
     bodyType: 'standard',
     hasBlush: false,
     materials: {
-      body: '#1C1C3A',
-      belly: '#2A2A52',
+      body: '#2A2A50',  // Brightened from #1C1C3A (+25%)
+      belly: '#3A3A62',  // Brightened from #2A2A52
       earInner: '#5B6EAE',
       eye: '#7EB8FF',
       nose: '#3D4F8A',
@@ -204,8 +204,8 @@ const CAT_3D_CONFIGS: Record<string, Cat3DConfig> = {
     bodyType: 'slim',
     hasBlush: false,
     materials: {
-      body: '#212121',
-      belly: '#424242',
+      body: '#333333',  // Brightened from #212121 (+30%)
+      belly: '#555555',  // Brightened from #424242
       earInner: '#AB47BC',
       eye: '#CE93D8',
       nose: '#7B1FA2',
