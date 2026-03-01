@@ -1,0 +1,16 @@
+# Helper: Logout Flow
+# Reusable flow for logging out of the app
+
+---
+
+# Navigate to profile or settings
+# - tapOn: "Profile|Settings|Account"
+
+# Tap logout button
+# - tapOn: "Logout|Sign Out"
+
+# Confirm logout if needed
+# - tapOn: "Confirm|Yes"
+
+# Verify logout successful
+# - assertVisible: "Login|Welcome|Sign In"

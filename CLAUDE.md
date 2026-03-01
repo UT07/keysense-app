@@ -6,18 +6,18 @@ Built with React Native (Expo) + Firebase + Gemini AI.
 
 **Stack:** Expo SDK 52+, TypeScript 5.x, react-native-audio-api, Zustand, Firebase
 
-## Current Sprint (Feb 27, 2026)
+## Current Sprint (Feb 28, 2026)
 
-**Codebase Health:** 121 test suites, 2,621 tests passing, 0 TypeScript errors
+**Codebase Health:** 122 test suites, 2,630 tests passing, 0 TypeScript errors
 
 **Phases 1-10.5 COMPLETE** (Core Loop, Gamification, Auth, Adaptive Learning, Evolution, UI Revamp, All-AI Exercises, Audio Input + Polyphonic Detection, Music Library + 124 songs, Arcade Concert Hall, Social & Leaderboards)
 
-**Up Next:** Phase 11 — QA + Launch
+**In Progress:** Phase 11 — QA + Launch
 
 **Active Roadmap:**
 - **Phase 10: Arcade Concert Hall** — COMPLETE (SoundManager, combo escalation, loot reveal, GameCard system, screen redesigns, rarity borders)
 - **Phase 10.5: Social & Leaderboards** — COMPLETE (friends, leagues, challenges, activity feed, notifications)
-- **Phase 11: QA + Launch** — UP NEXT
+- **Phase 11: QA + Launch** — IN PROGRESS (account deletion, Cloud Functions for Gemini, CI/CD, environment audit, MIDI hardware, 3D models)
 
 See `docs/plans/UNIFIED-PLAN.md` for the **single source of truth** on all phases.
 See `docs/PRD.md` for product requirements.
@@ -220,6 +220,14 @@ src/
 | `src/screens/AddFriendScreen.tsx` | Friend code display/copy + code lookup to add friends |
 | `src/screens/FriendsScreen.tsx` | Friends list + activity feed (two-tab layout) |
 | `src/components/ShareCard.tsx` | Shareable score/streak/evolution image cards (view-shot + expo-sharing) |
+| `src/services/firebase/__tests__/deleteUserData.test.ts` | Account deletion tests (10 tests: Cloud Function + client-side fallback, subcollections, friend cleanup) |
+| `src/services/firebase/firestore.ts` | Firestore CRUD + `deleteUserData()` (Cloud Function primary, client-side fallback) |
+| `firebase/functions/src/generateExercise.ts` | Cloud Function: Gemini AI exercise generation (httpsCallable) |
+| `firebase/functions/src/generateSong.ts` | Cloud Function: Gemini AI song generation (httpsCallable) |
+| `firebase/functions/src/generateCoachFeedback.ts` | Cloud Function: Gemini AI coaching feedback (httpsCallable) |
+| `firebase/functions/src/deleteUserData.ts` | Cloud Function: GDPR-compliant account data deletion (Admin SDK) |
+| `.github/workflows/ci.yml` | GitHub Actions CI: typecheck + lint + test on push/PR |
+| `.github/workflows/build.yml` | GitHub Actions: EAS Build on version tags |
 
 ## Code Style
 
@@ -274,10 +282,10 @@ onAudioBuffer((buffer: Float32Array) => {
 | Core logic | Jest | `src/core/**/__tests__/` |
 | Components | React Testing Library | `src/components/**/__tests__/` |
 | Integration | Jest + mocks | `src/__tests__/integration/` |
-| E2E | Detox | `e2e/` |
+| E2E | Maestro (planned) | `.maestro/` |
 | Audio latency | Custom harness | `scripts/measure-latency.ts` |
 
-**2,621 tests, 121 suites**. Run tests before committing:
+**2,630 tests, 122 suites**. Run tests before committing:
 ```bash
 npm run typecheck && npm run test
 ```

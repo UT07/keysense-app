@@ -1,9 +1,9 @@
 {
   "id": "lesson-06-ex-02",
-  "version": 1,
+  "version": 2,
   "metadata": {
     "title": "Happy Birthday",
-    "description": "The world's most sung song! Play with both hands",
+    "description": "The world's most sung song! Play with both hands in waltz time",
     "difficulty": 3,
     "estimatedMinutes": 5,
     "skills": [
@@ -18,128 +18,128 @@
     ]
   },
   "settings": {
-    "tempo": 58,
+    "tempo": 100,
     "timeSignature": [
-      4,
+      3,
       4
     ],
     "keySignature": "C",
-    "countIn": 4,
+    "countIn": 3,
     "metronomeEnabled": true,
     "loopEnabled": true
   },
   "notes": [
     {
-      "note": 36,
-      "startBeat": 0,
-      "durationBeats": 1,
-      "hand": "left",
-      "finger": 5
-    },
-    {
-      "note": 60,
-      "startBeat": 0,
-      "durationBeats": 0.5,
-      "hand": "right",
-      "finger": 1
-    },
-    {
-      "note": 60,
-      "startBeat": 0.5,
-      "durationBeats": 0.5,
-      "hand": "right",
-      "finger": 1
-    },
-    {
       "note": 48,
-      "startBeat": 1,
-      "durationBeats": 1,
+      "startBeat": 0,
+      "durationBeats": 3,
       "hand": "left",
       "finger": 5
+    },
+    {
+      "note": 60,
+      "startBeat": 1,
+      "durationBeats": 0.5,
+      "hand": "right",
+      "finger": 1
+    },
+    {
+      "note": 60,
+      "startBeat": 1.5,
+      "durationBeats": 0.5,
+      "hand": "right",
+      "finger": 1
     },
     {
       "note": 62,
-      "startBeat": 1,
+      "startBeat": 2,
       "durationBeats": 1,
       "hand": "right",
       "finger": 2
     },
     {
-      "note": 36,
-      "startBeat": 2,
-      "durationBeats": 1,
+      "note": 48,
+      "startBeat": 3,
+      "durationBeats": 3,
       "hand": "left",
       "finger": 5
     },
     {
       "note": 60,
-      "startBeat": 2,
+      "startBeat": 3,
       "durationBeats": 1,
       "hand": "right",
       "finger": 1
     },
     {
-      "note": 48,
-      "startBeat": 3,
-      "durationBeats": 1,
-      "hand": "left",
-      "finger": 5
-    },
-    {
       "note": 65,
-      "startBeat": 3,
+      "startBeat": 4,
       "durationBeats": 1,
       "hand": "right",
       "finger": 4
     },
     {
-      "note": 36,
-      "startBeat": 4,
-      "durationBeats": 1,
-      "hand": "left",
-      "finger": 5
-    },
-    {
       "note": 64,
-      "startBeat": 4,
+      "startBeat": 5,
       "durationBeats": 1,
       "hand": "right",
       "finger": 3
     },
     {
       "note": 48,
-      "startBeat": 5,
-      "durationBeats": 1,
+      "startBeat": 6,
+      "durationBeats": 3,
       "hand": "left",
       "finger": 5
     },
     {
-      "note": 62,
-      "startBeat": 5,
-      "durationBeats": 0.5,
-      "hand": "right",
-      "finger": 2
-    },
-    {
       "note": 60,
-      "startBeat": 5.5,
+      "startBeat": 7,
       "durationBeats": 0.5,
       "hand": "right",
       "finger": 1
     },
     {
-      "note": 36,
-      "startBeat": 6,
+      "note": 60,
+      "startBeat": 7.5,
+      "durationBeats": 0.5,
+      "hand": "right",
+      "finger": 1
+    },
+    {
+      "note": 62,
+      "startBeat": 8,
       "durationBeats": 1,
+      "hand": "right",
+      "finger": 2
+    },
+    {
+      "note": 48,
+      "startBeat": 9,
+      "durationBeats": 3,
       "hand": "left",
       "finger": 5
     },
     {
+      "note": 60,
+      "startBeat": 9,
+      "durationBeats": 1,
+      "hand": "right",
+      "finger": 1
+    },
+    {
       "note": 67,
-      "startBeat": 6,
-      "durationBeats": 2,
+      "startBeat": 10,
+      "durationBeats": 1,
       "hand": "right",
       "finger": 5
+    },
+    {
+      "note": 65,
+      "startBeat": 11,
+      "durationBeats": 1,
+      "hand": "right",
+      "finger": 4
     }
   ],
   "scoring": {
@@ -154,11 +154,11 @@
     ]
   },
   "hints": {
-    "beforeStart": "Happy Birthday has a distinctive rhythm: C-C-D-C-F-E. The pattern repeats with slight variations. With left-hand bass, you'll coordinate the steady bass with the somewhat syncopated melody. This is a real test of hand independence!",
+    "beforeStart": "Happy Birthday is in 3/4 waltz time — count 1-2-3, 1-2-3. The melody pickup starts with two quick C notes (eighth notes) before D. The pattern: C-C-D-C-F-E (phrase 1), then C-C-D-C-G-F (phrase 2). Left hand holds a steady C bass.",
     "commonMistakes": [
       {
-        "pattern": "rushing-rhythm",
-        "advice": "The rhythm in Happy Birthday is less regular than other songs. There are two C's close together, then a quarter note pause. Stay with the metronome precisely to keep the rhythm right.",
+        "pattern": "time-signature-confusion",
+        "advice": "This is in 3/4 (waltz time), not 4/4. Each measure has 3 beats. Count 1-2-3, 1-2-3. The characteristic lilt comes from this waltz rhythm.",
         "triggerCondition": {
           "type": "timing",
           "threshold": 150
@@ -166,7 +166,7 @@
       },
       {
         "pattern": "hand-coordination",
-        "advice": "The left hand provides steady accompaniment while the right hand plays the melody with its own rhythm. Practice hands separately, then slowly combine. The bass should feel like a drum keeping time."
+        "advice": "The left hand holds a steady bass while the right hand plays the melody. The pickup notes (two quick C's) come before the downbeat. Practice hands separately first."
       }
     ],
     "successMessage": "Fantastic! You can now play the most recognized song in the world. Imagine the birthday celebrations you can create!"

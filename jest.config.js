@@ -19,6 +19,7 @@ module.exports = {
     '^@/services/(.*)$': '<rootDir>/src/services/$1',
     '^@/utils/(.*)$': '<rootDir>/src/utils/$1',
     '^@/content/(.*)$': '<rootDir>/content/$1',
+    '\\.glb$': '<rootDir>/__mocks__/fileMock.js',
   },
   testMatch: [
     '**/__tests__/**/*.[jt]s?(x)',

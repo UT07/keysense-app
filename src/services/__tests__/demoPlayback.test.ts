@@ -1,8 +1,8 @@
 /**
  * Tests for DemoPlaybackService
  *
- * Tests the demo playback system that auto-plays exercises at reduced tempo
- * with passing-threshold quality (85% notes, slight timing jitter).
+ * Tests the demo playback system that auto-plays exercises at full tempo
+ * with perfect accuracy (all notes, no jitter).
  */
 
 import { DemoPlaybackService, generateDemoSchedule } from '../demoPlayback';
@@ -38,49 +38,16 @@ describe('generateDemoSchedule', () => {
     });
   });
 
-  it('generates a schedule with ~85% play rate over many runs', () => {
-    // Run enough times to smooth out randomness
-    const runs = 20;
-    const results = Array.from({ length: runs }, () => generateDemoSchedule(notes));
-    const avgPlayedRatio =
-      results.reduce(
-        (sum, schedule) => sum + schedule.filter((s) => s.play).length / notes.length,
-        0,
-      ) / runs;
-
-    // Should be roughly 85% +/- 15%
-    expect(avgPlayedRatio).toBeGreaterThan(0.6);
-    expect(avgPlayedRatio).toBeLessThan(1.0);
+  it('plays all notes (100% play rate)', () => {
+    const schedule = generateDemoSchedule(notes);
+    const playedCount = schedule.filter((s) => s.play).length;
+    expect(playedCount).toBe(notes.length);
   });
 
-  it('adds timing jitter to some played notes', () => {
-    // Run enough times — at least one run should have jitter
-    const anyJitter = Array.from({ length: 10 }, () =>
-      generateDemoSchedule(notes).some((s) => s.play && s.jitterMs !== 0),
-    ).some(Boolean);
-    expect(anyJitter).toBe(true);
-  });
-
-  it('jitter values are within +-40ms range', () => {
-    // Generate many schedules and check all jitter values
-    for (let i = 0; i < 50; i++) {
-      const schedule = generateDemoSchedule(notes);
-      for (const entry of schedule) {
-        expect(entry.jitterMs).toBeGreaterThanOrEqual(-40);
-        expect(entry.jitterMs).toBeLessThanOrEqual(40);
-      }
-    }
-  });
-
-  it('skipped notes have zero jitter', () => {
-    // Generate many schedules
-    for (let i = 0; i < 20; i++) {
-      const schedule = generateDemoSchedule(notes);
-      for (const entry of schedule) {
-        if (!entry.play) {
-          expect(entry.jitterMs).toBe(0);
-        }
-      }
+  it('has zero timing jitter on all notes', () => {
+    const schedule = generateDemoSchedule(notes);
+    for (const entry of schedule) {
+      expect(entry.jitterMs).toBe(0);
     }
   });
 
@@ -93,8 +60,8 @@ describe('generateDemoSchedule', () => {
     const schedule = generateDemoSchedule([notes[0]]);
     expect(schedule).toHaveLength(1);
     expect(schedule[0].note).toBe(notes[0]);
-    expect(typeof schedule[0].play).toBe('boolean');
-    expect(typeof schedule[0].jitterMs).toBe('number');
+    expect(schedule[0].play).toBe(true);
+    expect(schedule[0].jitterMs).toBe(0);
   });
 });
 
@@ -135,7 +102,7 @@ describe('DemoPlaybackService', () => {
 
   it('starts and reports isPlaying = true', () => {
     const service = new DemoPlaybackService();
-    service.start(makeExercise() as never, mockAudioEngine, 0.6);
+    service.start(makeExercise() as never, mockAudioEngine);
     expect(service.isPlaying).toBe(true);
   });
 
@@ -146,7 +113,7 @@ describe('DemoPlaybackService', () => {
 
   it('stops cleanly and reports isPlaying = false', () => {
     const service = new DemoPlaybackService();
-    service.start(makeExercise() as never, mockAudioEngine, 0.6);
+    service.start(makeExercise() as never, mockAudioEngine);
     service.stop();
     expect(service.isPlaying).toBe(false);
   });
@@ -159,9 +126,9 @@ describe('DemoPlaybackService', () => {
 
   it('can be restarted after stop', () => {
     const service = new DemoPlaybackService();
-    service.start(makeExercise() as never, mockAudioEngine, 0.6);
+    service.start(makeExercise() as never, mockAudioEngine);
     service.stop();
-    service.start(makeExercise() as never, mockAudioEngine, 0.6);
+    service.start(makeExercise() as never, mockAudioEngine);
     expect(service.isPlaying).toBe(true);
   });
 
@@ -173,11 +140,10 @@ describe('DemoPlaybackService', () => {
     });
     const service = new DemoPlaybackService();
     const onBeatUpdate = jest.fn();
-    service.start(exercise as never, mockAudioEngine, 0.6, onBeatUpdate);
+    service.start(exercise as never, mockAudioEngine, 1.0, onBeatUpdate);
 
-    // At 120 BPM * 0.6 speed = 72 BPM effective
-    // 60000 / 72 = 833.33ms per beat
-    jest.advanceTimersByTime(833);
+    // At 120 BPM, 1 beat = 500ms
+    jest.advanceTimersByTime(500);
 
     expect(onBeatUpdate).toHaveBeenCalled();
     const lastBeat = onBeatUpdate.mock.calls[onBeatUpdate.mock.calls.length - 1][0];
@@ -228,20 +194,20 @@ describe('DemoPlaybackService', () => {
     expect(lastFull).toBeGreaterThan(lastHalf * 1.5);
   });
 
-  it('defaults speedMultiplier to 0.6', () => {
+  it('defaults speedMultiplier to 1.0 (full speed)', () => {
     const exercise = makeExercise({
       notes: [{ note: 60, startBeat: 0, durationBeats: 8 }] as NoteEvent[],
     });
     const beats: number[] = [];
     const service = new DemoPlaybackService();
-    // Call start without speedMultiplier — should default to 0.6
+    // Call start without speedMultiplier — should default to 1.0
     service.start(exercise as never, mockAudioEngine, undefined, (b) => beats.push(b));
 
-    // At 120 BPM * 0.6 = 72 effective BPM → 833ms per beat
-    jest.advanceTimersByTime(833);
+    // At 120 BPM * 1.0 = 120 effective BPM → 500ms per beat
+    jest.advanceTimersByTime(500);
 
     const lastBeat = beats[beats.length - 1];
-    // Should be approximately 1 beat at 72 BPM after 833ms
+    // Should be approximately 1 beat at 120 BPM after 500ms
     expect(lastBeat).toBeGreaterThan(0.8);
     expect(lastBeat).toBeLessThan(1.3);
 
@@ -256,12 +222,11 @@ describe('DemoPlaybackService', () => {
     });
     const service = new DemoPlaybackService();
     const onActiveNotes = jest.fn();
-    service.start(exercise as never, mockAudioEngine, 0.6, jest.fn(), onActiveNotes);
+    service.start(exercise as never, mockAudioEngine, 1.0, jest.fn(), onActiveNotes);
 
     // Advance into the note
     jest.advanceTimersByTime(100);
 
-    // onActiveNotes should have been called (even if the set is empty due to 85% random chance)
     expect(onActiveNotes).toHaveBeenCalled();
     // Every call should receive a Set
     for (const call of onActiveNotes.mock.calls) {
@@ -271,8 +236,7 @@ describe('DemoPlaybackService', () => {
 
   // ---------- Audio engine interaction ----------
 
-  it('plays notes through the audio engine', () => {
-    // Use a large note set to increase chance of at least one being in the 85%
+  it('plays all notes through the audio engine', () => {
     const notes: NoteEvent[] = Array.from({ length: 20 }, (_, i) => ({
       note: 60 + i,
       startBeat: i * 0.25,
@@ -285,9 +249,8 @@ describe('DemoPlaybackService', () => {
     // Advance well into the exercise
     jest.advanceTimersByTime(3000);
 
-    // At 120 BPM, 3 seconds = 6 beats, all 20 notes fit in 5 beats
-    // With 85% play rate, expect ~17 note-on calls
-    expect(mockAudioEngine.playNote.mock.calls.length).toBeGreaterThan(0);
+    // All 20 notes should be played (100% play rate)
+    expect(mockAudioEngine.playNote.mock.calls.length).toBe(20);
 
     service.stop();
   });
@@ -358,7 +321,7 @@ describe('DemoPlaybackService', () => {
     });
     const onBeatUpdate = jest.fn();
     const service = new DemoPlaybackService();
-    service.start(exercise as never, mockAudioEngine, 0.6, onBeatUpdate);
+    service.start(exercise as never, mockAudioEngine, 1.0, onBeatUpdate);
 
     jest.advanceTimersByTime(100);
     const callCountBeforeStop = onBeatUpdate.mock.calls.length;
@@ -380,11 +343,11 @@ describe('DemoPlaybackService', () => {
     const onBeatUpdate2 = jest.fn();
     const service = new DemoPlaybackService();
 
-    service.start(exercise as never, mockAudioEngine, 0.6, onBeatUpdate1);
+    service.start(exercise as never, mockAudioEngine, 1.0, onBeatUpdate1);
     jest.advanceTimersByTime(100);
 
     // Start again with a different callback
-    service.start(exercise as never, mockAudioEngine, 0.6, onBeatUpdate2);
+    service.start(exercise as never, mockAudioEngine, 1.0, onBeatUpdate2);
     const callCount1AtRestart = onBeatUpdate1.mock.calls.length;
 
     jest.advanceTimersByTime(200);

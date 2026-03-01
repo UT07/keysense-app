@@ -49,6 +49,11 @@ import {
 import { computeZoomedRange } from '../components/Keyboard/computeZoomedRange';
 import { hitTestPianoKey, getWhiteKeysInRange } from '../components/Keyboard/keyboardHitTest';
 
+jest.mock('../input/AudioCapture', () => ({
+  configureAudioSessionForRecording: jest.fn(),
+  requestMicrophonePermission: jest.fn().mockResolvedValue(true),
+}));
+
 // Mocks needed because SkillAssessmentScreen imports InputManager → MicrophoneInput → AudioCapture → react-native-audio-api
 jest.mock('../audio/createAudioEngine', () => ({
   createAudioEngine: jest.fn(() => ({

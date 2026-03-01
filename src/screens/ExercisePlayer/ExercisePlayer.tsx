@@ -5,7 +5,7 @@
  *
  * Architecture:
  * - Exercise state from store (Zustand)
- * - Real-time scoring from ScoringEngine
+ * - Real-time scoring from ExerciseValidator
  * - 60fps animations with react-native-reanimated
  * - Haptic/audio feedback on note events
  */
@@ -63,6 +63,7 @@ import { getAchievementById } from '../../core/achievements/achievements';
 import type { PlaybackSpeed } from '../../stores/types';
 import { useDevKeyboardMidi } from '../../input/DevKeyboardMidi';
 import { DemoPlaybackService } from '../../services/demoPlayback';
+import { createAudioEngine } from '../../audio/createAudioEngine';
 import { ExerciseIntroOverlay } from './ExerciseIntroOverlay';
 import { ExerciseLoadingScreen } from './ExerciseLoadingScreen';
 import { ComboMeter } from './ComboMeter';
@@ -1339,7 +1340,9 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   }, [resetPlayback]);
 
   /**
-   * Start demo playback — pauses exercise, plays the exercise at 60% speed
+   * Start demo playback — pauses exercise, plays at full speed
+   * Uses the audio engine singleton directly (not the playback hook bridge)
+   * to avoid handle collisions when the same note repeats.
    */
   const startDemo = useCallback(() => {
     // Pause current exercise if playing
@@ -1351,18 +1354,16 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     setIsDemoPlaying(true);
     useExerciseStore.getState().setDemoWatched(true);
 
+    // Use the audio engine singleton directly — the demo service has its own
+    // per-index handle tracking that correctly handles repeated notes.
+    // Going through handleManualNoteOn caused handle collisions because
+    // activeNotesRef uses MIDI note number as key (one handle per pitch).
+    const audioEngine = createAudioEngine();
+
     demoServiceRef.current.start(
       exercise,
-      {
-        playNote: (note: number, velocity: number) => {
-          handleManualNoteOn(note, velocity);
-          return note as any; // NoteHandle bridge
-        },
-        releaseNote: (handle: any) => {
-          handleManualNoteOff(handle as number);
-        },
-      },
-      0.6, // 60% speed
+      audioEngine,
+      1.0, // Full speed — demo shows exactly how the piece should sound
       (beat) => {
         // Drive the VerticalPianoRoll during demo via local state
         setDemoBeat(beat);
@@ -1375,7 +1376,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         setDemoActiveNotes(new Set());
       },
     );
-  }, [exercise, isPlaying, pausePlayback, handleManualNoteOn, handleManualNoteOff]);
+  }, [exercise, isPlaying, pausePlayback]);
 
   /**
    * Stop demo playback and reset to ready state
@@ -1882,7 +1883,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       {/* Demo mode banner */}
       {isDemoPlaying && (
         <View style={styles.demoBanner} testID="demo-banner">
-          <Text style={styles.demoBannerText}>Watching Demo — 60% speed</Text>
+          <Text style={styles.demoBannerText}>Watching Demo</Text>
           <TouchableOpacity onPress={stopDemo} style={styles.tryNowButton}>
             <Text style={styles.tryNowButtonText}>Try Now</Text>
           </TouchableOpacity>

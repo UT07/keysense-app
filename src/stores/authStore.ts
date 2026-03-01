@@ -49,6 +49,8 @@ export interface AuthState {
   user: User | null;
   isAnonymous: boolean;
   isLoading: boolean;
+  /** True only during first initAuth() call — used by AppNavigator to avoid rendering before auth state is known */
+  isInitializing: boolean;
   isAuthenticated: boolean;
   error: string | null;
 
@@ -256,11 +258,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAnonymous: false,
   isLoading: false,
+  isInitializing: true,
   isAuthenticated: false,
   error: null,
 
   initAuth: async () => {
-    set({ isLoading: true, error: null });
+    set({ isLoading: true, isInitializing: true, error: null });
 
     // Unsubscribe previous listener to prevent duplicates
     if (authUnsubscribe) {
@@ -275,6 +278,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isAuthenticated: user !== null,
           isAnonymous: user?.isAnonymous ?? false,
           isLoading: false,
+          isInitializing: false,
           error: null,
         });
         resolve();

@@ -50,6 +50,13 @@ jest.mock('../MidiInput', () => ({
   }),
 }));
 
+// Mock AudioCapture (configureAudioSessionForRecording)
+jest.mock('../AudioCapture', () => ({
+  configureAudioSessionForRecording: jest.fn(),
+  requestMicrophonePermission: jest.fn(async () => true),
+  checkMicrophonePermission: jest.fn(async () => true),
+}));
+
 // Mock MicrophoneInput
 let mockMicPermissionGranted = false;
 const mockMicNoteCallbacks: Array<(event: MidiNoteEvent) => void> = [];

@@ -9,7 +9,7 @@
  * then calls onReady once both the timer has elapsed AND the exercise is loaded.
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
@@ -17,6 +17,7 @@ import { SalsaCoach } from '../../components/Mascot/SalsaCoach';
 import { FunFactCard } from '../../components/FunFact/FunFactCard';
 import { getRandomFact } from '../../content/funFactSelector';
 import { getRandomLoadingTip } from '../../content/loadingTips';
+import { ttsService } from '../../services/tts/TTSService';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../../theme/tokens';
 
 const MIN_DISPLAY_MS = 2000;
@@ -42,6 +43,18 @@ export function ExerciseLoadingScreen({
   const funFact = useMemo(() => (showFunFact ? getRandomFact() : null), [showFunFact]);
   const loadingTip = useMemo(() => (showFunFact ? '' : getRandomLoadingTip()), [showFunFact]);
 
+  // Speak the displayed tip/fact via TTS (delay to let animation settle)
+  const hasSpokenRef = useRef(false);
+  const spokenText = showFunFact ? funFact?.text : loadingTip;
+  useEffect(() => {
+    if (!spokenText || hasSpokenRef.current) return;
+    hasSpokenRef.current = true;
+    const timer = setTimeout(() => {
+      ttsService.speak(spokenText, { catId: 'salsa' });
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [spokenText]);
+
   // Minimum display timer
   useEffect(() => {
     const timer = setTimeout(() => setMinTimeElapsed(true), MIN_DISPLAY_MS);
@@ -66,7 +79,7 @@ export function ExerciseLoadingScreen({
     >
       <View style={styles.content}>
         {/* Salsa the coach */}
-        <SalsaCoach size="large" mood="teaching" showCatchphrase />
+        <SalsaCoach size="large" mood="teaching" showCatchphrase speakCatchphrase={false} />
 
         {/* Fun fact card OR loading tip */}
         <View style={styles.tipContainer}>

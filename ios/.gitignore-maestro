@@ -1,0 +1,28 @@
+# Maestro specific gitignore entries
+# Add these lines to your .gitignore file
+
+# Maestro
+.maestro/.env
+.maestro/screenshots/
+maestro-results.xml
+
+# Maestro cache and logs
+~/.maestro/
+.maestro/cache/
+
+# Test artifacts
+artifacts/
+test-results/
+detox-logs/
+screenshots/
+
+# Coverage reports
+coverage/
+.nyc_output/
+*.lcov
+
+# CI/CD artifacts
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

@@ -4,7 +4,7 @@
  * MVP uses emoji-based rendering with mood-tinted avatar
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -21,9 +21,9 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { KeysieSvg } from './KeysieSvg';
-import { getCatById } from './catCharacters';
+import { Cat3DCanvas } from './3d';
 import type { MascotMood } from './mascotTips';
+import { ttsService } from '@/services/tts/TTSService';
 
 export interface MascotBubbleProps {
   mood: MascotMood;
@@ -33,6 +33,8 @@ export interface MascotBubbleProps {
   onDismiss?: () => void;
   /** When provided, renders the specific cat's visuals instead of generic Keysie */
   catId?: string;
+  /** Speak the message via TTS when shown (default: true) */
+  speakMessage?: boolean;
 }
 
 const MOOD_COLORS: Record<MascotMood, string> = {
@@ -76,10 +78,21 @@ export const MascotBubble: React.FC<MascotBubbleProps> = ({
   showBubble = true,
   onDismiss,
   catId,
+  speakMessage = true,
 }) => {
-  const catVisuals = catId ? getCatById(catId) : undefined;
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.8);
+  const hasSpokenRef = useRef(false);
+
+  // Speak the message via TTS
+  useEffect(() => {
+    if (!speakMessage || !message || !showBubble || hasSpokenRef.current) return;
+    hasSpokenRef.current = true;
+    const timer = setTimeout(() => {
+      ttsService.speak(message, { catId: catId ?? 'salsa' });
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [speakMessage, message, showBubble, catId]);
 
   useEffect(() => {
     // Entrance animation: fade in with slight bounce
@@ -145,13 +158,12 @@ export const MascotBubble: React.FC<MascotBubbleProps> = ({
         ]}
         testID="mascot-avatar"
       >
-        <KeysieSvg
+        <Cat3DCanvas
+          catId={catId ?? 'salsa'}
+          size={Math.round(avatarSize * 0.85)}
           mood={mood}
-          size="small"
-          pixelSize={Math.round(avatarSize * 0.8)}
-          accentColor={catVisuals?.color}
-          visuals={catVisuals?.visuals}
-          catId={catId}
+          pose={mood === 'teaching' ? 'teach' : mood === 'celebrating' ? 'celebrate' : 'idle'}
+          forceSVG
         />
       </View>
 

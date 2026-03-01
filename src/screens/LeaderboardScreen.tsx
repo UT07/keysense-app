@@ -10,7 +10,7 @@
  * - Footer: user's current rank summary
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -142,6 +142,26 @@ export function LeaderboardScreen(): React.JSX.Element {
   const currentUserUid = useAuthStore((s) => s.user?.uid ?? '');
 
   const [refreshing, setRefreshing] = useState(false);
+
+  // Auto-fetch standings on mount
+  useEffect(() => {
+    if (!membership?.leagueId) return;
+    let cancelled = false;
+
+    setLoadingStandings(true);
+    getLeagueStandings(membership.leagueId)
+      .then((data) => {
+        if (!cancelled) setStandings(data);
+      })
+      .catch((err) => {
+        console.warn('[Leaderboard] Auto-fetch failed:', err);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingStandings(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [membership?.leagueId, setStandings, setLoadingStandings]);
 
   const tier = membership?.tier ?? 'bronze';
   const config = LEAGUE_TIER_CONFIG[tier];

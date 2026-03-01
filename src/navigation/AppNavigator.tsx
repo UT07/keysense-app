@@ -8,6 +8,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import type { NavigatorScreenParams } from '@react-navigation/native';
 // Screens
 import { HomeScreen } from '../screens/HomeScreen';
 import { ExercisePlayer } from '../screens/ExercisePlayer/ExercisePlayer';
@@ -22,8 +23,6 @@ import { EmailAuthScreen } from '../screens/EmailAuthScreen';
 import { AccountScreen } from '../screens/AccountScreen';
 import { TierIntroScreen } from '../screens/TierIntroScreen';
 import { CatSwitchScreen } from '../screens/CatSwitchScreen';
-// CatCollectionScreen is deprecated — CatSwitchScreen serves as the unified gallery
-// import { CatCollectionScreen } from '../screens/CatCollectionScreen';
 import { SkillAssessmentScreen } from '../screens/SkillAssessmentScreen';
 import { DailySessionScreen } from '../screens/DailySessionScreen';
 import { SongLibraryScreen } from '../screens/SongLibraryScreen';
@@ -44,7 +43,7 @@ export type RootStackParamList = {
   Auth: undefined;
   EmailAuth: { isLinking?: boolean } | undefined;
   Onboarding: undefined;
-  MainTabs: undefined;
+  MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
   Exercise: {
     exerciseId: string;
     testMode?: boolean;
@@ -65,7 +64,6 @@ export type RootStackParamList = {
   MicSetup: undefined;
   Account: undefined;
   CatSwitch: undefined;
-  CatCollection: undefined;
   SongPlayer: { songId: string };
   Leaderboard: undefined;
   Friends: undefined;
@@ -130,9 +128,12 @@ function MainTabs() {
  */
 export function AppNavigator() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const isLoading = useAuthStore((s) => s.isLoading);
+  const isInitializing = useAuthStore((s) => s.isInitializing);
 
-  if (isLoading) {
+  // Only block rendering during initial auth state detection (first boot).
+  // Do NOT block during in-app operations (sign out, delete account) —
+  // that causes a white screen flash while async cleanup runs.
+  if (isInitializing) {
     return null;
   }
 
@@ -228,11 +229,6 @@ export function AppNavigator() {
             />
             <RootStack.Screen
               name="CatSwitch"
-              component={CatSwitchScreen}
-              options={{ animation: 'slide_from_right' }}
-            />
-            <RootStack.Screen
-              name="CatCollection"
               component={CatSwitchScreen}
               options={{ animation: 'slide_from_right' }}
             />

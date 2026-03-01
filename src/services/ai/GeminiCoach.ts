@@ -5,6 +5,8 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../firebase/config';
 import { getOfflineCoachingText } from '../../content/offlineCoachingTemplates';
 
 // ============================================================================
@@ -255,7 +257,8 @@ export class GeminiCoach {
   }
 
   /**
-   * Get AI-generated feedback for exercise
+   * Get AI-generated feedback for exercise.
+   * Tries Cloud Function first, then falls back to direct Gemini API call.
    */
   static async getFeedback(request: CoachRequest): Promise<string> {
     const cacheKey = this.getCacheKey(request);
@@ -266,6 +269,22 @@ export class GeminiCoach {
       return cached;
     }
 
+    // Try Cloud Function first
+    try {
+      const fn = httpsCallable<CoachRequest, { feedback: string }>(functions, 'generateCoachFeedback');
+      const result = await fn(request);
+      const text = result.data.feedback;
+
+      if (text) {
+        // Cache successful Cloud Function response
+        await this.cacheResponse(cacheKey, text);
+        return text;
+      }
+    } catch (cfError) {
+      console.warn('[GeminiCoach] Cloud Function unavailable, using direct API:', (cfError as Error)?.message ?? cfError);
+    }
+
+    // Fall back to direct Gemini API call
     try {
       const genAI = this.initialize();
       const model = genAI.getGenerativeModel({

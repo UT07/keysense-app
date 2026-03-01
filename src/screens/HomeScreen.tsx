@@ -29,7 +29,7 @@ import type { SkillCategory } from '../core/curriculum/SkillTree';
 import { MusicLibrarySpotlight } from '../components/MusicLibrarySpotlight';
 import { ReviewChallengeCard } from '../components/ReviewChallengeCard';
 import { useSongStore } from '../stores/songStore';
-import { CatAvatar } from '../components/Mascot/CatAvatar';
+import { Cat3DCanvas } from '../components/Mascot/3d';
 import { SalsaCoach } from '../components/Mascot/SalsaCoach';
 import { StreakFlame } from '../components/StreakFlame';
 import { getRandomCatMessage } from '../content/catDialogue';
@@ -394,13 +394,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     origin={`${GOAL_ARC_SIZE / 2}, ${GOAL_ARC_SIZE / 2}`}
                   />
                 </Svg>
-                {/* Cat avatar in center */}
+                {/* Cat avatar in center — 3D model with SVG fallback */}
                 <View style={styles.avatarInRing}>
-                  <CatAvatar
+                  <Cat3DCanvas
                     catId={selectedCatId ?? 'mini-meowww'}
-                    size="large"
+                    size={120}
                     mood={mascotMood}
-                    showGlow={dailyGoalProgress >= 1}
                     evolutionStage={activeCatEvolution?.currentStage}
                   />
                 </View>
@@ -521,8 +520,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               totalSongs={totalSongs}
               totalGenres={genres}
               featuredSong={featuredSong}
-              onBrowse={() => navigation.navigate('MainTabs', { screen: 'Songs' } as any)}
-              onPlayFeatured={() => navigation.navigate('MainTabs', { screen: 'Songs' } as any)}
+              onBrowse={() => navigation.navigate('MainTabs', { screen: 'Songs' })}
+              onPlayFeatured={() => navigation.navigate('MainTabs', { screen: 'Songs' })}
             />
           </GameCard>
         </Animated.View>
@@ -567,6 +566,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             mood={mascotMood}
             size="small"
             showCatchphrase
+            speakCatchphrase={false}
             catchphrase={catMessage}
           />
         </Animated.View>

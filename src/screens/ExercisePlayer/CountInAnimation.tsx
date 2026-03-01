@@ -11,8 +11,8 @@ import {
   StyleSheet,
   Animated,
 } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import { COLORS } from '../../theme/tokens';
+import { soundManager } from '../../audio/SoundManager';
 
 export interface CountInAnimationProps {
   countIn: number; // Number of beats in count-in
@@ -67,8 +67,13 @@ export const CountInAnimation: React.FC<CountInAnimationProps> = ({
         }),
       ]).start();
 
-      // Haptic feedback on each beat
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      // Sound + haptic feedback on each beat
+      // Last beat plays "Go!" sound, earlier beats play tick
+      if (nextBeat === countIn - 1) {
+        soundManager.play('countdown_go');
+      } else {
+        soundManager.play('countdown_tick');
+      }
     }
   }, [elapsedTime, tempo, countIn]);
 

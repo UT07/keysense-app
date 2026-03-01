@@ -32,9 +32,8 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { Button, Card } from '../components/common';
-import { CatAvatar } from '../components/Mascot';
-import { KeysieSvg } from '../components/Mascot/KeysieSvg';
-import { getCatById, getDefaultCat, getStarterCats } from '../components/Mascot/catCharacters';
+import { Cat3DCanvas } from '../components/Mascot/3d';
+import { getStarterCats } from '../components/Mascot/catCharacters';
 import type { CatCharacter } from '../components/Mascot/catCharacters';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useCatEvolutionStore } from '../stores/catEvolutionStore';
@@ -144,7 +143,7 @@ function WelcomeStep({
   return (
     <AnimatedStepWrapper direction={direction} testID="onboarding-step-1">
       <View style={styles.iconContainer}>
-        <CatAvatar catId={catInfo.catId} size="large" showTooltipOnTap={false} />
+        <Cat3DCanvas catId={catInfo.catId} size={80} pose="idle" forceSVG />
       </View>
       <Text style={styles.stepTitle}>Welcome to Purrrfect Keys</Text>
       <Text style={styles.catIntro}>{catInfo.subtitle}</Text>
@@ -187,7 +186,7 @@ function ExperienceLevelStep({
   return (
     <AnimatedStepWrapper direction={direction} testID="onboarding-step-2">
       <View style={styles.stepCatRow}>
-        <CatAvatar catId={catInfo.catId} size="small" showTooltipOnTap={false} />
+        <Cat3DCanvas catId={catInfo.catId} size={36} pose="idle" forceSVG />
         <Text style={styles.catIntro}>{catInfo.subtitle}</Text>
       </View>
       <Text style={styles.stepTitle}>What's Your Experience Level?</Text>
@@ -254,7 +253,7 @@ function EquipmentCheckStep({
   return (
     <AnimatedStepWrapper direction={direction} testID="onboarding-step-3">
       <View style={styles.stepCatRow}>
-        <CatAvatar catId={catInfo.catId} size="small" showTooltipOnTap={false} />
+        <Cat3DCanvas catId={catInfo.catId} size={36} pose="idle" forceSVG />
         <Text style={styles.catIntro}>{catInfo.subtitle}</Text>
       </View>
       <Text style={styles.stepTitle}>How Will You Play?</Text>
@@ -321,7 +320,7 @@ function GoalSettingStep({
   return (
     <AnimatedStepWrapper direction={direction} testID="onboarding-step-4">
       <View style={styles.stepCatRow}>
-        <CatAvatar catId={catInfo.catId} size="small" showTooltipOnTap={false} />
+        <Cat3DCanvas catId={catInfo.catId} size={36} pose="idle" forceSVG />
         <Text style={styles.catIntro}>{catInfo.subtitle}</Text>
       </View>
       <Text style={styles.stepTitle}>What's Your Goal?</Text>
@@ -446,7 +445,7 @@ function CatSelectionCard({
       testID={`onboarding-cat-${cat.id}`}
     >
       <View style={styles.catCardAvatar}>
-        <CatAvatar catId={cat.id} size="large" showTooltipOnTap={false} skipEntryAnimation />
+        <Cat3DCanvas catId={cat.id} size={80} pose="idle" forceSVG />
       </View>
 
       <Text style={styles.catCardName}>{cat.name}</Text>
@@ -541,7 +540,6 @@ function OptionCard({
 function ProgressBar({ step }: { step: number }): React.ReactElement {
   const fillFraction = useSharedValue(step / TOTAL_STEPS);
   const catInfo = STEP_CATS[step] ?? STEP_CATS[1];
-  const cat = getCatById(catInfo.catId) ?? getDefaultCat();
 
   React.useEffect(() => {
     fillFraction.value = withTiming(step / TOTAL_STEPS, {
@@ -568,13 +566,7 @@ function ProgressBar({ step }: { step: number }): React.ReactElement {
     <View style={styles.progressBarContainer} testID="onboarding-progress">
       {/* Cat avatar walking along the bar */}
       <Animated.View style={[styles.catAvatarContainer, catStyle]}>
-        <KeysieSvg
-          mood="happy"
-          size="small"
-          accentColor={cat.color}
-          pixelSize={CAT_SIZE}
-          visuals={cat.visuals}
-        />
+        <Cat3DCanvas catId={catInfo.catId} size={CAT_SIZE} pose="idle" forceSVG />
       </Animated.View>
 
       {/* Track */}

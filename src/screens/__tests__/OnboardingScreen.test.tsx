@@ -87,25 +87,13 @@ jest.mock('@react-navigation/native', () => {
   };
 });
 
-// Mock CatAvatar as a simple View with testID
-jest.mock('../../components/Mascot/CatAvatar', () => ({
-  CatAvatar: (props: any) => {
+// Mock Cat3DCanvas (replaces CatAvatar + KeysieSvg)
+jest.mock('../../components/Mascot/3d', () => ({
+  Cat3DCanvas: (props: any) => {
     const { View, Text } = require('react-native');
     return (
-      <View testID={`cat-avatar-${props.catId || 'default'}`}>
-        <Text>CatAvatar</Text>
-      </View>
-    );
-  },
-}));
-
-// Mock KeysieSvg as a simple View (used in ProgressBar)
-jest.mock('../../components/Mascot/KeysieSvg', () => ({
-  KeysieSvg: (_props: any) => {
-    const { View, Text } = require('react-native');
-    return (
-      <View testID="keysie-svg">
-        <Text>KeysieSvg</Text>
+      <View testID={`cat-3d-${props.catId || 'default'}`}>
+        <Text>Cat3DCanvas</Text>
       </View>
     );
   },
@@ -641,29 +629,29 @@ describe('OnboardingScreen', () => {
   });
 
   // -----------------------------------------------------------------------
-  // 7. Progress bar renders (KeysieSvg cat walks along bar)
+  // 7. Progress bar renders (Cat3DCanvas walks along bar)
   // -----------------------------------------------------------------------
   describe('Progress bar', () => {
-    it('renders the KeysieSvg walking cat in the progress bar', () => {
-      const { getByTestId } = render(<OnboardingScreen />);
+    it('renders the cat walking in the progress bar', () => {
+      const { getAllByTestId } = render(<OnboardingScreen />);
 
-      expect(getByTestId('keysie-svg')).toBeTruthy();
+      expect(getAllByTestId('cat-3d-mini-meowww').length).toBeGreaterThanOrEqual(1);
     });
 
     it('progress bar cat is present on every step', () => {
-      const { getByText, getByTestId } = render(<OnboardingScreen />);
+      const { getByText, getAllByTestId } = render(<OnboardingScreen />);
 
-      // Step 1
-      expect(getByTestId('keysie-svg')).toBeTruthy();
+      // Step 1 (mini-meowww appears in both progress bar and welcome icon)
+      expect(getAllByTestId('cat-3d-mini-meowww').length).toBeGreaterThanOrEqual(1);
 
       // Step 2
       fireEvent.press(getByText('Get Started'));
-      expect(getByTestId('keysie-svg')).toBeTruthy();
+      expect(getAllByTestId(/^cat-3d-/).length).toBeGreaterThanOrEqual(1);
 
       // Step 3
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
-      expect(getByTestId('keysie-svg')).toBeTruthy();
+      expect(getAllByTestId(/^cat-3d-/).length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -671,40 +659,40 @@ describe('OnboardingScreen', () => {
   // 8. Cat avatar renders on screen
   // -----------------------------------------------------------------------
   describe('Cat avatar', () => {
-    it('renders CatAvatar on the welcome step (step 1)', () => {
-      const { getByTestId } = render(<OnboardingScreen />);
-
-      expect(getByTestId('cat-avatar-mini-meowww')).toBeTruthy();
+    it('renders Cat3DCanvas on the welcome step (step 1)', () => {
+      const { getAllByTestId } = render(<OnboardingScreen />);
+      // mini-meowww appears in both progress bar and step content
+      expect(getAllByTestId('cat-3d-mini-meowww').length).toBeGreaterThanOrEqual(1);
     });
 
-    it('renders CatAvatar for Jazzy on step 2', () => {
-      const { getByText, getByTestId } = render(<OnboardingScreen />);
+    it('renders Cat3DCanvas for Jazzy on step 2', () => {
+      const { getByText, getAllByTestId } = render(<OnboardingScreen />);
 
       fireEvent.press(getByText('Get Started'));
-
-      expect(getByTestId('cat-avatar-jazzy')).toBeTruthy();
+      // jazzy appears in both progress bar and step content
+      expect(getAllByTestId('cat-3d-jazzy').length).toBeGreaterThanOrEqual(1);
     });
 
-    it('renders CatAvatar for Chonky Monke on step 3', () => {
-      const { getByText, getByTestId } = render(<OnboardingScreen />);
+    it('renders Cat3DCanvas for Chonky Monke on step 3', () => {
+      const { getByText, getAllByTestId } = render(<OnboardingScreen />);
 
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
-
-      expect(getByTestId('cat-avatar-chonky-monke')).toBeTruthy();
+      // chonky-monke appears in both progress bar and step content
+      expect(getAllByTestId('cat-3d-chonky-monke').length).toBeGreaterThanOrEqual(1);
     });
 
-    it('renders CatAvatar for Luna on step 4', () => {
-      const { getByText, getByTestId } = render(<OnboardingScreen />);
+    it('renders Cat3DCanvas for Luna on step 4', () => {
+      const { getByText, getAllByTestId } = render(<OnboardingScreen />);
 
       fireEvent.press(getByText('Get Started'));
       fireEvent.press(getByText('Complete Beginner'));
       fireEvent.press(getByText('Next'));
       fireEvent.press(getByText("On-Screen Keyboard"));
       fireEvent.press(getByText('Next'));
-
-      expect(getByTestId('cat-avatar-luna')).toBeTruthy();
+      // luna appears in both progress bar and step content
+      expect(getAllByTestId('cat-3d-luna').length).toBeGreaterThanOrEqual(1);
     });
 
     it('renders cat intro text matching each step cat', () => {

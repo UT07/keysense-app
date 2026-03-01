@@ -1,0 +1,64 @@
+# List Scrolling and Item Interaction Test
+# Tests scrollable lists, infinite scroll, and item interactions
+
+appId: ${APP_ID}
+name: List Scrolling and Interactions
+tags:
+  - lists
+  - scrolling
+
+---
+
+- launchApp
+
+# Navigate to a list screen
+# - tapOn: "Browse|List|Feed"
+
+# Assert list is visible
+# - assertVisible: ".*"
+
+# Take initial screenshot
+- takeScreenshot: screenshots/list-initial
+
+# Scroll down to load more items
+- scroll:
+    direction: DOWN
+    speed: 40
+
+- scroll:
+    direction: DOWN
+    speed: 40
+
+# Wait for content to load
+- waitForAnimationToEnd
+
+# Take screenshot after scroll
+- takeScreenshot: screenshots/list-scrolled
+
+# Test pull-to-refresh
+- scroll:
+    direction: UP
+    speed: 100
+
+- waitForAnimationToEnd
+
+# Tap on a list item (adjust selector based on your app)
+# - tapOn: ".*Item.*"
+# - assertVisible: "Detail|Description"
+
+# Go back to list
+# - back
+
+# Test search functionality (if applicable)
+# - tapOn: "Search"
+# - inputText: "Test Query"
+# - waitForAnimationToEnd
+# - assertVisible: ".*Test.*"
+
+# Test filter functionality (if applicable)
+# - tapOn: "Filter"
+# - tapOn: "Category A"
+# - tapOn: "Apply"
+# - assertVisible: ".*"
+
+- takeScreenshot: screenshots/list-complete

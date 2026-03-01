@@ -1,0 +1,55 @@
+# Gestures and Interactions Test
+# Tests various touch gestures and interactions
+
+appId: ${APP_ID}
+name: Gestures and Interactions
+tags:
+  - gestures
+  - interactions
+
+---
+
+- launchApp
+
+- assertVisible: ".*"
+
+# Test tap gesture
+# - tapOn: "Button"
+# - assertVisible: ".*"
+
+# Test long press (if applicable)
+# - longPressOn: "Item"
+# - assertVisible: "Menu|Options"
+# - tapOn: "Cancel"
+
+# Test swipe gesture on item (like delete)
+# - swipe:
+#     direction: LEFT
+#     on: "List Item"
+# - assertVisible: "Delete|Remove"
+# - tapOn: "Cancel"
+
+# Test pinch to zoom (on images/maps if applicable)
+# Note: Maestro has limited support for pinch gestures
+
+# Test double tap (if applicable)
+# - tapOn: "Image"
+# - tapOn: "Image"
+# Wait for zoom/action
+
+# Test drag and drop (if applicable)
+# - tapOn: "Draggable Item"
+# - dragTo: "Drop Zone"
+
+# Test horizontal scrolling (carousel/tabs)
+- scroll:
+    direction: LEFT
+    speed: 40
+
+- waitForAnimationToEnd
+
+- scroll:
+    direction: RIGHT
+    speed: 40
+
+- takeScreenshot: screenshots/gestures-complete

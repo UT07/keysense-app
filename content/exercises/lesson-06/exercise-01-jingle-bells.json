@@ -1,9 +1,9 @@
 {
   "id": "lesson-06-ex-01",
-  "version": 1,
+  "version": 2,
   "metadata": {
     "title": "Jingle Bells (Right Hand)",
-    "description": "Play the holiday classic with right hand only",
+    "description": "Play the holiday classic chorus with right hand only",
     "difficulty": 2,
     "estimatedMinutes": 5,
     "skills": [
@@ -30,42 +30,42 @@
   },
   "notes": [
     {
-      "note": 67,
+      "note": 64,
       "startBeat": 0,
       "durationBeats": 1,
       "hand": "right",
-      "finger": 5
+      "finger": 3
     },
     {
-      "note": 67,
+      "note": 64,
       "startBeat": 1,
       "durationBeats": 1,
       "hand": "right",
-      "finger": 5
+      "finger": 3
     },
     {
-      "note": 67,
+      "note": 64,
       "startBeat": 2,
       "durationBeats": 2,
       "hand": "right",
-      "finger": 5
+      "finger": 3
     },
     {
-      "note": 67,
+      "note": 64,
       "startBeat": 4,
       "durationBeats": 1,
       "hand": "right",
-      "finger": 5
+      "finger": 3
     },
     {
-      "note": 69,
+      "note": 64,
       "startBeat": 5,
       "durationBeats": 1,
       "hand": "right",
-      "finger": 4
+      "finger": 3
     },
     {
-      "note": 71,
+      "note": 64,
       "startBeat": 6,
       "durationBeats": 2,
       "hand": "right",
@@ -86,16 +86,23 @@
       "finger": 5
     },
     {
-      "note": 69,
+      "note": 60,
       "startBeat": 10,
       "durationBeats": 1,
       "hand": "right",
-      "finger": 4
+      "finger": 1
     },
     {
-      "note": 71,
+      "note": 62,
       "startBeat": 11,
-      "durationBeats": 2,
+      "durationBeats": 1,
+      "hand": "right",
+      "finger": 2
+    },
+    {
+      "note": 64,
+      "startBeat": 12,
+      "durationBeats": 4,
       "hand": "right",
       "finger": 3
     }
@@ -112,19 +119,19 @@
     ]
   },
   "hints": {
-    "beforeStart": "The famous melody 'Jingle Bells' starts on G and features the classic notes G-G-G (whole note), G-A-B (half notes), then C-G-A-B. The rhythm has whole notes (4 beats) and half notes (2 beats). Listen for the characteristic 'jingling' rhythm.",
+    "beforeStart": "Jingle Bells chorus starts on E (finger 3). The pattern is: E-E-E (half note), E-E-E (half note), E-G-C-D-E (whole note). Keep your hand in C position with thumb on C.",
     "commonMistakes": [
       {
         "pattern": "note-duration",
-        "advice": "Watch the note durations carefully. G is held for 4 beats (whole note). Later, A and B are 1 beat each, and some are held 2 beats. Don't rush the long notes.",
+        "advice": "Watch the note durations carefully. The third E in each group is held for 2 beats (half note). The final E is held for 4 beats (whole note). Don't rush the long notes.",
         "triggerCondition": {
           "type": "timing",
           "threshold": 200
         }
       },
       {
-        "pattern": "c-position-error",
-        "advice": "When you jump to C (64), make sure you're on the correct C. It's the white key below your high G, between black keys. Don't play a wrong C or G instead."
+        "pattern": "wrong-starting-note",
+        "advice": "Start on E (finger 3), not G. The classic Jingle Bells chorus begins on the third note of the C major scale."
       }
     ],
     "successMessage": "Wonderful! You've played a beloved holiday classic. This recognizable melody is a joy to play."

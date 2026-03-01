@@ -597,6 +597,7 @@ const styles = StyleSheet.create({
   },
   genreCarousel: {
     paddingHorizontal: SPACING.lg,
+    paddingRight: SPACING.xl,
     gap: SPACING.xs,
   },
   genrePill: {

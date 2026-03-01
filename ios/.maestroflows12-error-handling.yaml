@@ -1,0 +1,67 @@
+# Error Handling and Edge Cases Test
+# Tests app behavior with errors and edge cases
+
+appId: ${APP_ID}
+name: Error Handling and Edge Cases
+tags:
+  - error-handling
+  - edge-cases
+
+---
+
+- launchApp:
+    clearState: true
+
+# Test with no network (if mockable)
+# Note: This might require additional setup
+
+# Test with invalid input
+# - tapOn: "Email"
+# - inputText: "not-an-email"
+# - tapOn: "Submit"
+# - assertVisible: "Invalid|Error"
+
+# Test with empty required fields
+# - tapOn: "Submit"
+# - assertVisible: "Required|Error"
+
+# Test with extremely long input
+# - tapOn: "Text Input"
+# - inputText: "a" * 1000
+# - assertVisible: ".*"
+
+# Test with special characters
+# - tapOn: "Text Input"
+# - inputText: "!@#$%^&*()_+{}|:<>?~"
+# - assertVisible: ".*"
+
+# Test with emoji
+# - tapOn: "Text Input"
+# - inputText: "😀🎉🚀💻🔥"
+# - assertVisible: "😀"
+
+# Test rapid button clicks
+# - tapOn: "Submit"
+# - tapOn: "Submit"
+# - tapOn: "Submit"
+# Should handle duplicate submissions gracefully
+
+# Test boundary values
+# - tapOn: "Number Input"
+# - inputText: "0"
+# - inputText: "-1"
+# - inputText: "999999999"
+
+# Test session timeout (if applicable)
+# - runFlow: ../helpers/background-app.yaml
+# - wait: 60000  # Wait for session to expire
+# Should handle session expiration gracefully
+
+# Test app in low memory conditions
+# Note: This is difficult to simulate with Maestro
+
+# Test orientation changes
+# - runScript:
+#     script: adb shell content insert --uri content://settings/system --bind name:s:user_rotation --bind value:i:1
+
+- takeScreenshot: screenshots/error-handling-complete

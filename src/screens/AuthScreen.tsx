@@ -149,14 +149,11 @@ function ShimmerTitle(): React.ReactElement {
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: shimmerValue.value,
-    textShadowColor: `rgba(255, 215, 0, ${shimmerValue.value * 0.6})`,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 12,
   }));
 
   return (
     <Animated.View entering={FadeIn.duration(800)}>
-      <Animated.Text style={[styles.appName, animatedStyle]}>
+      <Animated.Text style={[styles.appName, styles.appNameGlow, animatedStyle]}>
         Purrrfect Keys
       </Animated.Text>
     </Animated.View>
@@ -396,6 +393,11 @@ const styles = StyleSheet.create({
     color: COLORS.starGold,
     letterSpacing: 1,
     marginTop: SPACING.sm,
+  },
+  appNameGlow: {
+    textShadowColor: 'rgba(255, 215, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 12,
   },
   tagline: {
     ...TYPOGRAPHY.heading.md,

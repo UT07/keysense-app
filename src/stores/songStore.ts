@@ -136,7 +136,12 @@ export const useSongStore = create<SongStoreState>((set, get) => ({
       );
       if (thisRequest !== loadRequestId) return; // stale
       lastDocCursor = lastDoc;
-      set((s) => ({ summaries: [...s.summaries, ...more], isLoadingSummaries: false }));
+      set((s) => {
+        // Deduplicate by song ID to prevent "two children with same key" errors
+        const existingIds = new Set(s.summaries.map((x) => x.id));
+        const unique = more.filter((x) => !existingIds.has(x.id));
+        return { summaries: [...s.summaries, ...unique], isLoadingSummaries: false };
+      });
     } catch (err) {
       if (thisRequest !== loadRequestId) return; // stale
       console.warn('[SongStore] loadMoreSummaries failed:', err);

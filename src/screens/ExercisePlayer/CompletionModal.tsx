@@ -27,7 +27,7 @@ import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button } from '../../components/common/Button';
 import { MascotBubble } from '../../components/Mascot/MascotBubble';
-import { CatAvatar } from '../../components/Mascot/CatAvatar';
+import { Cat3DCanvas } from '../../components/Mascot/3d';
 import { SalsaCoach } from '../../components/Mascot/SalsaCoach';
 import { useCatEvolutionStore } from '../../stores/catEvolutionStore';
 import { FunFactCard } from '../../components/FunFact/FunFactCard';
@@ -433,11 +433,11 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
               entering={skipAnimation ? undefined : FadeInDown.duration(400).springify()}
               style={styles.header}
             >
-              <CatAvatar
+              <Cat3DCanvas
                 catId={activeCatId}
-                size="large"
+                size={120}
+                pose={score.overall >= 95 ? 'celebrate' : score.overall >= 80 ? 'play' : 'curious'}
                 mood={mascotMood}
-                showGlow={score.stars >= 2}
                 evolutionStage={evolutionStage}
               />
               <Text style={styles.title}>{exercise.metadata.title}</Text>

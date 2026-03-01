@@ -1,15 +1,15 @@
 # Purrrfect Keys Stabilization Report
 
-**Date:** February 2026 (last updated Feb 27)
-**Scope:** Codebase stabilization — tests, types, navigation, UI, adaptive learning, gamification, Phase 7 UI revamp, gem bug fix, cat gallery redesign, Phase 9 Music Library, Phase 8 polyphonic completion, Phase 9.5 UX overhaul, Phase 10 Arcade Concert Hall, Phase 10.5 Social & Leaderboards
+**Date:** February 2026 (last updated Feb 28)
+**Scope:** Codebase stabilization — tests, types, navigation, UI, adaptive learning, gamification, Phase 7 UI revamp, gem bug fix, cat gallery redesign, Phase 9 Music Library, Phase 8 polyphonic completion, Phase 9.5 UX overhaul, Phase 10 Arcade Concert Hall, Phase 10.5 Social & Leaderboards, Phase 11 QA + Launch Prep
 **Full history:** See `docs/stabilization-report-archive.md` for detailed change narratives.
 
 ## Final State
 
 | Metric | Before | After |
 |--------|--------|-------|
-| Test Suites | 18 (many failing) | 121 passed |
-| Tests | ~393 passing, 40+ failing | 2,621 passed, 0 failing |
+| Test Suites | 18 (many failing) | 122 passed |
+| Tests | ~393 passing, 40+ failing | 2,630 passed, 0 failing |
 | TypeScript Errors | 144+ | 0 |
 | Skill Nodes | 0 | 100 (15 tiers, DAG-validated) |
 | Session Types | 1 (new-material only) | 4 (new-material, review, challenge, mixed) |
@@ -394,16 +394,65 @@
 
 - **Tests:** 121 suites, 2,621 tests, 0 failures, 0 TypeScript errors
 
+### Phase 11: QA + Launch Preparation (Feb 28)
+
+#### Account Deletion (GDPR Compliance)
+- **Cloud Function `deleteUserData`** (`firebase/functions/src/deleteUserData.ts`): Admin SDK-powered deletion of all user data — 9 subcollections (progress, settings, songs, mastery, friends, activity, achievements, learnerProfile, catEvolution), friend codes (`friendCodes/{code}`), league membership, challenges (bidirectional dual-query), friend list cleanup (removes user from all friends' lists before deleting own data), root user document
+- **Client-side fallback** (`src/services/firebase/firestore.ts`): `deleteUserData()` tries Cloud Function via `httpsCallable` first, falls through to `deleteUserDataClientSide()` if Cloud Function unavailable — ensures data cleanup even without deployed functions
+- **`deleteUserDataClientSide()`**: Mirrors Cloud Function logic using client Firestore SDK — friend list removal, friend code deletion, league membership cleanup, challenge deletion, subcollection batch deletes, root document delete
+- **`authStore.deleteAccount()`**: Calls `deleteUserData(uid)` → resets all stores → `user.delete()` (Firebase Auth)
+- **New test file:** `src/services/firebase/__tests__/deleteUserData.test.ts` — 10 tests covering Cloud Function path, client-side fallback, subcollection deletion, friend cleanup, error handling
+
+#### Cloud Functions for Gemini API
+- **3 new Cloud Functions** in `firebase/functions/src/`:
+  - `generateExercise.ts` — Skill-aware AI exercise generation via Gemini 2.0 Flash, `httpsCallable` with auth check
+  - `generateSong.ts` — AI song generation via Gemini, `httpsCallable` with auth + rate limiting
+  - `generateCoachFeedback.ts` — Post-exercise AI coaching feedback, `httpsCallable`
+- **Client-side fallback:** All 3 services (geminiExerciseService, songGenerationService, GeminiCoach) fall back to direct Gemini API calls if Cloud Function is unavailable
+- **Security:** API key moved server-side; client no longer needs `EXPO_PUBLIC_GEMINI_API_KEY` when functions are deployed
+
+#### CI/CD: GitHub Actions
+- **`.github/workflows/ci.yml`**: Runs on push + PR — `npm ci` → `npm run typecheck` → `npm run lint` → `npm run test --ci --maxWorkers=2`
+- **`.github/workflows/build.yml`**: EAS Build triggered on version tags (`v*`) — iOS preview profile via `expo/expo-github-action@v8`
+
+#### Environment Security Audit
+- **`.env.example` updated**: Documents all required environment variables with placeholder values
+- **PostHog variable mismatch fixed**: Renamed inconsistent env var references
+- **EAS channels configured**: `preview` and `production` profiles in `eas.json`
+
+#### Sound Enhancement
+- **Procedural synthesis improvements**: Formant-based cat vocals (vowel frequencies + bandpass filters), reverb convolution, deterministic noise generation for variety without randomness
+- **SoundManager** now has improved fallback behavior when `.wav` files are missing — haptic-only mode
+
+#### Bug Fixes
+- **`textShadowColor` Reanimated error (AuthScreen):** Removed `textShadowColor` from Reanimated `useAnimatedStyle` — Reanimated does not support animating text shadow properties. Replaced with static `style` prop for shadow.
+- **AddFriendScreen anonymous auth gate:** Anonymous users now see a prompt to sign in instead of crashing when trying to register/look up friend codes
+- **Skeleton code cleanup:** Removed `SignatureExercise` dead code from `catQuestService.ts` (interface, 8 placeholder entries, 2 getter functions); RiveCatAvatar.tsx deleted; barrel export cleaned
+
+#### 3D Cat Models
+- **`chonky-cat.glb` exported with materials**: 9 named meshes (Body, Head, LeftEar, RightEar, LeftEye, RightEye, Nose, Tail, Belly), 7 NLA animations (idle, celebrate, teach, sleep, sad, play, curious), Draco compression
+- **Blender MCP integration**: `.mcp.json` configured with `uvx blender-mcp` command, addon installed in Blender for programmatic model creation
+
+#### MIDI Hardware Integration
+- **Package:** `@motiz88/react-native-midi` (Expo Modules, Web MIDI API pattern)
+- **NativeMidiInput rewritten:** `requestMIDIAccess()` → `MIDIAccess` → `input.onmidimessage` → raw byte parsing (0x90=NoteOn, 0x80=NoteOff, 0xB0=CC)
+- **`getMidiInput()` detection:** Tries `require('@motiz88/react-native-midi')`, falls back to `NoOpMidiInput`
+- Needs dev build with native module for actual hardware testing
+
+- **Tests:** 122 suites, 2,630 tests, 0 failures, 0 TypeScript errors
+
 ---
 
 ## Known Remaining Items
 
 1. **Worker teardown warning**: Jest reports "worker process has failed to exit gracefully" (timer leak, non-blocking)
 2. **Native audio engine**: ExpoAudioEngine primary; react-native-audio-api requires RN 0.77+ for codegen
-3. **Native MIDI module**: `react-native-midi` not installed yet (needs RN 0.77+). VMPK + IAC Driver ready
+3. **MIDI hardware testing**: `@motiz88/react-native-midi` installed, NativeMidiInput rewritten — needs dev build for actual hardware testing
 4. **Open bugs on GitHub**: ~45 remaining open issues
-5. **Rive animation files**: .riv files not created (need Rive editor design work) — SVG composable system is working alternative
-6. **Phase 8 remaining**: Real-device testing (mic accuracy >95%, ONNX model loading on device, ambient calibration UX), Basic Pitch ONNX model download
-7. **Sound assets**: SoundManager skeleton in place but actual .wav files not yet sourced (30+ sounds needed)
-8. **3D cat infrastructure**: Deferred (expo-gl + three.js could break RN 0.76 build, no Blender models yet)
-9. **Phase 11+**: QA + Launch
+5. **Phase 8 remaining**: Real-device testing (mic accuracy >95%, ONNX model loading on device, ambient calibration UX)
+6. **Sound assets**: SoundManager has procedural synthesis improvements, but dedicated .wav files not yet sourced (~30 sounds needed)
+7. **3D cat models**: 4 body type GLBs created (salsa, slim, round, chonky), color override system working — per-cat unique meshes and skeletal animations are stretch goals
+8. **Maestro E2E testing**: 12 flow YAML files planned, setup in progress
+9. **Cat voice TTS upgrade**: ElevenLabs/OpenAI evaluation planned for higher-quality per-cat voices (currently expo-speech)
+10. **Cloud Functions deployment**: 4 functions written (deleteUserData, generateExercise, generateSong, generateCoachFeedback) — need Firebase project deployment
+11. **Phase 11 QA**: Comprehensive codebase audit identified 40 issues (8 P0, 13 P1, 7 P2, 12 P3) — in progress

@@ -26,6 +26,7 @@ import { hydrateSocialStore, useSocialStore } from './stores/socialStore';
 import { hydrateLeagueStore, useLeagueStore } from './stores/leagueStore';
 import { getCurrentLeagueMembership, assignToLeague } from './services/firebase/leagueService';
 import { registerFriendCode } from './services/firebase/socialService';
+import { useSoundManagerSync } from './hooks/useSoundManager';
 
 // Configure Google Sign-In at module level (synchronous, must run before any signIn call)
 // iosClientId is passed explicitly so the native module doesn't need GoogleService-Info.plist
@@ -166,25 +167,14 @@ export default function App(): React.ReactElement {
           console.log(`[App] Learner profile fully hydrated (${masteredCount} mastered skills, ${noteCount} note records)`);
         }
 
-        // Hydrate gem store (gem balance, transactions)
-        await hydrateGemStore();
-        console.log('[App] Gem store hydrated');
-
-        // Hydrate cat evolution store (owned cats, evolution data, daily rewards)
-        await hydrateCatEvolutionStore();
-        console.log('[App] Cat evolution store hydrated');
-
-        // Hydrate song store (mastery, recent songs, request counter)
-        await hydrateSongStore();
-        console.log('[App] Song store hydrated');
-
-        // Hydrate social store (friend code, friends, activity, challenges)
-        await hydrateSocialStore();
-        console.log('[App] Social store hydrated');
-
-        // Hydrate league store (league membership)
-        await hydrateLeagueStore();
-        console.log('[App] League store hydrated');
+        // Hydrate remaining stores in parallel (all independent AsyncStorage reads)
+        await Promise.all([
+          hydrateGemStore().then(() => console.log('[App] Gem store hydrated')),
+          hydrateCatEvolutionStore().then(() => console.log('[App] Cat evolution store hydrated')),
+          hydrateSongStore().then(() => console.log('[App] Song store hydrated')),
+          hydrateSocialStore().then(() => console.log('[App] Social store hydrated')),
+          hydrateLeagueStore().then(() => console.log('[App] League store hydrated')),
+        ]);
 
         // ── Phase 2: Firebase Auth (network, may be slow) ──────────────
         try {
@@ -279,11 +269,11 @@ export default function App(): React.ReactElement {
       }
     }
 
-    // Failsafe: Force app ready after 5s if auth/hydration hangs
+    // Failsafe: Force app ready after 3s if auth/hydration hangs
     const failsafeTimeout = setTimeout(() => {
       console.warn('[App] Hydration took too long, forcing app ready');
       setAppIsReady(true);
-    }, 5000);
+    }, 3000);
 
     prepare().then(() => clearTimeout(failsafeTimeout));
 
@@ -315,6 +305,9 @@ export default function App(): React.ReactElement {
 }
 
 function AppContent(): React.ReactElement {
+  // Preload UI sound effects and sync SoundManager with settings (volume, enabled state)
+  useSoundManagerSync();
+
   return (
     <AppNavigator />
   );

@@ -10,6 +10,9 @@ admin.initializeApp();
 
 // Export all functions
 export * from './generateCoachFeedback';
+export * from './deleteUserData';
+export * from './generateExercise';
+export * from './generateSong';
 
 // ============================================================================
 // Additional Cloud Functions

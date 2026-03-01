@@ -32,6 +32,7 @@ let mockAuthState: any = {
   user: null,
   isAnonymous: false,
   isLoading: false,
+  isInitializing: false,
   isAuthenticated: false,
   error: null,
   initAuth: jest.fn(),
@@ -254,6 +255,7 @@ function resetAuthState(overrides: Partial<typeof mockAuthState> = {}) {
     user: null,
     isAnonymous: false,
     isLoading: false,
+    isInitializing: false,
     isAuthenticated: false,
     error: null,
     initAuth: jest.fn(),
@@ -278,29 +280,38 @@ describe('AppNavigator', () => {
   // -----------------------------------------------------------------------
 
   describe('Loading state', () => {
-    it('should render null while auth is loading', () => {
-      resetAuthState({ isLoading: true });
+    it('should render null while auth is initializing', () => {
+      resetAuthState({ isInitializing: true });
 
       const { toJSON } = render(<AppNavigator />);
 
       expect(toJSON()).toBeNull();
     });
 
-    it('should not render NavigationContainer while loading', () => {
-      resetAuthState({ isLoading: true });
+    it('should not render NavigationContainer while initializing', () => {
+      resetAuthState({ isInitializing: true });
 
       const { queryByTestId } = render(<AppNavigator />);
 
       expect(queryByTestId('navigation-container')).toBeNull();
     });
 
-    it('should not render any screens while loading', () => {
-      resetAuthState({ isLoading: true });
+    it('should not render any screens while initializing', () => {
+      resetAuthState({ isInitializing: true });
 
       const { queryByTestId } = render(<AppNavigator />);
 
       expect(queryByTestId('auth-screen')).toBeNull();
       expect(queryByTestId('home-screen')).toBeNull();
+    });
+
+    it('should still render screens during in-app isLoading (not initializing)', () => {
+      resetAuthState({ isLoading: true, isInitializing: false, isAuthenticated: true });
+
+      const { toJSON } = render(<AppNavigator />);
+
+      // Should NOT be null — screens should stay visible during sign-out/delete
+      expect(toJSON()).not.toBeNull();
     });
   });
 
@@ -573,25 +584,25 @@ describe('AppNavigator', () => {
       expect(queryByTestId('home-screen')).toBeNull();
     });
 
-    it('should transition from loading to authenticated', () => {
-      resetAuthState({ isLoading: true });
+    it('should transition from initializing to authenticated', () => {
+      resetAuthState({ isInitializing: true });
 
       const { toJSON, queryByTestId, rerender } = render(<AppNavigator />);
       expect(toJSON()).toBeNull();
 
-      resetAuthState({ isAuthenticated: true, isLoading: false });
+      resetAuthState({ isAuthenticated: true, isInitializing: false });
       rerender(<AppNavigator />);
 
       expect(queryByTestId('home-screen')).toBeTruthy();
     });
 
-    it('should transition from loading to unauthenticated', () => {
-      resetAuthState({ isLoading: true });
+    it('should transition from initializing to unauthenticated', () => {
+      resetAuthState({ isInitializing: true });
 
       const { toJSON, queryByTestId, rerender } = render(<AppNavigator />);
       expect(toJSON()).toBeNull();
 
-      resetAuthState({ isAuthenticated: false, isLoading: false });
+      resetAuthState({ isAuthenticated: false, isInitializing: false });
       rerender(<AppNavigator />);
 
       expect(queryByTestId('auth-screen')).toBeTruthy();

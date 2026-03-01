@@ -39,15 +39,13 @@ const MAX_CODE_RETRIES = 5;
 /**
  * Generate a random 6-character alphanumeric friend code.
  * Uses a restricted alphabet (no I/O/0/1) to avoid ambiguity.
- * Uses crypto.getRandomValues() for cryptographic randomness.
+ * Uses Math.random() — friend codes are short-lived lookup keys,
+ * not security-critical tokens, so cryptographic randomness is unnecessary.
  */
 export function generateFriendCode(): string {
-  const randomBytes = new Uint8Array(FRIEND_CODE_LENGTH);
-  crypto.getRandomValues(randomBytes);
-
   let code = '';
   for (let i = 0; i < FRIEND_CODE_LENGTH; i++) {
-    const index = randomBytes[i] % FRIEND_CODE_ALPHABET.length;
+    const index = Math.floor(Math.random() * FRIEND_CODE_ALPHABET.length);
     code += FRIEND_CODE_ALPHABET[index];
   }
   return code;
@@ -86,6 +84,25 @@ export async function lookupFriendCode(code: string): Promise<string | null> {
 
   const data = snap.data() as { uid: string };
   return data.uid;
+}
+
+/**
+ * Get a user's public profile (display name + selected cat).
+ * Used when sending friend requests to populate the outgoing connection.
+ */
+export async function getUserPublicProfile(
+  uid: string,
+): Promise<{ displayName: string; selectedCatId: string } | null> {
+  const userDoc = doc(db, 'users', uid);
+  const snap = await getDoc(userDoc);
+
+  if (!snap.exists()) return null;
+
+  const data = snap.data();
+  return {
+    displayName: (data.displayName as string) || 'Player',
+    selectedCatId: (data.settings?.selectedCatId as string) || '',
+  };
 }
 
 // ---------------------------------------------------------------------------

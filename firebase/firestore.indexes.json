@@ -1,4 +1,60 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "songs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "metadata.genre", "order": "ASCENDING" },
+        { "fieldPath": "metadata.title", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "songs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "metadata.difficulty", "order": "ASCENDING" },
+        { "fieldPath": "metadata.title", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "songs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "metadata.genre", "order": "ASCENDING" },
+        { "fieldPath": "metadata.difficulty", "order": "ASCENDING" },
+        { "fieldPath": "metadata.title", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "leagues",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tier", "order": "ASCENDING" },
+        { "fieldPath": "weekStart", "order": "ASCENDING" },
+        { "fieldPath": "memberCount", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "members",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "weeklyXp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "activity",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "syncLog",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "timestamp", "order": "ASCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

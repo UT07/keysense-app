@@ -9,7 +9,7 @@
  * - Total latency target: <5ms
  */
 
-import { Platform } from 'react-native';
+import { Platform, NativeModules } from 'react-native';
 import type { MidiNoteEvent } from '@/core/exercises/types';
 export type { MidiNoteEvent } from '@/core/exercises/types';
 
@@ -446,14 +446,20 @@ let midiInputInstance: MidiInput | null = null;
 
 export function getMidiInput(): MidiInput {
   if (!midiInputInstance) {
-    // Try to use native Web MIDI API if @motiz88/react-native-midi is available
+    // Try to use native Web MIDI API if @motiz88/react-native-midi is available.
+    // IMPORTANT: Check NativeModules BEFORE require(). In Hermes, require() for
+    // native modules can throw uncatchable errors during module evaluation —
+    // try/catch won't save us. Same pattern as Cat3DCanvas.tsx.
     let useNative = false;
     if (Platform.OS !== 'web') {
-      try {
-        require('@motiz88/react-native-midi');
-        useNative = true;
-      } catch {
-        // Native MIDI module not linked in this build
+      const hasNativeMidi = !!NativeModules.ReactNativeMidi;
+      if (hasNativeMidi) {
+        try {
+          require('@motiz88/react-native-midi');
+          useNative = true;
+        } catch {
+          // Native MIDI module not linked in this build
+        }
       }
     }
     midiInputInstance = useNative ? new NativeMidiInput() : new NoOpMidiInput();

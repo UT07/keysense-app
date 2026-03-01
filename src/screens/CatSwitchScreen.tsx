@@ -38,7 +38,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { KeysieSvg } from '../components/Mascot/KeysieSvg';
+import { Cat3DCanvas } from '../components/Mascot/3d';
 import { CAT_CHARACTERS, isCatOwned, getCatById } from '../components/Mascot/catCharacters';
 import type { CatCharacter } from '../components/Mascot/catCharacters';
 import { useSettingsStore } from '../stores/settingsStore';
@@ -292,7 +292,7 @@ function BuyModal({ visible, cat, gems, onConfirm, onCancel }: {
             colors={[cat.color + '20', 'transparent']}
             style={StyleSheet.absoluteFill}
           />
-          <KeysieSvg mood="happy" size="medium" accentColor={cat.color} pixelSize={100} visuals={cat.visuals} />
+          <Cat3DCanvas catId={cat.id} size={100} mood="happy" pose="idle" />
           <Text style={styles.modalTitle}>Unlock {cat.name}?</Text>
           <View style={styles.modalCostRow}>
             <MaterialCommunityIcons name="diamond-stone" size={18} color={COLORS.gemGold} />
@@ -404,28 +404,27 @@ function CatCard({ cat, isSelected, isOwned, evolutionXp, stage, unlockedAbiliti
         style={StyleSheet.absoluteFill}
       />
 
-      {/* Character showcase area */}
+      {/* Character showcase area — 3D for owned, dimmed SVG for locked */}
       <View style={styles.showcaseArea}>
         {isOwned ? (
           <View style={styles.characterDisplay}>
             <SelectBurst color={cat.color} active={showBurst} />
-            <KeysieSvg
-              mood={isSelected ? 'celebrating' : 'happy'}
-              size="large"
-              accentColor={cat.color}
-              pixelSize={140}
-              visuals={cat.visuals}
+            <Cat3DCanvas
+              catId={cat.id}
+              size={140}
+              pose={isSelected ? 'celebrate' : 'idle'}
+              evolutionStage={stage}
             />
           </View>
         ) : (
           <View style={styles.lockedCharacter}>
             <View style={{ opacity: 0.4 }}>
-              <KeysieSvg
+              <Cat3DCanvas
+                catId={cat.id}
+                size={140}
                 mood="happy"
-                size="large"
-                accentColor={cat.color}
-                pixelSize={140}
-                visuals={cat.visuals}
+                pose="idle"
+                forceSVG
               />
             </View>
             <View style={styles.lockedBadge}>

@@ -82,6 +82,23 @@ jest.mock('expo-speech', () => ({
   getAvailableVoicesAsync: jest.fn(() => Promise.resolve([])),
 }));
 
+// Mock expo-crypto
+jest.mock('expo-crypto', () => ({
+  getRandomBytes: jest.fn((size) => {
+    const bytes = new Uint8Array(size);
+    for (let i = 0; i < size; i++) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+    return bytes;
+  }),
+  getRandomValues: jest.fn((array) => {
+    for (let i = 0; i < array.length; i++) {
+      array[i] = Math.floor(Math.random() * 256);
+    }
+    return array;
+  }),
+}));
+
 // Mock AsyncStorage (Expo Go compatible version)
 jest.mock('@react-native-async-storage/async-storage', () => {
   const storage = new Map();
@@ -121,3 +138,98 @@ jest.mock('@react-native-async-storage/async-storage', () => {
     },
   };
 });
+
+// Mock 3D rendering modules (not available in Jest node environment)
+jest.mock('@react-three/fiber/native', () => ({
+  Canvas: jest.fn(({ children }) => children),
+  useFrame: jest.fn(),
+}));
+
+jest.mock('@react-three/drei/native', () => ({
+  useGLTF: jest.fn(() => ({
+    scene: { clone: jest.fn(() => ({ traverse: jest.fn() })) },
+    animations: [],
+  })),
+  useAnimations: jest.fn(() => ({
+    actions: {},
+    mixer: null,
+  })),
+}));
+
+jest.mock('three', () => {
+  const MockGeometry = jest.fn();
+  const MockColor = jest.fn(() => ({
+    multiplyScalar: jest.fn(() => ({ getHexString: jest.fn(() => '000000') })),
+    offsetHSL: jest.fn(() => ({ getHexString: jest.fn(() => 'ffffff') })),
+    getHexString: jest.fn(() => '000000'),
+  }));
+  return {
+    Color: MockColor,
+    Mesh: jest.fn(),
+    Group: jest.fn(),
+    MeshStandardMaterial: jest.fn(),
+    SphereGeometry: MockGeometry,
+    BoxGeometry: MockGeometry,
+    TorusGeometry: MockGeometry,
+    ConeGeometry: MockGeometry,
+    RingGeometry: MockGeometry,
+    CylinderGeometry: MockGeometry,
+    DoubleSide: 2,
+    BackSide: 1,
+  };
+});
+
+jest.mock('expo-gl', () => ({
+  GLView: jest.fn(),
+}));
+
+// Mock Firebase modules (prevent real Firebase initialization in test environment)
+jest.mock('firebase/app', () => ({
+  initializeApp: jest.fn(() => ({})),
+}));
+
+jest.mock('firebase/auth', () => ({
+  initializeAuth: jest.fn(() => ({
+    emulatorConfig: null,
+    currentUser: null,
+    onAuthStateChanged: jest.fn(() => jest.fn()),
+  })),
+  getReactNativePersistence: jest.fn(() => ({})),
+  connectAuthEmulator: jest.fn(),
+  signInAnonymously: jest.fn(() => Promise.resolve({ user: { uid: 'test-uid' } })),
+  signInWithEmailAndPassword: jest.fn(),
+  createUserWithEmailAndPassword: jest.fn(),
+  signOut: jest.fn(() => Promise.resolve()),
+  onAuthStateChanged: jest.fn(() => jest.fn()),
+}));
+
+jest.mock('firebase/firestore', () => ({
+  getFirestore: jest.fn(() => ({})),
+  connectFirestoreEmulator: jest.fn(),
+  collection: jest.fn(),
+  doc: jest.fn(),
+  getDoc: jest.fn(),
+  getDocs: jest.fn(),
+  setDoc: jest.fn(),
+  updateDoc: jest.fn(),
+  deleteDoc: jest.fn(),
+  query: jest.fn(),
+  where: jest.fn(),
+  orderBy: jest.fn(),
+  limit: jest.fn(),
+  startAfter: jest.fn(),
+  serverTimestamp: jest.fn(),
+  increment: jest.fn(),
+  Timestamp: {
+    fromMillis: jest.fn((ms) => ({ toMillis: () => ms, seconds: Math.floor(ms / 1000), nanoseconds: 0 })),
+    fromDate: jest.fn((d) => ({ toMillis: () => d.getTime(), seconds: Math.floor(d.getTime() / 1000), nanoseconds: 0 })),
+    now: jest.fn(() => ({ toMillis: () => Date.now(), seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 })),
+  },
+}));
+
+jest.mock('firebase/functions', () => ({
+  getFunctions: jest.fn(() => ({})),
+  httpsCallable: jest.fn(() => jest.fn(() => Promise.reject(new Error('Cloud Function not available in test')))),
+  connectFunctionsEmulator: jest.fn(),
+}));
+

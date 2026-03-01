@@ -33,6 +33,7 @@ import type { ActiveInputMethod } from '../input/InputManager';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useSongStore } from '../stores/songStore';
 import { analyzeSession, type FreePlayAnalysis } from '../services/FreePlayAnalyzer';
+import { ttsService } from '../services/tts/TTSService';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS, glowColor } from '../theme/tokens';
 import { computeZoomedRange } from '../components/Keyboard/computeZoomedRange';
 import type { NoteEvent } from '../core/exercises/types';
@@ -76,11 +77,11 @@ const RIGHT_KB_OCTAVES = 2; // C4 - C6
 // Horizontal Note Strip — left-to-right piano roll for song mode
 // ============================================================================
 
-const PIXELS_PER_BEAT = 50;
-const NOTE_ROW_HEIGHT = 18;
+const PIXELS_PER_BEAT = 60;
+const NOTE_ROW_HEIGHT = 28;
 const NOTE_COLORS = [
-  '#DC143C', '#E65100', '#FF9800', '#FFC107', '#8BC34A', '#4CAF50',
-  '#009688', '#00BCD4', '#2196F3', '#3F51B5', '#9C27B0', '#E91E63',
+  '#FF3B5C', '#FF6D1F', '#FFA726', '#FFD54F', '#A5D64A', '#66CC66',
+  '#26C6A0', '#29D6E6', '#42A5F5', '#5C6BC0', '#BA68C8', '#F06292',
 ];
 
 function noteColor(midiNote: number): string {
@@ -143,7 +144,7 @@ function HorizontalNoteStrip({
               right: 0,
               top: i * NOTE_ROW_HEIGHT,
               height: 1,
-              backgroundColor: 'rgba(255,255,255,0.04)',
+              backgroundColor: 'rgba(255,255,255,0.08)',
             }}
           />
         ))}
@@ -158,7 +159,7 @@ function HorizontalNoteStrip({
               top: 0,
               bottom: 0,
               width: 1,
-              backgroundColor: i % 4 === 0 ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.03)',
+              backgroundColor: i % 4 === 0 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.06)',
             }}
           />
         ))}
@@ -179,15 +180,15 @@ function HorizontalNoteStrip({
                 backgroundColor: isHighlighted
                   ? COLORS.success
                   : noteColor(note.note),
-                borderRadius: 3,
-                opacity: isHighlighted ? 1 : 0.75,
+                borderRadius: 4,
+                opacity: isHighlighted ? 1 : 0.9,
                 justifyContent: 'center',
                 paddingHorizontal: 3,
               }}
             >
               {note.durationBeats * PIXELS_PER_BEAT > 30 && (
-                <Text style={{ fontSize: 8, color: '#fff', fontWeight: '700' }}>
-                  {NOTE_NAMES[note.note % 12]}
+                <Text style={{ fontSize: 11, color: '#fff', fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>
+                  {NOTE_NAMES[note.note % 12]}{Math.floor(note.note / 12) - 1}
                 </Text>
               )}
             </View>
@@ -249,6 +250,7 @@ export function PlayScreen(): React.JSX.Element {
   const [analysis, setAnalysis] = useState<FreePlayAnalysis | null>(null);
   const [activeInput, setActiveInput] = useState<ActiveInputMethod>('touch');
   const preferredInput = useSettingsStore((s) => s.preferredInputMethod);
+  const selectedCatId = useSettingsStore((s) => s.selectedCatId);
   const recordingStartRef = useRef(0);
   const audioEngineRef = useRef(createAudioEngine());
   const inputManagerRef = useRef<InputManager | null>(null);
@@ -263,14 +265,16 @@ export function PlayScreen(): React.JSX.Element {
   // Song reference state
   const [showSongPicker, setShowSongPicker] = useState(false);
   const [selectedSongTitle, setSelectedSongTitle] = useState<string | null>(null);
+  const [songLoadError, setSongLoadError] = useState<string | null>(null);
   const loadSong = useSongStore((s) => s.loadSong);
   const currentSong = useSongStore((s) => s.currentSong);
+  const isLoadingSong = useSongStore((s) => s.isLoadingSong);
   const [selectedSectionIndex, setSelectedSectionIndex] = useState(0);
 
   // Song mode: when a song is loaded, switch to portrait with note strip
-  const songMode = !!(currentSong && selectedSongTitle);
+  const songMode = !!(currentSong?.sections && selectedSongTitle);
   const songNotes: NoteEvent[] = songMode
-    ? (currentSong!.sections[selectedSectionIndex]?.layers.melody ?? [])
+    ? (currentSong?.sections[selectedSectionIndex]?.layers?.melody ?? [])
     : [];
 
   // Compute keyboard range from song notes (zoom to the relevant octaves)
@@ -326,6 +330,8 @@ export function PlayScreen(): React.JSX.Element {
       autoReleaseTimersRef.current.clear();
       // Clear silence analysis timer
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      // Stop any ongoing TTS
+      ttsService.stop();
     };
   }, []);
 
@@ -431,7 +437,15 @@ export function PlayScreen(): React.JSX.Element {
       setAnalysis(null); // dismiss any existing analysis card while playing
       silenceTimerRef.current = setTimeout(() => {
         if (sessionNotesRef.current.length > 0) {
-          setAnalysis(analyzeSession(sessionNotesRef.current));
+          const result = analyzeSession(sessionNotesRef.current);
+          setAnalysis(result);
+          // Voice summary using the user's selected cat
+          if (result.detectedKey) {
+            const voiceSummary = result.suggestedDrillType
+              ? `You played in ${result.detectedKey}. Try a ${result.suggestedDrillType} drill to improve.`
+              : `You played in ${result.detectedKey}. Nice session!`;
+            ttsService.speak(voiceSummary, { catId: selectedCatId });
+          }
         }
       }, 2000);
 
@@ -624,10 +638,16 @@ export function PlayScreen(): React.JSX.Element {
   // Song reference
   // --------------------------------------------------------------------------
   const handleSongSelect = useCallback(
-    (songId: string, songTitle: string) => {
+    async (songId: string, songTitle: string) => {
       setSelectedSongTitle(songTitle);
       setShowSongPicker(false);
-      loadSong(songId);
+      setSongLoadError(null);
+      await loadSong(songId);
+      // loadSong swallows errors — check if song actually loaded
+      const loaded = useSongStore.getState().currentSong;
+      if (!loaded) {
+        setSongLoadError('Could not load song. Try again later.');
+      }
     },
     [loadSong],
   );
@@ -638,6 +658,46 @@ export function PlayScreen(): React.JSX.Element {
   const handleBack = useCallback(() => {
     navigation.goBack();
   }, [navigation]);
+
+  // --------------------------------------------------------------------------
+  // Render — Song Loading / Error State
+  // --------------------------------------------------------------------------
+  if (selectedSongTitle && !currentSong) {
+    return (
+      <SafeAreaView style={songStyles.container} testID="play-screen">
+        <View style={songStyles.header}>
+          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+            <MaterialCommunityIcons name="arrow-left" size={22} color={COLORS.textPrimary} />
+          </TouchableOpacity>
+          <View style={songStyles.headerCenter}>
+            <Text style={songStyles.headerTitle} numberOfLines={1}>
+              {selectedSongTitle}
+            </Text>
+            <Text style={songStyles.headerSubtitle}>
+              {isLoadingSong ? 'Loading...' : songLoadError ?? 'Song unavailable'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => { setSelectedSongTitle(null); setSongLoadError(null); }}
+            style={songStyles.closeSongBtn}
+          >
+            <MaterialCommunityIcons name="close" size={18} color={COLORS.textMuted} />
+          </TouchableOpacity>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          {isLoadingSong ? (
+            <Text style={{ color: COLORS.textSecondary, ...TYPOGRAPHY.body }}>Loading song...</Text>
+          ) : (
+            <TouchableOpacity onPress={() => { setSelectedSongTitle(null); setSongLoadError(null); }}>
+              <Text style={{ color: COLORS.info, ...TYPOGRAPHY.body }}>
+                {songLoadError ?? 'Could not load song.'} Tap to dismiss.
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   // --------------------------------------------------------------------------
   // Render — Song Mode (portrait, note strip + keyboard at bottom)
@@ -655,7 +715,7 @@ export function PlayScreen(): React.JSX.Element {
               {selectedSongTitle}
             </Text>
             <Text style={songStyles.headerSubtitle}>
-              {currentSong!.metadata.artist} · {currentSong!.settings.tempo} BPM · {currentSong!.settings.keySignature}
+              {currentSong?.metadata?.artist ?? ''} · {currentSong?.settings?.tempo ?? 120} BPM · {currentSong?.settings?.keySignature ?? 'C'}
             </Text>
           </View>
           <TouchableOpacity
@@ -667,9 +727,9 @@ export function PlayScreen(): React.JSX.Element {
         </View>
 
         {/* Section selector */}
-        {currentSong!.sections.length > 1 && (
+        {(currentSong?.sections?.length ?? 0) > 1 && (
           <SongSectionPills
-            sections={currentSong!.sections}
+            sections={currentSong?.sections ?? []}
             selectedIndex={selectedSectionIndex}
             onSelect={setSelectedSectionIndex}
           />
@@ -1260,6 +1320,7 @@ const songStyles = StyleSheet.create({
   // Note strip
   noteStripContainer: {
     flex: 1,
+    minHeight: 120,
     marginHorizontal: SPACING.sm,
     marginVertical: SPACING.xs,
     backgroundColor: COLORS.surface,
@@ -1273,16 +1334,18 @@ const songStyles = StyleSheet.create({
     flexDirection: 'row',
   },
   noteLabels: {
-    width: 32,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    width: 40,
+    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-start',
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(255,255,255,0.1)',
   },
   noteLabelRow: {
     justifyContent: 'center',
-    paddingLeft: 3,
+    paddingLeft: 4,
   },
   noteLabelText: {
-    fontSize: 7,
+    fontSize: 10,
     fontWeight: '700',
     fontFamily: 'monospace',
   },

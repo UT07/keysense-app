@@ -1,0 +1,76 @@
+# Performance and Stress Test
+# Tests app performance under various conditions
+
+appId: ${APP_ID}
+name: Performance and Stress Testing
+tags:
+  - performance
+  - stress
+
+---
+
+- launchApp:
+    clearState: true
+
+# Measure app launch time
+- assertVisible:
+    timeout: 3000
+
+- takeScreenshot: screenshots/perf-launch
+
+# Test rapid navigation
+- repeat:
+    count: 5
+    commands:
+      # - tapOn: "Tab 1"
+      # - waitForAnimationToEnd
+      # - tapOn: "Tab 2"
+      # - waitForAnimationToEnd
+      # - tapOn: "Tab 3"
+      # - waitForAnimationToEnd
+      - scroll:
+          direction: DOWN
+          speed: 100
+      - scroll:
+          direction: UP
+          speed: 100
+
+# Test rapid scrolling
+- repeat:
+    count: 10
+    commands:
+      - scroll:
+          direction: DOWN
+          speed: 100
+      - waitForAnimationToEnd:
+          timeout: 500
+
+# Test memory with large lists
+# - tapOn: "Large List"
+- repeat:
+    count: 20
+    commands:
+      - scroll:
+          direction: DOWN
+          speed: 40
+
+- takeScreenshot: screenshots/perf-scroll
+
+# Go back to top
+- repeat:
+    count: 20
+    commands:
+      - scroll:
+          direction: UP
+          speed: 100
+
+# Test rapid input
+# - tapOn: "Search"
+# - inputText: "abcdefghijklmnopqrstuvwxyz"
+# - clearTextField
+# - inputText: "1234567890"
+
+# Test app backgrounding and foregrounding
+- runFlow: ../helpers/background-app.yaml
+
+- takeScreenshot: screenshots/perf-complete

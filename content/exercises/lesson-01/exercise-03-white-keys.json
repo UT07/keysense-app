@@ -1,9 +1,9 @@
 {
   "id": "lesson-01-ex-03",
-  "version": 1,
+  "version": 2,
   "metadata": {
     "title": "White Keys Pattern",
-    "description": "Learn the names of white keys using the white key pattern",
+    "description": "Learn the names of white keys using the five-finger position",
     "difficulty": 1,
     "estimatedMinutes": 3,
     "skills": [
@@ -30,58 +30,65 @@
     {
       "note": 60,
       "startBeat": 0,
-      "durationBeats": 0.5,
+      "durationBeats": 1,
       "hand": "right",
       "finger": 1
     },
     {
       "note": 62,
-      "startBeat": 0.5,
-      "durationBeats": 0.5,
+      "startBeat": 1,
+      "durationBeats": 1,
       "hand": "right",
       "finger": 2
     },
     {
       "note": 64,
-      "startBeat": 1,
-      "durationBeats": 0.5,
+      "startBeat": 2,
+      "durationBeats": 1,
       "hand": "right",
       "finger": 3
     },
     {
       "note": 65,
-      "startBeat": 1.5,
-      "durationBeats": 0.5,
+      "startBeat": 3,
+      "durationBeats": 1,
       "hand": "right",
       "finger": 4
     },
     {
       "note": 67,
-      "startBeat": 2,
-      "durationBeats": 0.5,
+      "startBeat": 4,
+      "durationBeats": 1,
       "hand": "right",
       "finger": 5
     },
     {
-      "note": 69,
-      "startBeat": 2.5,
-      "durationBeats": 0.5,
+      "note": 65,
+      "startBeat": 5,
+      "durationBeats": 1,
       "hand": "right",
       "finger": 4
     },
     {
-      "note": 71,
-      "startBeat": 3,
-      "durationBeats": 0.5,
+      "note": 64,
+      "startBeat": 6,
+      "durationBeats": 1,
       "hand": "right",
       "finger": 3
     },
     {
-      "note": 72,
-      "startBeat": 3.5,
-      "durationBeats": 0.5,
+      "note": 62,
+      "startBeat": 7,
+      "durationBeats": 1,
       "hand": "right",
       "finger": 2
+    },
+    {
+      "note": 60,
+      "startBeat": 8,
+      "durationBeats": 2,
+      "hand": "right",
+      "finger": 1
     }
   ],
   "scoring": {
@@ -96,11 +103,11 @@
     ]
   },
   "hints": {
-    "beforeStart": "Play the white keys from C to C using eighth notes: C-D-E-F-G-A-B-C. Notice there are no black keys between E-F and B-C. Use fingers 1-2-3-4-5-4-3-2 to maintain good technique.",
+    "beforeStart": "Place your right hand in C position: thumb (1) on C, index (2) on D, middle (3) on E, ring (4) on F, pinky (5) on G. Play up C-D-E-F-G then back down G-F-E-D-C. Your hand stays in position the whole time!",
     "commonMistakes": [
       {
         "pattern": "black-key-confusion",
-        "advice": "Remember: There are 7 white keys in a C-to-C pattern. No black keys appear between E-F or between B-C. Listen carefully to the sound to confirm you're on white keys only.",
+        "advice": "Stay on the white keys only. Notice there are no black keys between E-F and B-C — these pairs of white keys sit right next to each other.",
         "triggerCondition": {
           "type": "pitch",
           "threshold": 2
@@ -108,10 +115,10 @@
       },
       {
         "pattern": "finger-number-skip",
-        "advice": "Use your thumb (1) for C, then count up: 2 for D, 3 for E, 4 for F, 5 for G, then back down 4 for A, 3 for B, 2 for high C. This pattern prevents your hand from getting stuck."
+        "advice": "Keep your hand in one position: thumb on C, pinky on G. Going up is 1-2-3-4-5, coming down is 5-4-3-2-1. No hand movement needed!"
       }
     ],
-    "successMessage": "Excellent! You've learned the white key pattern. This is the foundation for all white key navigation."
+    "successMessage": "Excellent! You've mastered the five-finger position. This is the foundation for all your piano playing."
   },
   "display": {
     "showFingerNumbers": true,

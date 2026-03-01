@@ -28,6 +28,7 @@ import {
   registerFriendCode,
   lookupFriendCode,
   sendFriendRequest,
+  getUserPublicProfile,
 } from '../services/firebase/socialService';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../theme/tokens';
 import type { RootStackParamList } from '../navigation/AppNavigator';
@@ -67,6 +68,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
 export function AddFriendScreen(): React.JSX.Element {
   const navigation = useNavigation<Nav>();
   const user = useAuthStore((s) => s.user);
+  const isAnonymous = useAuthStore((s) => s.isAnonymous);
   const friendCode = useSocialStore((s) => s.friendCode);
   const setFriendCode = useSocialStore((s) => s.setFriendCode);
   const friends = useSocialStore((s) => s.friends);
@@ -81,6 +83,39 @@ export function AddFriendScreen(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auth gate: anonymous users cannot use friend codes
+  if (isAnonymous) {
+    return (
+      <SafeAreaView style={styles.container} testID="add-friend-screen">
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            testID="add-friend-back"
+          >
+            <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Add Friend</Text>
+          <View style={styles.backButton} />
+        </View>
+        <View style={styles.authGateContainer}>
+          <MaterialCommunityIcons name="account-lock" size={64} color={COLORS.textMuted} />
+          <Text style={styles.authGateTitle}>Sign In Required</Text>
+          <Text style={styles.authGateSubtitle}>
+            Sign in to generate your friend code and add friends.
+          </Text>
+          <TouchableOpacity
+            style={styles.authGateButton}
+            onPress={() => navigation.navigate('Auth')}
+          >
+            <Text style={styles.authGateButtonText}>Sign In</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   // Register friend code on mount if not yet set
   useEffect(() => {
@@ -166,20 +201,25 @@ export function AddFriendScreen(): React.JSX.Element {
         return;
       }
 
+      // Fetch the friend's profile to get their display name and cat
+      const friendProfile = await getUserPublicProfile(friendUid);
+      const friendDisplayName = friendProfile?.displayName || 'Player';
+      const friendCatId = friendProfile?.selectedCatId || '';
+
       await sendFriendRequest(
         user.uid,
         friendUid,
         displayName || 'Player',
         selectedCatId,
-        '', // We don't know their display name yet — Firestore has it
-        '', // Same for their cat
+        friendDisplayName,
+        friendCatId,
       );
 
-      // Add to local store
+      // Add to local store with actual profile data
       addFriend({
         uid: friendUid,
-        displayName: 'Friend',
-        selectedCatId: '',
+        displayName: friendDisplayName,
+        selectedCatId: friendCatId,
         status: 'pending_outgoing',
         connectedAt: Date.now(),
       });
@@ -467,5 +507,34 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.body.md,
     color: COLORS.success,
     flex: 1,
+  },
+  // Auth gate for anonymous users
+  authGateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.xl,
+  },
+  authGateTitle: {
+    ...TYPOGRAPHY.heading.lg,
+    color: COLORS.textPrimary,
+    marginTop: SPACING.lg,
+  },
+  authGateSubtitle: {
+    ...TYPOGRAPHY.body.md,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.xl,
+  },
+  authGateButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: BORDER_RADIUS.lg,
+  },
+  authGateButtonText: {
+    ...TYPOGRAPHY.button.lg,
+    color: COLORS.textPrimary,
   },
 });

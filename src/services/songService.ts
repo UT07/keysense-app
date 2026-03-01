@@ -40,6 +40,9 @@ export async function getSongSummaries(
   pageAfter?: QueryDocumentSnapshot,
 ): Promise<{ summaries: SongSummary[]; lastDoc: QueryDocumentSnapshot | null }> {
   const constraints: Parameters<typeof query>[1][] = [];
+  const hasFilters =
+    (filter.genre && filter.genre !== 'all') ||
+    (filter.difficulty && filter.difficulty !== 'all');
 
   if (filter.genre && filter.genre !== 'all') {
     constraints.push(where('metadata.genre', '==', filter.genre));
@@ -48,17 +51,20 @@ export async function getSongSummaries(
     constraints.push(where('metadata.difficulty', '==', filter.difficulty));
   }
 
-  constraints.push(orderBy('metadata.title'));
-  constraints.push(limit(pageSize));
-
-  if (pageAfter) {
-    constraints.push(startAfter(pageAfter));
+  // Only use orderBy when no where-clauses are present (avoids composite index requirement).
+  // With filters active, we sort client-side instead.
+  if (!hasFilters) {
+    constraints.push(orderBy('metadata.title'));
+    constraints.push(limit(pageSize));
+    if (pageAfter) {
+      constraints.push(startAfter(pageAfter));
+    }
   }
 
   const q = query(collection(db, 'songs'), ...constraints);
   const snap = await getDocs(q);
 
-  const summaries: SongSummary[] = snap.docs.map((d) => {
+  let summaries: SongSummary[] = snap.docs.map((d) => {
     const data = d.data() as Song;
     return {
       id: data.id,
@@ -73,17 +79,24 @@ export async function getSongSummaries(
   });
 
   // Client-side text search (Firestore doesn't support full-text search)
-  const filtered = filter.searchQuery
-    ? summaries.filter(
-        (s) =>
-          s.metadata.title.toLowerCase().includes(filter.searchQuery!.toLowerCase()) ||
-          s.metadata.artist.toLowerCase().includes(filter.searchQuery!.toLowerCase()),
-      )
-    : summaries;
+  if (filter.searchQuery) {
+    const q = filter.searchQuery.toLowerCase();
+    summaries = summaries.filter(
+      (s) =>
+        s.metadata.title.toLowerCase().includes(q) ||
+        s.metadata.artist.toLowerCase().includes(q),
+    );
+  }
+
+  // Client-side sort + pagination when filters are active
+  summaries.sort((a, b) => a.metadata.title.localeCompare(b.metadata.title));
+  if (hasFilters) {
+    summaries = summaries.slice(0, pageSize);
+  }
 
   const lastDoc = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
 
-  return { summaries: filtered, lastDoc };
+  return { summaries, lastDoc };
 }
 
 export async function searchSongs(

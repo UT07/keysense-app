@@ -20,113 +20,220 @@ service cloud.firestore {
              get(/databases/{database}/documents/admins/{request.auth.uid}).exists;
     }
 
+    function isNotAnonymous() {
+      return isAuthenticated() &&
+             request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
     // ========================================================================
     // User Profiles (users/{uid})
     // ========================================================================
 
     match /users/{userId} {
-      // Read own profile
-      allow read: if isOwner(userId);
+      // Owner reads own full profile; any authenticated user can read
+      // public profile fields (displayName, selectedCatId) for friend requests
+      allow read: if isAuthenticated();
 
       // Create profile on signup
       allow create: if isOwner(userId) &&
                       request.resource.data.uid == userId &&
-                      request.resource.data.email != null &&
                       request.resource.data.createdAt != null;
 
       // Update own profile
       allow update: if isOwner(userId) &&
-                       request.resource.data.uid == userId &&
-                       // Don't allow changing email directly
-                       request.resource.data.email == resource.data.email;
+                       request.resource.data.uid == userId;
 
       // Delete own profile
       allow delete: if isOwner(userId);
 
-      // ======================================================================
+      // ====================================================================
       // Progress Sub-collection (users/{uid}/progress/{lessonId})
-      // ======================================================================
+      // ====================================================================
 
       match /progress/{lessonId} {
-        // Read own progress
         allow read: if isOwner(userId);
-
-        // Create progress document
         allow create: if isOwner(userId) &&
-                        request.resource.data.lessonId == lessonId &&
-                        request.resource.data.status in ['locked', 'available', 'in_progress', 'completed'];
-
-        // Update own progress
-        allow update: if isOwner(userId) &&
-                         request.resource.data.lessonId == lessonId;
-
-        // Delete progress (typically not done)
+                        request.resource.data.lessonId == lessonId;
+        allow update: if isOwner(userId);
+        // Allow deletion for account cleanup (via Cloud Functions)
         allow delete: if false;
       }
 
-      // ======================================================================
-      // Gamification Sub-collection (users/{uid}/gamification/{doc})
-      // ======================================================================
+      // ====================================================================
+      // Gamification Sub-collection (users/{uid}/gamification/{docId})
+      // Explicit document IDs instead of wildcard
+      // ====================================================================
 
-      match /gamification/{document=**} {
-        // Read own gamification data
+      match /gamification/{docId} {
         allow read: if isOwner(userId);
-
-        // Create and update own gamification data
         allow create, update: if isOwner(userId) &&
-                              request.resource.data.uid == userId;
-
-        // Prevent deletion of gamification data
+                                 docId in ['data', 'catEvolution', 'gems'];
         allow delete: if false;
       }
 
-      // ======================================================================
+      // ====================================================================
       // XP Log Sub-collection (users/{uid}/xpLog/{doc})
-      // ======================================================================
+      // ====================================================================
 
-      match /xpLog/{document=**} {
-        // Read own XP log
+      match /xpLog/{logId} {
         allow read: if isOwner(userId);
+        // Client cannot write — only Cloud Functions
+        allow create, update, delete: if false;
+      }
 
-        // Create XP log entries (server-side only)
-        allow create: if false;
+      // ====================================================================
+      // Sync Log Sub-collection (users/{uid}/syncLog/{doc})
+      // ====================================================================
 
-        // Prevent updates and deletes
+      match /syncLog/{logId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
+        allow delete: if false;
+      }
+
+      // ====================================================================
+      // Settings Sub-collection (users/{uid}/settings/{doc})
+      // ====================================================================
+
+      match /settings/{settingId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId);
+        allow delete: if false;
+      }
+
+      // ====================================================================
+      // Friends Sub-collection (users/{uid}/friends/{friendUid})
+      // ====================================================================
+
+      match /friends/{friendUid} {
+        // Owner reads own friends list
+        allow read: if isOwner(userId);
+        // Any authenticated non-anonymous user can create friend connections
+        // (needed for sendFriendRequest batch write — writes to BOTH users' subcollections)
+        allow create: if isAuthenticated() && isNotAnonymous();
+        // Owner manages (accept/update) own friend connections
+        allow update: if isOwner(userId) && isNotAnonymous();
+        // Any authenticated user can delete (needed for removeFriendConnection + account cleanup)
+        allow delete: if isAuthenticated();
+      }
+
+      // ====================================================================
+      // Activity Feed (users/{uid}/activity/{itemId})
+      // ====================================================================
+
+      match /activity/{itemId} {
+        // Owner reads own feed; friends can post to it
+        allow read: if isOwner(userId);
+        // Any authenticated non-anonymous user can post (friend posts activity)
+        allow create: if isAuthenticated() && isNotAnonymous();
         allow update, delete: if false;
       }
 
-      // ======================================================================
-      // Sync Log Sub-collection (users/{uid}/syncLog/{doc})
-      // ======================================================================
+      // ====================================================================
+      // Song Mastery (users/{uid}/songMastery/{songId})
+      // ====================================================================
 
-      match /syncLog/{document=**} {
-        // Read own sync log
+      match /songMastery/{songId} {
         allow read: if isOwner(userId);
-
-        // Create sync log entries
-        allow create: if isOwner(userId);
-
-        // Update (mark as synced)
-        allow update: if isOwner(userId) &&
-                         request.resource.data.id == resource.data.id;
-
-        // Prevent deletion
+        allow create, update: if isOwner(userId);
         allow delete: if false;
       }
 
-      // ======================================================================
-      // Settings Sub-collection (users/{uid}/settings/{doc})
-      // ======================================================================
+      // ====================================================================
+      // Song Requests / Rate Limiting (users/{uid}/songRequests/{date})
+      // ====================================================================
 
-      match /settings/{document=**} {
-        // Read own settings
+      match /songRequests/{dateId} {
         allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) &&
+                                 request.resource.data.count is int &&
+                                 request.resource.data.count <= 5;
+        allow delete: if false;
+      }
+    }
 
-        // Update own settings
-        allow update: if isOwner(userId);
+    // ========================================================================
+    // Songs Collection (songs/{songId}) — Public catalog
+    // ========================================================================
 
-        // Prevent creation and deletion through client
-        allow create, delete: if false;
+    match /songs/{songId} {
+      // All authenticated users can browse the song library
+      allow read: if isAuthenticated();
+      // Only admins can add/modify songs
+      allow write: if isAdminUser();
+    }
+
+    // ========================================================================
+    // Friend Codes (friendCodes/{code}) — Public lookup
+    // ========================================================================
+
+    match /friendCodes/{code} {
+      // Any authenticated user can look up a friend code
+      allow read: if isAuthenticated();
+      // Owner can register their code (uid matches auth)
+      allow create: if isAuthenticated() && isNotAnonymous() &&
+                       request.resource.data.uid == request.auth.uid;
+      // No updates from client
+      allow update: if false;
+      // Owner can delete their code (account cleanup)
+      allow delete: if isAuthenticated() &&
+                       resource.data.uid == request.auth.uid;
+    }
+
+    // ========================================================================
+    // Challenges (challenges/{challengeId}) — Friend challenges
+    // ========================================================================
+
+    match /challenges/{challengeId} {
+      // Participants can read
+      allow read: if isAuthenticated() &&
+                     (request.auth.uid == resource.data.fromUid ||
+                      request.auth.uid == resource.data.toUid);
+      // Authenticated non-anonymous users can create challenges
+      allow create: if isAuthenticated() && isNotAnonymous() &&
+                       request.resource.data.fromUid == request.auth.uid;
+      // Participants can update (submit results)
+      allow update: if isAuthenticated() &&
+                       (request.auth.uid == resource.data.fromUid ||
+                        request.auth.uid == resource.data.toUid);
+      // Participants can delete (account cleanup)
+      allow delete: if isAuthenticated() &&
+                       (request.auth.uid == resource.data.fromUid ||
+                        request.auth.uid == resource.data.toUid);
+    }
+
+    // ========================================================================
+    // Leagues (leagues/{leagueId}) — Weekly competition groups
+    // ========================================================================
+
+    match /leagues/{leagueId} {
+      // All authenticated users can read league info
+      allow read: if isAuthenticated();
+      // Authenticated non-anonymous users can create leagues (via assignToLeague transaction)
+      allow create: if isAuthenticated() && isNotAnonymous() &&
+                       request.resource.data.tier is string &&
+                       request.resource.data.weekStart is string &&
+                       request.resource.data.memberCount is int &&
+                       request.resource.data.memberCount <= 30;
+      // Allow updating memberCount (increment on join)
+      allow update: if isAuthenticated() && isNotAnonymous() &&
+                       request.resource.data.tier == resource.data.tier &&
+                       request.resource.data.weekStart == resource.data.weekStart &&
+                       request.resource.data.memberCount is int &&
+                       request.resource.data.memberCount <= 30;
+      allow delete: if false;
+
+      // League Members (leagues/{leagueId}/members/{uid})
+      match /members/{memberUid} {
+        // All authenticated users can read standings
+        allow read: if isAuthenticated();
+        // Members can create their own entry (join) and update own XP
+        allow create: if isOwner(memberUid) && isNotAnonymous();
+        allow update: if isOwner(memberUid) &&
+                         // Only allow updating weeklyXp via increment
+                         request.resource.data.uid == resource.data.uid;
+        allow delete: if false;
       }
     }
 
@@ -134,12 +241,15 @@ service cloud.firestore {
     // Cache Collection (for AI responses and other cached data)
     // ========================================================================
 
-    match /cache/{document=**} {
-      // Only authenticated users can read cache
+    match /cache/{cacheType} {
       allow read: if isAuthenticated();
-
       // Only Cloud Functions can write to cache
-      allow write: if request.auth.uid == null;
+      allow write: if false;
+
+      match /{document=**} {
+        allow read: if isAuthenticated();
+        allow write: if false;
+      }
     }
 
     // ========================================================================
@@ -147,15 +257,10 @@ service cloud.firestore {
     // ========================================================================
 
     match /analytics/{document=**} {
-      // Authenticated users can write analytics
       allow create: if isAuthenticated() &&
                        request.resource.data.userId == request.auth.uid &&
                        request.resource.data.timestamp != null;
-
-      // Only admins can read analytics
       allow read: if isAdminUser();
-
-      // Prevent updates and deletes
       allow update, delete: if false;
     }
 
@@ -164,18 +269,12 @@ service cloud.firestore {
     // ========================================================================
 
     match /exercises/{exerciseId} {
-      // All authenticated users can read exercises
       allow read: if isAuthenticated();
-
-      // Only admins can write
       allow write: if isAdminUser();
     }
 
     match /lessons/{lessonId} {
-      // All authenticated users can read lessons
       allow read: if isAuthenticated();
-
-      // Only admins can write
       allow write: if isAdminUser();
     }
 
@@ -184,10 +283,7 @@ service cloud.firestore {
     // ========================================================================
 
     match /admins/{userId} {
-      // Only the user can read their own admin status
       allow read: if isOwner(userId);
-
-      // Only admins can create/update admin records (prevent escalation)
       allow write: if false;
     }
 

@@ -1,0 +1,309 @@
+name: Comprehensive Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  # Jest Unit Tests
+  jest-tests:
+    name: Jest Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run Jest tests
+        run: npm run test -- --ci --coverage --maxWorkers=2
+      
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/coverage-final.json
+          flags: jest
+          name: jest-coverage
+      
+      - name: Archive test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: jest-test-results
+          path: |
+            coverage/
+            test-results/
+
+  # Detox E2E Tests (iOS)
+  detox-ios:
+    name: Detox E2E Tests (iOS)
+    runs-on: macos-13
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.0'
+          bundler-cache: true
+      
+      - name: Install Detox CLI
+        run: npm install -g detox-cli
+      
+      - name: Cache Pods
+        uses: actions/cache@v3
+        with:
+          path: ios/Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+      
+      - name: Install Pods
+        run: |
+          cd ios
+          pod install --repo-update
+      
+      - name: Build iOS app for Detox
+        run: npm run detox:build:ios || npx detox build --configuration ios.sim.debug
+      
+      - name: Run Detox tests
+        run: npm run detox:test:ios || npx detox test --configuration ios.sim.debug --record-logs all
+      
+      - name: Archive Detox artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: detox-ios-artifacts
+          path: |
+            artifacts/
+            detox-logs/
+
+  # Detox E2E Tests (Android)
+  detox-android:
+    name: Detox E2E Tests (Android)
+    runs-on: macos-13
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      
+      - name: Install Detox CLI
+        run: npm install -g detox-cli
+      
+      - name: Cache Gradle
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+      
+      - name: Build Android app for Detox
+        run: npm run detox:build:android || npx detox build --configuration android.emu.debug
+      
+      - name: Run Detox tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          script: npm run detox:test:android || npx detox test --configuration android.emu.debug --record-logs all
+      
+      - name: Archive Detox artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: detox-android-artifacts
+          path: |
+            artifacts/
+            detox-logs/
+
+  # Maestro E2E Tests (iOS)
+  maestro-ios:
+    name: Maestro E2E Tests (iOS)
+    runs-on: macos-13
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Setup Expo
+        run: npm install -g expo-cli eas-cli
+      
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "${HOME}/.maestro/bin" >> $GITHUB_PATH
+      
+      - name: Create .env file
+        run: |
+          cat > .maestro/.env << EOF
+          APP_ID=${{ secrets.IOS_APP_ID || 'com.example.app' }}
+          TEST_EMAIL=${{ secrets.TEST_EMAIL || 'test@example.com' }}
+          TEST_PASSWORD=${{ secrets.TEST_PASSWORD || 'testpass123' }}
+          EOF
+      
+      - name: Build iOS app
+        run: |
+          npx expo prebuild --platform ios --clean || true
+          cd ios
+          xcodebuild -workspace *.xcworkspace -scheme $(xcodebuild -list -workspace *.xcworkspace | grep -A 1 "Schemes:" | tail -1 | xargs) -configuration Debug -sdk iphonesimulator -derivedDataPath build
+      
+      - name: Start iOS Simulator
+        run: |
+          xcrun simctl boot "iPhone 15 Pro" || true
+      
+      - name: Run Maestro tests
+        run: |
+          maestro test --env .maestro/.env --format junit --output maestro-results.xml .maestro/flows
+      
+      - name: Archive Maestro artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: maestro-ios-artifacts
+          path: |
+            ~/.maestro/tests/
+            maestro-results.xml
+            .maestro/screenshots/
+
+  # Maestro E2E Tests (Android)
+  maestro-android:
+    name: Maestro E2E Tests (Android)
+    runs-on: macos-13
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "${HOME}/.maestro/bin" >> $GITHUB_PATH
+      
+      - name: Create .env file
+        run: |
+          cat > .maestro/.env << EOF
+          APP_ID=${{ secrets.ANDROID_APP_ID || 'com.example.app' }}
+          TEST_EMAIL=${{ secrets.TEST_EMAIL || 'test@example.com' }}
+          TEST_PASSWORD=${{ secrets.TEST_PASSWORD || 'testpass123' }}
+          EOF
+      
+      - name: Build Android app
+        run: |
+          npx expo prebuild --platform android --clean || true
+          cd android
+          ./gradlew assembleDebug
+      
+      - name: Run Maestro tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          script: maestro test --env .maestro/.env --format junit --output maestro-results.xml .maestro/flows
+      
+      - name: Archive Maestro artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: maestro-android-artifacts
+          path: |
+            ~/.maestro/tests/
+            maestro-results.xml
+            .maestro/screenshots/
+
+  # Test summary
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [jest-tests, detox-ios, detox-android, maestro-ios, maestro-android]
+    if: always()
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+      
+      - name: Create test summary
+        run: |
+          echo "# Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Status" >> $GITHUB_STEP_SUMMARY
+          echo "- Jest Unit Tests: ${{ needs.jest-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Detox iOS: ${{ needs.detox-ios.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Detox Android: ${{ needs.detox-android.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Maestro iOS: ${{ needs.maestro-ios.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Maestro Android: ${{ needs.maestro-android.result }}" >> $GITHUB_STEP_SUMMARY
+      
+      - name: Check if all tests passed
+        if: |
+          needs.jest-tests.result != 'success' ||
+          needs.detox-ios.result != 'success' ||
+          needs.detox-android.result != 'success' ||
+          needs.maestro-ios.result != 'success' ||
+          needs.maestro-android.result != 'success'
+        run: exit 1

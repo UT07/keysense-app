@@ -34,7 +34,7 @@ import { useGemStore } from '../stores/gemStore';
 import { useCatEvolutionStore } from '../stores/catEvolutionStore';
 import { SKILL_TREE } from '../core/curriculum/SkillTree';
 import { hasTierMasteryTestPassed } from '../core/curriculum/tierMasteryTest';
-import { CatAvatar } from '../components/Mascot/CatAvatar';
+import { Cat3DCanvas } from '../components/Mascot/3d';
 import { SalsaCoach } from '../components/Mascot/SalsaCoach';
 import { COLORS, GRADIENTS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../theme/tokens';
 import type { RootStackParamList } from '../navigation/AppNavigator';
@@ -535,12 +535,12 @@ function PathNode({
         styles.catCompanion,
         data.state === 'locked' && styles.catCompanionLocked,
       ]}>
-        <CatAvatar
+        <Cat3DCanvas
           catId={tierCatId}
-          size="small"
+          size={48}
           mood={data.state === 'current' ? 'encouraging' : data.state === 'completed' ? 'happy' : 'teaching'}
-          skipEntryAnimation
-          showTooltipOnTap={false}
+          pose={data.state === 'current' ? 'teach' : data.state === 'completed' ? 'celebrate' : 'idle'}
+          forceSVG
         />
       </View>
     </Animated.View>
@@ -584,12 +584,12 @@ function SectionBanner({
         {rewardCatId && (
           <View style={styles.sectionRewardBadge}>
             {catOwned ? (
-              <CatAvatar
+              <Cat3DCanvas
                 catId={rewardCatId}
-                size="small"
+                size={40}
                 mood="happy"
-                skipEntryAnimation
-                showTooltipOnTap={false}
+                pose="idle"
+                forceSVG
               />
             ) : (
               <View style={styles.sectionRewardLocked}>

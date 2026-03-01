@@ -1,6 +1,6 @@
 {
   "id": "lesson-04-ex-04",
-  "version": 1,
+  "version": 2,
   "metadata": {
     "title": "Ode to Joy (Introduction)",
     "description": "Play the opening phrase of Beethoven's Ode to Joy with both hands",
@@ -30,115 +30,164 @@
   },
   "notes": [
     {
-      "note": 36,
-      "startBeat": 0,
-      "durationBeats": 1,
-      "hand": "left",
-      "finger": 5
-    },
-    {
-      "note": 67,
-      "startBeat": 0,
-      "durationBeats": 1,
-      "hand": "right",
-      "finger": 5
-    },
-    {
       "note": 48,
-      "startBeat": 1,
-      "durationBeats": 1,
+      "startBeat": 0,
+      "durationBeats": 2,
       "hand": "left",
       "finger": 5
     },
     {
-      "note": 67,
+      "note": 64,
+      "startBeat": 0,
+      "durationBeats": 1,
+      "hand": "right",
+      "finger": 3
+    },
+    {
+      "note": 64,
       "startBeat": 1,
       "durationBeats": 1,
       "hand": "right",
-      "finger": 5
+      "finger": 3
     },
     {
-      "note": 36,
-      "startBeat": 2,
-      "durationBeats": 1,
-      "hand": "left",
-      "finger": 5
-    },
-    {
-      "note": 69,
+      "note": 65,
       "startBeat": 2,
       "durationBeats": 1,
       "hand": "right",
       "finger": 4
     },
     {
-      "note": 48,
-      "startBeat": 3,
-      "durationBeats": 1,
+      "note": 43,
+      "startBeat": 2,
+      "durationBeats": 2,
       "hand": "left",
       "finger": 5
     },
     {
-      "note": 71,
+      "note": 67,
       "startBeat": 3,
+      "durationBeats": 1,
+      "hand": "right",
+      "finger": 5
+    },
+    {
+      "note": 48,
+      "startBeat": 4,
+      "durationBeats": 2,
+      "hand": "left",
+      "finger": 5
+    },
+    {
+      "note": 67,
+      "startBeat": 4,
+      "durationBeats": 1,
+      "hand": "right",
+      "finger": 5
+    },
+    {
+      "note": 65,
+      "startBeat": 5,
+      "durationBeats": 1,
+      "hand": "right",
+      "finger": 4
+    },
+    {
+      "note": 43,
+      "startBeat": 6,
+      "durationBeats": 2,
+      "hand": "left",
+      "finger": 5
+    },
+    {
+      "note": 64,
+      "startBeat": 6,
       "durationBeats": 1,
       "hand": "right",
       "finger": 3
     },
     {
-      "note": 36,
-      "startBeat": 4,
-      "durationBeats": 1,
-      "hand": "left",
-      "finger": 5
-    },
-    {
-      "note": 72,
-      "startBeat": 4,
+      "note": 62,
+      "startBeat": 7,
       "durationBeats": 1,
       "hand": "right",
       "finger": 2
     },
     {
       "note": 48,
-      "startBeat": 5,
-      "durationBeats": 1,
+      "startBeat": 8,
+      "durationBeats": 2,
       "hand": "left",
       "finger": 5
     },
     {
-      "note": 71,
-      "startBeat": 5,
+      "note": 60,
+      "startBeat": 8,
+      "durationBeats": 1,
+      "hand": "right",
+      "finger": 1
+    },
+    {
+      "note": 60,
+      "startBeat": 9,
+      "durationBeats": 1,
+      "hand": "right",
+      "finger": 1
+    },
+    {
+      "note": 43,
+      "startBeat": 10,
+      "durationBeats": 2,
+      "hand": "left",
+      "finger": 5
+    },
+    {
+      "note": 62,
+      "startBeat": 10,
+      "durationBeats": 1,
+      "hand": "right",
+      "finger": 2
+    },
+    {
+      "note": 64,
+      "startBeat": 11,
       "durationBeats": 1,
       "hand": "right",
       "finger": 3
     },
     {
-      "note": 36,
-      "startBeat": 6,
-      "durationBeats": 1,
-      "hand": "left",
-      "finger": 5
-    },
-    {
-      "note": 69,
-      "startBeat": 6,
-      "durationBeats": 1,
-      "hand": "right",
-      "finger": 4
-    },
-    {
       "note": 48,
-      "startBeat": 7,
-      "durationBeats": 1,
+      "startBeat": 12,
+      "durationBeats": 2,
       "hand": "left",
       "finger": 5
     },
     {
-      "note": 67,
-      "startBeat": 7,
+      "note": 64,
+      "startBeat": 12,
+      "durationBeats": 1.5,
+      "hand": "right",
+      "finger": 3
+    },
+    {
+      "note": 62,
+      "startBeat": 13.5,
+      "durationBeats": 0.5,
+      "hand": "right",
+      "finger": 2
+    },
+    {
+      "note": 62,
+      "startBeat": 14,
       "durationBeats": 2,
       "hand": "right",
+      "finger": 2
+    },
+    {
+      "note": 43,
+      "startBeat": 14,
+      "durationBeats": 2,
+      "hand": "left",
       "finger": 5
     }
   ],
@@ -146,27 +195,27 @@
     "timingToleranceMs": 60,
     "timingGracePeriodMs": 160,
     "velocitySensitive": false,
-    "passingScore": 72,
+    "passingScore": 70,
     "starThresholds": [
-      72,
+      70,
       84,
       94
     ]
   },
   "hints": {
-    "beforeStart": "This is the opening of Beethoven's immortal Ode to Joy! The melody ascends from G: G-G-A-B-C-B-A-G, while the left hand maintains steady C and G bass. The melody is mostly quarter notes with a final half note.",
+    "beforeStart": "This is the opening of Beethoven's immortal Ode to Joy! The right hand melody is E-E-F-G | G-F-E-D | C-C-D-E | E-D-D. The left hand plays steady bass notes (C and G). Keep both hands relaxed.",
     "commonMistakes": [
       {
-        "pattern": "high-notes",
-        "advice": "The melody goes high (up to C, note 72). Make sure your hand position allows you to reach. You may need to shift your right hand slightly higher for this piece.",
+        "pattern": "wrong-melody",
+        "advice": "The melody starts on E (not C or G). Think 'E-E-F-G' for the first four notes. Each phrase of four notes steps up then comes back down.",
         "triggerCondition": {
           "type": "pitch",
-          "threshold": 70
+          "threshold": 2
         }
       },
       {
         "pattern": "lost-coordination",
-        "advice": "With a more famous melody, you might anticipate where it goes and rush ahead. Stay with the metronome and the steady left-hand bass. The music will sound right if the rhythm is right."
+        "advice": "Focus on the left hand bass first — it alternates between C and G every two beats. Once that feels automatic, add the right hand melody on top."
       }
     ],
     "successMessage": "Magnificent! You've just played one of the world's most famous melodies. Beethoven would be proud!"

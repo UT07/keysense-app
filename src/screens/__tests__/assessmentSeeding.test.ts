@@ -23,6 +23,11 @@ import {
   getSkillsToSeedForLesson,
 } from '../SkillAssessmentScreen';
 
+jest.mock('../../input/AudioCapture', () => ({
+  configureAudioSessionForRecording: jest.fn(),
+  requestMicrophonePermission: jest.fn().mockResolvedValue(true),
+}));
+
 jest.mock('../../audio/createAudioEngine', () => ({
   createAudioEngine: jest.fn(() => ({
     isReady: () => true,

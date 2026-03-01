@@ -1,6 +1,6 @@
 {
   "id": "lesson-04-ex-02",
-  "version": 1,
+  "version": 2,
   "metadata": {
     "title": "Mary Had a Little Lamb (Full)",
     "description": "Play the complete song with melody and bass accompaniment",
@@ -107,11 +107,11 @@
       "finger": 5
     },
     {
-      "note": 65,
+      "note": 64,
       "startBeat": 5,
       "durationBeats": 1,
       "hand": "right",
-      "finger": 4
+      "finger": 3
     },
     {
       "note": 36,
@@ -135,14 +135,28 @@
       "finger": 5
     },
     {
-      "note": 60,
+      "note": 64,
       "startBeat": 7,
-      "durationBeats": 2,
+      "durationBeats": 1,
       "hand": "right",
-      "finger": 1
+      "finger": 3
     },
     {
       "note": 36,
+      "startBeat": 8,
+      "durationBeats": 1,
+      "hand": "left",
+      "finger": 5
+    },
+    {
+      "note": 62,
+      "startBeat": 8,
+      "durationBeats": 1,
+      "hand": "right",
+      "finger": 2
+    },
+    {
+      "note": 48,
       "startBeat": 9,
       "durationBeats": 1,
       "hand": "left",
@@ -156,7 +170,7 @@
       "finger": 2
     },
     {
-      "note": 48,
+      "note": 36,
       "startBeat": 10,
       "durationBeats": 1,
       "hand": "left",
@@ -165,37 +179,51 @@
     {
       "note": 62,
       "startBeat": 10,
-      "durationBeats": 1,
+      "durationBeats": 2,
       "hand": "right",
       "finger": 2
+    },
+    {
+      "note": 48,
+      "startBeat": 12,
+      "durationBeats": 1,
+      "hand": "left",
+      "finger": 5
+    },
+    {
+      "note": 64,
+      "startBeat": 12,
+      "durationBeats": 1,
+      "hand": "right",
+      "finger": 3
     },
     {
       "note": 36,
-      "startBeat": 11,
+      "startBeat": 13,
       "durationBeats": 1,
       "hand": "left",
       "finger": 5
     },
     {
-      "note": 62,
-      "startBeat": 11,
+      "note": 67,
+      "startBeat": 13,
       "durationBeats": 1,
       "hand": "right",
-      "finger": 2
+      "finger": 5
     },
     {
       "note": 48,
-      "startBeat": 12,
+      "startBeat": 14,
       "durationBeats": 1,
       "hand": "left",
       "finger": 5
     },
     {
-      "note": 60,
-      "startBeat": 12,
+      "note": 67,
+      "startBeat": 14,
       "durationBeats": 2,
       "hand": "right",
-      "finger": 1
+      "finger": 5
     }
   ],
   "scoring": {
@@ -210,7 +238,7 @@
     ]
   },
   "hints": {
-    "beforeStart": "This is the complete 'Mary Had a Little Lamb' with left-hand bass accompaniment. The bass alternates C (36) and G (48) each beat. The melody descends from E with a rest in the middle. Play slowly and focus on hand independence.",
+    "beforeStart": "This is the complete 'Mary Had a Little Lamb' with left-hand bass. The bass alternates C2 (36) and C3 (48) each beat. Phrase 1: E-D-C-D | E-E-E-E. Phrase 2: D-D-D (held). Phrase 3: E-G-G (held). Play slowly and focus on hand independence.",
     "commonMistakes": [
       {
         "pattern": "coordination-breakdown",

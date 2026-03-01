@@ -1,13 +1,13 @@
 /**
  * Demo Playback Service
  *
- * Auto-plays an exercise at reduced tempo (default 60%) with passing-threshold
- * quality. Used for the "Watch Demo" feature where the AI cat shows the student
- * how a piece should be played.
+ * Auto-plays an exercise at full tempo with perfect accuracy.
+ * Used for the "Watch Demo" feature where the student sees exactly
+ * how a piece should be played — correct notes, correct timing.
  *
  * Design decisions:
- * - ~85% of notes are played (simulates imperfection — not robotic)
- * - 60% of played notes get ±20-40ms timing jitter
+ * - All notes are played (no skipping — demo must be pedagogically accurate)
+ * - No timing jitter (demo shows exact rhythm)
  * - Velocity is 0.7 (not full force — gentle demo feel)
  * - Stateless enough to create fresh instances per exercise attempt
  * - No React imports — pure TypeScript service
@@ -43,36 +43,13 @@ export interface DemoScheduleEntry {
 // ============================================================================
 
 /**
- * Generate a "passing threshold" demo schedule.
- *
- * Each note has an 85% chance of being played. Of the played notes, 60% get
- * slight timing jitter (±20-40ms random) to avoid sounding robotic.
- * Skipped notes have zero jitter.
+ * Generate a perfect demo schedule — all notes played, no jitter.
  *
  * @param notes - The exercise's note events
- * @returns Schedule entries, one per note
+ * @returns Schedule entries, one per note (all marked play: true)
  */
 export function generateDemoSchedule(notes: NoteEvent[]): DemoScheduleEntry[] {
-  return notes.map((note) => {
-    const play = Math.random() < 0.85;
-
-    if (!play) {
-      return { note, play: false, jitterMs: 0 };
-    }
-
-    // 60% of played notes get slight jitter
-    const hasJitter = Math.random() < 0.6;
-    let jitterMs = 0;
-    if (hasJitter) {
-      // Generate jitter in range [-40, +40]ms
-      // Use ±20-40ms: pick a magnitude between 20-40, then random sign
-      const magnitude = 20 + Math.random() * 20; // 20-40ms
-      const sign = Math.random() < 0.5 ? -1 : 1;
-      jitterMs = sign * magnitude;
-    }
-
-    return { note, play, jitterMs };
-  });
+  return notes.map((note) => ({ note, play: true, jitterMs: 0 }));
 }
 
 // ============================================================================
@@ -110,7 +87,7 @@ export class DemoPlaybackService {
    *
    * @param exercise - The exercise to play
    * @param audioEngine - Audio engine for sound output
-   * @param speedMultiplier - Tempo multiplier (default 0.6 = 60% speed)
+   * @param speedMultiplier - Tempo multiplier (default 1.0 = full speed)
    * @param onBeatUpdate - Called every frame (~16ms) with the current beat position
    * @param onActiveNotes - Called every frame with the Set of currently sounding MIDI notes
    */
@@ -121,7 +98,7 @@ export class DemoPlaybackService {
   start(
     exercise: Pick<Exercise, 'notes' | 'settings'>,
     audioEngine: DemoAudioEngine,
-    speedMultiplier: number = 0.6,
+    speedMultiplier: number = 1.0,
     onBeatUpdate?: (beat: number) => void,
     onActiveNotes?: (notes: Set<number>) => void,
     onComplete?: () => void,

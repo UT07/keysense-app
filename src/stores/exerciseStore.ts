@@ -18,7 +18,7 @@ import { PersistenceManager, STORAGE_KEYS, createDebouncedSave } from './persist
 /** Data-only shape of exercise session (excludes actions) */
 type ExerciseSessionData = Pick<
   ExerciseSessionState,
-  'currentExercise' | 'currentExerciseId' | 'playedNotes' | 'isPlaying' | 'currentBeat' | 'score' | 'sessionStartTime' | 'sessionEndTime'
+  'currentExercise' | 'currentExerciseId' | 'playedNotes' | 'isPlaying' | 'currentBeat' | 'score' | 'lastCompletedScore' | 'sessionStartTime' | 'sessionEndTime'
 >;
 
 /** Transient demo/ghost state defaults (not persisted to MMKV) */
@@ -36,6 +36,7 @@ const defaultData: ExerciseSessionData = {
   isPlaying: false,
   currentBeat: 0,
   score: null,
+  lastCompletedScore: null,
   sessionStartTime: null,
   sessionEndTime: null,
 };
@@ -80,6 +81,7 @@ export const useExerciseStore = create<ExerciseSessionState>((set, get) => ({
   setScore: (score: ExerciseScore) => {
     const newState = {
       score,
+      lastCompletedScore: score,
       sessionEndTime: Date.now(),
     };
     set(newState);
@@ -137,6 +139,10 @@ export const useExerciseStore = create<ExerciseSessionState>((set, get) => ({
   setDemoWatched: (watched: boolean) => {
     set({ demoWatched: watched });
     // Transient - no persistence
+  },
+
+  clearLastCompletedScore: () => {
+    set({ lastCompletedScore: null });
   },
 
   reset: () => {

@@ -153,6 +153,14 @@ jest.mock('../../components/Mascot/CatAvatar', () => {
   };
 });
 
+jest.mock('../../components/Mascot/3d', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    Cat3DCanvas: (props: any) => React.createElement(View, { testID: 'cat-avatar', ...props }),
+  };
+});
+
 jest.mock('../../components/Mascot/MascotBubble', () => {
   const React = require('react');
   const { View, Text } = require('react-native');

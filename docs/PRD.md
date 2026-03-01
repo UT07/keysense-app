@@ -1,9 +1,9 @@
 # Purrrfect Keys — Product Requirements Document
 
-**Version:** 2.0
-**Last Updated:** February 21, 2026
+**Version:** 3.0
+**Last Updated:** February 28, 2026
 **Author:** Product Team
-**Status:** Active Development (Phase 7 next)
+**Status:** Phase 11 QA + Launch (Phases 1-10.5 complete)
 
 ---
 
@@ -146,18 +146,26 @@ Evolution is NOT cosmetic — it reflects the learner's real progress:
 - [x] Gem-based unlocking
 - [ ] Cat personality preview before purchase
 
-### 4.7 Social (P2 — Phase 9)
-- [ ] Friend list with practice streaks
-- [ ] Weekly leaderboards (opt-in)
-- [ ] Share score cards
-- [ ] Practice challenges (friend vs friend)
+### 4.7 Social (P2 — Phase 10.5) **COMPLETE**
+- [x] Friend list with practice streaks (6-char friend codes, activity feed)
+- [x] Weekly leaderboards (opt-in, 4-tier leagues: Bronze/Silver/Gold/Diamond)
+- [x] Share score cards (react-native-view-shot + expo-sharing)
+- [x] Practice challenges (friend vs friend, 48h window)
+- [x] Local notifications (daily reminder, streak-at-risk)
 
-### 4.8 Audio Input (P2 — Phase 8)
-- [ ] Phone microphone input for real piano detection
-- [ ] Monophonic pitch detection (<200ms latency)
-- [ ] Polyphonic chord detection (ML-based)
-- [ ] Adaptive timing windows per input method
-- [ ] Calibration flow
+### 4.8 Audio Input (P2 — Phase 8) **COMPLETE**
+- [x] Phone microphone input for real piano detection
+- [x] Monophonic pitch detection (YIN algorithm, <150ms latency)
+- [x] Polyphonic chord detection (ONNX Basic Pitch model)
+- [x] Adaptive timing windows per input method (1.5x multiplier for mic)
+- [x] Ambient noise calibration flow (RMS-based threshold auto-tune)
+
+### 4.9 Account Management (P0 — Phase 11) **IN PROGRESS**
+- [x] Account deletion with GDPR compliance (Cloud Function + client-side fallback)
+- [x] Gemini API moved to Cloud Functions (secure server-side API keys)
+- [x] CI/CD pipelines (GitHub Actions: test/lint/typecheck + EAS Build)
+- [ ] Maestro E2E testing (12 flow YAML files planned)
+- [ ] App Store submission preparation
 
 ---
 
@@ -203,13 +211,14 @@ Evolution is NOT cosmetic — it reflects the learner's real progress:
 
 ---
 
-## 7. Current State (Feb 21, 2026)
+## 7. Current State (Feb 28, 2026)
 
-**Completed:** Phases 1-6 (Core Loop, Gamification, Auth, Adaptive Learning, Avatar Evolution)
-**Codebase:** 84 test suites, 1,991 tests, 0 TypeScript errors
-**Next:** Phase 7 (UI Revamp + Game Feel & Polish) — the app is functional but needs industry-standard visual quality
+**Completed:** Phases 1-10.5 (Core Loop, Gamification, Auth, Adaptive Learning, Avatar Evolution, UI Revamp, All-AI Exercises, Audio Input + Polyphonic Detection, Music Library with 124 songs, Arcade Concert Hall, Social & Leaderboards, 3D Cat Integration)
+**In Progress:** Phase 11 — QA + Launch (account deletion, Cloud Functions, CI/CD done; Maestro E2E, deep testing underway)
+**Codebase:** 122 test suites, 2,630 tests, 0 TypeScript errors
+**Content:** 30 static exercises across 6 lessons, AI generation for tiers 7-15, 124 songs in Firestore
 
-**Key gap:** The app currently looks and feels like a well-built prototype, not a polished consumer product. Phase 7 addresses this with a comprehensive UI revamp targeting Duolingo-level visual quality.
+**Key milestone:** The app is feature-complete. Phase 11 focuses on quality assurance, security hardening (GDPR-compliant account deletion, server-side API keys via Cloud Functions), and launch preparation. A comprehensive codebase audit identified 40 issues (8 P0, 13 P1, 7 P2, 12 P3) being addressed.
 
 ---
 

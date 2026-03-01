@@ -1,0 +1,60 @@
+# Accessibility Test
+# Tests app accessibility features and compatibility
+
+appId: ${APP_ID}
+name: Accessibility Features
+tags:
+  - accessibility
+  - a11y
+
+---
+
+- launchApp
+
+# Enable accessibility features (VoiceOver/TalkBack)
+# Note: This requires platform-specific commands
+
+# iOS VoiceOver
+# - runScript:
+#     platform: iOS
+#     script: |
+#       xcrun simctl spawn booted launchctl setenv SIMULATOR_ACCESSIBILITY_ENABLED 1
+
+# Test that all interactive elements have accessibility labels
+# - assertVisible:
+#     accessibilityLabel: "Home Button"
+
+# - assertVisible:
+#     accessibilityLabel: "Settings Button"
+
+# Test navigation with accessibility
+# - tapOn:
+#     accessibilityLabel: "Profile"
+
+# - assertVisible:
+#     accessibilityLabel: "User Profile"
+
+# Test form inputs with accessibility
+# - tapOn:
+#     accessibilityLabel: "Email Input"
+# - inputText: "test@example.com"
+
+# Test that important content has accessibility hints
+# - assertVisible:
+#     accessibilityHint: ".*"
+
+# Test dynamic font sizes
+# Note: This requires changing system settings
+
+# Test color contrast and visibility
+# - assertVisible: ".*"
+
+- takeScreenshot: screenshots/accessibility-complete
+
+# Test with large text
+# - runScript:
+#     platform: iOS
+#     script: |
+#       xcrun simctl ui booted increase_content_size
+
+# - takeScreenshot: screenshots/large-text

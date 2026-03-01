@@ -189,6 +189,14 @@ jest.mock('../../components/Mascot/CatAvatar', () => {
   };
 });
 
+jest.mock('../../components/Mascot/3d', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    Cat3DCanvas: (props: any) => React.createElement(View, { testID: 'cat-avatar', ...props }),
+  };
+});
+
 jest.mock('../../components/StreakFlame', () => {
   const React = require('react');
   const { View, Text } = require('react-native');
@@ -415,11 +423,11 @@ describe('ProfileScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('Account');
   });
 
-  it('Cat avatar press navigates to CatCollectionScreen', () => {
+  it('Cat avatar press navigates to CatSwitchScreen', () => {
     const { getByTestId } = render(<ProfileScreen />);
     const avatar = getByTestId('cat-avatar');
     fireEvent.press(avatar);
-    expect(mockNavigate).toHaveBeenCalledWith('CatCollection');
+    expect(mockNavigate).toHaveBeenCalledWith('CatSwitch');
   });
 
   it('shows achievements section with count', () => {

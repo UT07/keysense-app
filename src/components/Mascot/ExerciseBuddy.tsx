@@ -27,7 +27,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 
-import { CatAvatar } from './CatAvatar';
+import { Cat3DCanvas } from './3d';
 import { getCatById, getDefaultCat } from './catCharacters';
 import { useCatEvolutionStore } from '@/stores/catEvolutionStore';
 import { reactionToMood, reactionToPose } from './animations/catAnimations';
@@ -194,9 +194,6 @@ export function ExerciseBuddy({
     transform: [{ translateY: emojiY.value }],
   }));
 
-  // Determine glow based on combo
-  const showGlow = comboCount >= 3;
-
   return (
     <View style={styles.container}>
       {/* Floating emoji reaction */}
@@ -208,15 +205,13 @@ export function ExerciseBuddy({
 
       {/* Cat avatar with pose-driven mood + animation */}
       <Animated.View style={buddyStyle}>
-        <CatAvatar
+        <Cat3DCanvas
           catId={catId}
-          size="small"
+          size={56}
           mood={reactionToMood(reaction)}
           pose={reactionToPose(reaction)}
-          showGlow={showGlow}
-          showTooltipOnTap={false}
-          skipEntryAnimation
           evolutionStage={evolutionStage}
+          forceSVG
         />
       </Animated.View>
 

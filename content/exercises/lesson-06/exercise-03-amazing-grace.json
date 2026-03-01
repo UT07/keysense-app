@@ -1,6 +1,6 @@
 {
   "id": "lesson-06-ex-03",
-  "version": 1,
+  "version": 2,
   "metadata": {
     "title": "Amazing Grace",
     "description": "Play the beloved hymn with both hands and smooth phrasing",
@@ -30,102 +30,103 @@
   },
   "notes": [
     {
-      "note": 36,
+      "note": 48,
       "startBeat": 0,
-      "durationBeats": 1,
+      "durationBeats": 3,
       "hand": "left",
       "finger": 5
     },
     {
       "note": 67,
-      "startBeat": 0,
+      "startBeat": 2,
       "durationBeats": 1,
       "hand": "right",
-      "finger": 5
+      "finger": 5,
+      "optional": true
     },
     {
       "note": 48,
-      "startBeat": 1,
-      "durationBeats": 1,
+      "startBeat": 3,
+      "durationBeats": 3,
       "hand": "left",
       "finger": 5
     },
     {
-      "note": 69,
-      "startBeat": 1,
+      "note": 72,
+      "startBeat": 3,
       "durationBeats": 2,
       "hand": "right",
-      "finger": 4
+      "finger": 3
     },
     {
-      "note": 36,
-      "startBeat": 3,
-      "durationBeats": 1,
-      "hand": "left",
+      "note": 76,
+      "startBeat": 5,
+      "durationBeats": 0.5,
+      "hand": "right",
       "finger": 5
     },
     {
-      "note": 69,
-      "startBeat": 3,
-      "durationBeats": 1,
+      "note": 72,
+      "startBeat": 5.5,
+      "durationBeats": 0.5,
       "hand": "right",
-      "finger": 4
+      "finger": 3
     },
     {
       "note": 48,
-      "startBeat": 4,
-      "durationBeats": 1,
+      "startBeat": 6,
+      "durationBeats": 3,
       "hand": "left",
       "finger": 5
     },
     {
-      "note": 67,
-      "startBeat": 4,
+      "note": 76,
+      "startBeat": 6,
       "durationBeats": 2,
       "hand": "right",
       "finger": 5
     },
     {
-      "note": 36,
-      "startBeat": 6,
-      "durationBeats": 1,
-      "hand": "left",
-      "finger": 5
-    },
-    {
-      "note": 64,
-      "startBeat": 6,
+      "note": 72,
+      "startBeat": 8,
       "durationBeats": 1,
       "hand": "right",
       "finger": 3
     },
     {
       "note": 48,
-      "startBeat": 7,
-      "durationBeats": 1,
+      "startBeat": 9,
+      "durationBeats": 3,
       "hand": "left",
       "finger": 5
     },
     {
-      "note": 65,
-      "startBeat": 7,
-      "durationBeats": 1,
+      "note": 69,
+      "startBeat": 9,
+      "durationBeats": 2,
       "hand": "right",
-      "finger": 4
-    },
-    {
-      "note": 36,
-      "startBeat": 8,
-      "durationBeats": 1,
-      "hand": "left",
-      "finger": 5
+      "finger": 2
     },
     {
       "note": 67,
-      "startBeat": 8,
-      "durationBeats": 2,
+      "startBeat": 11,
+      "durationBeats": 1,
       "hand": "right",
+      "finger": 1
+    },
+    {
+      "note": 48,
+      "startBeat": 12,
+      "durationBeats": 3,
+      "hand": "left",
       "finger": 5
+    },
+    {
+      "note": 72,
+      "startBeat": 12,
+      "durationBeats": 3,
+      "hand": "right",
+      "finger": 3
     }
   ],
   "scoring": {
@@ -140,7 +141,7 @@
     ]
   },
   "hints": {
-    "beforeStart": "Amazing Grace is in 3/4 waltz time (not 4/4). Count in threes: 1-2-3, 1-2-3. The melody is characterized by long notes that should sound smooth and connected (legato). The opening notes are G-A (ascending by step with long durations).",
+    "beforeStart": "Amazing Grace is in 3/4 waltz time. Count 1-2-3, 1-2-3. The melody starts with a G pickup note, then leaps up a fourth to C. The opening phrase: G (pickup) - C (held) - E-C - E (held) - C. Let the notes sing with smooth, connected phrasing (legato).",
     "commonMistakes": [
       {
         "pattern": "time-signature-confusion",
@@ -152,7 +153,7 @@
       },
       {
         "pattern": "rushed-long-notes",
-        "advice": "The half notes (2 beats) and whole notes (3 beats) should be held for their full duration. Don't rush to the next note. Let the notes breathe and sing."
+        "advice": "The held notes (2-3 beats) should be sustained for their full duration. Don't rush to the next note. Let the notes breathe and sing. This is what makes Amazing Grace sound beautiful."
       }
     ],
     "successMessage": "Beautiful! You've mastered a hymn with smooth, connected phrasing. This shows real musical sensitivity!"

@@ -237,10 +237,9 @@ export function useExercisePlayback({
       try {
         // Ensure iOS audio session is configured BEFORE engine init.
         // This must complete before any audio plays or iOS may suspend output.
-        // If mic input is preferred, configure for recording upfront to avoid
-        // reconfiguring the audio session mid-flight (which can cause audio glitches).
-        const needsRecording = resolvedInputMethod === 'mic';
-        await ensureAudioModeConfigured(needsRecording);
+        // Note: mic recording session config is now handled by InputManager
+        // via react-native-audio-api's AudioManager (avoids cross-library conflict).
+        await ensureAudioModeConfigured();
 
         // If already initialized (singleton was kept alive), skip re-init
         if (audioEngine.isReady()) {
@@ -299,7 +298,7 @@ export function useExercisePlayback({
         const noteIndex = playedNotesRef.current.length;
         playedNotesRef.current.push(normalizedEvent);
         trackNoteOnIndex(normalizedEvent.note, noteIndex);
-        setPlayedNotes(playedNotesRef.current);
+        setPlayedNotes([...playedNotesRef.current]);
         exerciseStore.addPlayedNote(normalizedEvent);
 
         // Surface external noteOn for keyboard highlighting in ExercisePlayer.
@@ -570,14 +569,33 @@ export function useExercisePlayback({
     const countInMs = exercise.settings.countIn * msPerBeat;
     const beat0EpochMs = startTimeRef.current + countInMs;
 
+    // Use InputManager's method-aware latency compensation (handles mono vs poly mic)
+    const managerCompensation = inputManagerRef.current?.getLatencyCompensationMs();
     const adjustedNotes = playedNotesRef.current.map((n) => {
       const source = (n.inputSource ?? 'touch') as ActiveInputMethod;
-      const compensation = INPUT_LATENCY_COMPENSATION_MS[source] ?? TOUCH_LATENCY_COMPENSATION_MS;
+      // Prefer InputManager's compensation (poly-aware), fall back to lookup table
+      const compensation = source === 'mic' && managerCompensation != null
+        ? managerCompensation
+        : (INPUT_LATENCY_COMPENSATION_MS[source] ?? TOUCH_LATENCY_COMPENSATION_MS);
       return {
         ...n,
         timestamp: n.timestamp - beat0EpochMs - compensation,
       };
     });
+
+    // Apply timing tolerance multiplier for mic input (BUG FIX: was defined but never applied).
+    // Mic detection has ~100-120ms pipeline latency with jitter — widen scoring windows.
+    const timingMultiplier = inputManagerRef.current?.getTimingMultiplier() ?? 1.0;
+    const scoringExercise = timingMultiplier !== 1.0
+      ? {
+          ...exercise,
+          scoring: {
+            ...exercise.scoring,
+            timingToleranceMs: exercise.scoring.timingToleranceMs * timingMultiplier,
+            timingGracePeriodMs: exercise.scoring.timingGracePeriodMs * timingMultiplier,
+          },
+        }
+      : exercise;
 
     // Look up previous high score so isNewHighScore is accurate
     const lessonId = getLessonIdForExercise(exercise.id);
@@ -586,7 +604,7 @@ export function useExercisePlayback({
       ? progressState.lessonProgress[lessonId]?.exerciseScores[exercise.id]?.highScore ?? 0
       : 0;
 
-    const score = scoreExercise(exercise, adjustedNotes, previousHighScore);
+    const score = scoreExercise(scoringExercise, adjustedNotes, previousHighScore);
     exerciseStore.setScore(score);
 
     console.log('[useExercisePlayback] Exercise completed:', score);

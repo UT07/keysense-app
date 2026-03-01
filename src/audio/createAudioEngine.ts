@@ -30,6 +30,9 @@ let factoryInstance: IAudioEngine | null = null;
 let audioModeConfigured = false;
 let audioModeRecordingEnabled = false;
 
+/** Promise from the latest ensureAudioModeConfigured() call — so consumers can await it */
+let audioModePromise: Promise<void> = Promise.resolve();
+
 /**
  * Try to create a WebAudioEngine. Returns null if react-native-audio-api
  * is not available (e.g., running in Expo Go without the native module).
@@ -69,10 +72,14 @@ export async function ensureAudioModeConfigured(allowRecording = false): Promise
   if (audioModeConfigured && !allowRecording) return;
   if (audioModeConfigured && allowRecording && audioModeRecordingEnabled) return;
 
+  // Wait for any in-flight configuration before changing it
+  await audioModePromise;
+
   // Track the pending promise to prevent concurrent configuration
   audioModeConfigured = true;
   if (allowRecording) audioModeRecordingEnabled = true;
 
+  const configPromise = (async () => {
   try {
     await Audio.setAudioModeAsync({
       playsInSilentModeIOS: true,
@@ -94,6 +101,10 @@ export async function ensureAudioModeConfigured(allowRecording = false): Promise
       audioModeRecordingEnabled = false;
     }
   }
+  })();
+
+  audioModePromise = configPromise;
+  return configPromise;
 }
 
 /**

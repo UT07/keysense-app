@@ -15,6 +15,7 @@ import Animated, {
   Easing,
   runOnJS,
 } from 'react-native-reanimated';
+import { soundManager } from '../../audio/SoundManager';
 
 export type AchievementType = 'xp' | 'streak' | 'level-up' | 'star';
 
@@ -64,6 +65,15 @@ export function AchievementToast({
   }, [onDismiss]);
 
   useEffect(() => {
+    // Play sound effect based on toast type
+    if (type === 'level-up') {
+      soundManager.play('level_up');
+    } else if (type === 'star') {
+      soundManager.play('star_earn');
+    } else if (type === 'xp') {
+      soundManager.play('xp_tick');
+    }
+
     // Slide in
     translateY.value = withTiming(0, {
       duration: 300,

@@ -6,7 +6,7 @@
  * Activity tab: chronological feed of friend milestones
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -22,7 +22,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSocialStore } from '../stores/socialStore';
 import { useAuthStore } from '../stores/authStore';
-import { acceptFriendRequest, removeFriendConnection } from '../services/firebase/socialService';
+import { acceptFriendRequest, removeFriendConnection, getFriends, getUserPublicProfile } from '../services/firebase/socialService';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../theme/tokens';
 import { PressableScale } from '../components/common/PressableScale';
 import type { RootStackParamList } from '../navigation/AppNavigator';
@@ -133,6 +133,37 @@ function PendingRequestRow({
   );
 }
 
+function SentRequestRow({
+  friend,
+  onCancel,
+  isProcessing,
+}: {
+  friend: FriendConnection;
+  onCancel: () => void;
+  isProcessing: boolean;
+}): React.JSX.Element {
+  return (
+    <View style={styles.friendRow}>
+      <Text style={styles.friendEmoji}>{catEmoji(friend.selectedCatId)}</Text>
+      <View style={styles.friendInfo}>
+        <Text style={styles.friendName} numberOfLines={1}>
+          {friend.displayName || 'Player'}
+        </Text>
+        <Text style={styles.friendSubtitle}>request sent</Text>
+      </View>
+      <View style={styles.pendingActions}>
+        {isProcessing ? (
+          <ActivityIndicator color={COLORS.primary} size="small" />
+        ) : (
+          <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+}
+
 function AcceptedFriendRow({
   friend,
 }: {
@@ -197,11 +228,62 @@ export function FriendsScreen(): React.JSX.Element {
   const updateFriendStatus = useSocialStore((s) => s.updateFriendStatus);
   const removeFriend = useSocialStore((s) => s.removeFriend);
 
+  const setFriends = useSocialStore((s) => s.setFriends);
+
   const [activeTab, setActiveTab] = useState<TabKey>('friends');
   const [processingUid, setProcessingUid] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Sync friends list from Firestore on mount to discover incoming requests.
+  // Also enriches any connections with missing display names (legacy data).
+  useEffect(() => {
+    if (!user?.uid) return;
+    let cancelled = false;
+    setIsSyncing(true);
+
+    (async () => {
+      try {
+        const remoteFriends = await getFriends(user.uid);
+        if (cancelled || remoteFriends.length === 0) return;
+
+        // Enrich friends that have empty/default display names
+        const enriched = await Promise.all(
+          remoteFriends.map(async (f) => {
+            if (f.displayName && f.displayName !== 'Friend' && f.displayName !== 'Player') {
+              return f;
+            }
+            try {
+              const profile = await getUserPublicProfile(f.uid);
+              if (profile) {
+                return { ...f, displayName: profile.displayName, selectedCatId: profile.selectedCatId || f.selectedCatId };
+              }
+            } catch {
+              // Profile fetch failed — keep original
+            }
+            return f;
+          }),
+        );
+
+        if (!cancelled) {
+          setFriends(enriched);
+        }
+      } catch {
+        // Silently fail — local data is still available
+      } finally {
+        if (!cancelled) setIsSyncing(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [user?.uid, setFriends]);
 
   const pendingIncoming = useMemo(
     () => friends.filter((f) => f.status === 'pending_incoming'),
+    [friends],
+  );
+
+  const pendingOutgoing = useMemo(
+    () => friends.filter((f) => f.status === 'pending_outgoing'),
     [friends],
   );
 
@@ -242,12 +324,30 @@ export function FriendsScreen(): React.JSX.Element {
     [user?.uid, removeFriend],
   );
 
+  const handleCancelRequest = useCallback(
+    async (friendUid: string) => {
+      if (!user?.uid) return;
+      setProcessingUid(friendUid);
+      try {
+        await removeFriendConnection(user.uid, friendUid);
+        removeFriend(friendUid);
+      } catch {
+        Alert.alert('Error', 'Failed to cancel request. Please try again.');
+      } finally {
+        setProcessingUid(null);
+      }
+    },
+    [user?.uid, removeFriend],
+  );
+
   // ---------------------------------------------------------------------------
   // Friends tab content
   // ---------------------------------------------------------------------------
 
   const renderFriendsTab = useCallback(() => {
-    if (pendingIncoming.length === 0 && acceptedFriends.length === 0) {
+    const hasAnyFriends = pendingIncoming.length > 0 || pendingOutgoing.length > 0 || acceptedFriends.length > 0;
+
+    if (!hasAnyFriends) {
       return (
         <View style={styles.emptyState}>
           <MaterialCommunityIcons name="account-group-outline" size={48} color={COLORS.textMuted} />
@@ -266,36 +366,71 @@ export function FriendsScreen(): React.JSX.Element {
       );
     }
 
+    // Build sections: incoming requests, sent requests, accepted friends
+    type SectionItem = { type: 'header'; title: string } | { type: 'friend'; friend: FriendConnection };
+    const sections: SectionItem[] = [];
+
+    if (pendingIncoming.length > 0) {
+      sections.push({ type: 'header', title: `Incoming Requests (${pendingIncoming.length})` });
+      for (const f of pendingIncoming) {
+        sections.push({ type: 'friend', friend: f });
+      }
+    }
+
+    if (pendingOutgoing.length > 0) {
+      sections.push({ type: 'header', title: `Sent Requests (${pendingOutgoing.length})` });
+      for (const f of pendingOutgoing) {
+        sections.push({ type: 'friend', friend: f });
+      }
+    }
+
+    if (acceptedFriends.length > 0) {
+      if (pendingIncoming.length > 0 || pendingOutgoing.length > 0) {
+        sections.push({ type: 'header', title: `Friends (${acceptedFriends.length})` });
+      }
+      for (const f of acceptedFriends) {
+        sections.push({ type: 'friend', friend: f });
+      }
+    }
+
     return (
       <FlatList
-        data={[...pendingIncoming, ...acceptedFriends]}
-        keyExtractor={(item) => item.uid}
+        data={sections}
+        keyExtractor={(item, index) => item.type === 'header' ? `header-${index}` : `friend-${(item as { type: 'friend'; friend: FriendConnection }).friend.uid}`}
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => {
-          if (item.status === 'pending_incoming') {
+          if (item.type === 'header') {
+            return (
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionHeaderText}>{item.title}</Text>
+              </View>
+            );
+          }
+          const friend = item.friend;
+          if (friend.status === 'pending_incoming') {
             return (
               <PendingRequestRow
-                friend={item}
-                onAccept={() => handleAcceptRequest(item.uid)}
-                onDecline={() => handleDeclineRequest(item.uid)}
-                isProcessing={processingUid === item.uid}
+                friend={friend}
+                onAccept={() => handleAcceptRequest(friend.uid)}
+                onDecline={() => handleDeclineRequest(friend.uid)}
+                isProcessing={processingUid === friend.uid}
               />
             );
           }
-          return <AcceptedFriendRow friend={item} />;
+          if (friend.status === 'pending_outgoing') {
+            return (
+              <SentRequestRow
+                friend={friend}
+                onCancel={() => handleCancelRequest(friend.uid)}
+                isProcessing={processingUid === friend.uid}
+              />
+            );
+          }
+          return <AcceptedFriendRow friend={friend} />;
         }}
-        ListHeaderComponent={
-          pendingIncoming.length > 0 ? (
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionHeaderText}>
-                Pending Requests ({pendingIncoming.length})
-              </Text>
-            </View>
-          ) : null
-        }
       />
     );
-  }, [pendingIncoming, acceptedFriends, processingUid, handleAcceptRequest, handleDeclineRequest, navigation]);
+  }, [pendingIncoming, pendingOutgoing, acceptedFriends, processingUid, handleAcceptRequest, handleDeclineRequest, handleCancelRequest, navigation]);
 
   // ---------------------------------------------------------------------------
   // Activity tab content
@@ -364,9 +499,9 @@ export function FriendsScreen(): React.JSX.Element {
           >
             Friends
           </Text>
-          {pendingIncoming.length > 0 && (
+          {(pendingIncoming.length + pendingOutgoing.length) > 0 && (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{pendingIncoming.length}</Text>
+              <Text style={styles.badgeText}>{pendingIncoming.length + pendingOutgoing.length}</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -386,6 +521,12 @@ export function FriendsScreen(): React.JSX.Element {
       </View>
 
       {/* Tab Content */}
+      {isSyncing && (
+        <View style={styles.syncBar}>
+          <ActivityIndicator color={COLORS.primary} size="small" />
+          <Text style={styles.syncText}>Syncing...</Text>
+        </View>
+      )}
       {activeTab === 'friends' ? renderFriendsTab() : renderActivityTab()}
     </SafeAreaView>
   );
@@ -526,6 +667,29 @@ const styles = StyleSheet.create({
     borderColor: COLORS.cardBorder,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  cancelButton: {
+    backgroundColor: COLORS.surfaceElevated,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    borderRadius: BORDER_RADIUS.sm,
+    paddingVertical: SPACING.xs + 2,
+    paddingHorizontal: SPACING.sm + 2,
+  },
+  cancelButtonText: {
+    ...TYPOGRAPHY.button.sm,
+    color: COLORS.textSecondary,
+  },
+  syncBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    paddingVertical: SPACING.xs,
+  },
+  syncText: {
+    ...TYPOGRAPHY.caption.lg,
+    color: COLORS.textMuted,
   },
   challengeButton: {
     flexDirection: 'row',

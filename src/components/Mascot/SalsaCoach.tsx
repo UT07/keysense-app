@@ -2,8 +2,9 @@
  * SalsaCoach — Dedicated coach character component.
  *
  * Renders Salsa (the grey cat with green eyes — your coach) with:
+ * - 3D rendering via Cat3DCanvas (SVG fallback if GL fails)
  * - Context-aware mood (time of day, user progress)
- * - Optional speech bubble with catchphrase
+ * - Optional speech bubble with catchphrase (auto-spoken via TTS)
  * - Larger default size than CatAvatar (100px vs 72px)
  * - Teaching pose animation
  *
@@ -11,17 +12,19 @@
  * who appears on every screen providing guidance.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useEffect, useRef } from 'react';
 import type { ReactElement } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { SALSA_COACH } from './catCharacters';
-import { KeysieSvg } from './KeysieSvg';
+import { Cat3DCanvas } from './3d';
 import type { MascotMood } from './types';
+import type { CatPose } from './animations/catAnimations';
 import { COLORS, SPACING, BORDER_RADIUS } from '@/theme/tokens';
+import { ttsService } from '@/services/tts/TTSService';
 
-/** Salsa's accent color, hardcoded to avoid StyleSheet.create referencing SALSA_COACH at import time */
+/** Salsa's accent color */
 const SALSA_ACCENT = '#FF5252';
 
 type SalsaSize = 'tiny' | 'small' | 'medium' | 'large';
@@ -33,6 +36,15 @@ const SIZE_MAP: Record<SalsaSize, number> = {
   large: 100,
 };
 
+/** Map mood to CatPose for 3D rendering */
+const MOOD_TO_POSE: Record<MascotMood, CatPose> = {
+  happy: 'idle',
+  celebrating: 'celebrate',
+  encouraging: 'teach',
+  teaching: 'teach',
+  excited: 'play',
+};
+
 interface SalsaCoachProps {
   /** Override mood. Auto-detects from time of day if not provided. */
   mood?: MascotMood;
@@ -41,6 +53,8 @@ interface SalsaCoachProps {
   showCatchphrase?: boolean;
   /** Override the catchphrase text */
   catchphrase?: string;
+  /** Speak the catchphrase via TTS (default: true when showCatchphrase is true) */
+  speakCatchphrase?: boolean;
 }
 
 /** Pick a Salsa mood based on time of day */
@@ -63,6 +77,7 @@ export function SalsaCoach({
   size = 'medium',
   showCatchphrase = false,
   catchphrase,
+  speakCatchphrase,
 }: SalsaCoachProps): ReactElement {
   const effectiveMood = mood ?? getTimeMood();
   const dimension = SIZE_MAP[size];
@@ -70,6 +85,25 @@ export function SalsaCoach({
     () => catchphrase ?? getRandomCatchphrase(),
     [catchphrase],
   );
+  const hasSpokenRef = useRef(false);
+
+  // Speak catchphrase via TTS
+  const shouldSpeak = speakCatchphrase ?? showCatchphrase;
+  useEffect(() => {
+    if (!shouldSpeak || !phrase || hasSpokenRef.current) return;
+    hasSpokenRef.current = true;
+    // Small delay so the bubble is visible first
+    const timer = setTimeout(() => {
+      ttsService.speak(phrase, { catId: 'salsa' });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [shouldSpeak, phrase]);
+
+  // Use 3D for medium+ sizes, SVG for tiny/small (performance)
+  // Always use SVG — SalsaCoach is an accent component that appears alongside
+  // primary Cat3DCanvas instances. Multiple GL contexts exhaust GPU resources.
+  const use3D = false;
+  const pose: CatPose = MOOD_TO_POSE[effectiveMood] ?? 'idle';
 
   return (
     <View style={styles.container} testID="salsa-coach">
@@ -85,13 +119,12 @@ export function SalsaCoach({
           },
         ]}
       >
-        <KeysieSvg
-          mood={effectiveMood}
-          size="medium"
-          pixelSize={Math.round(dimension * 0.75)}
-          accentColor={SALSA_COACH.color}
-          visuals={SALSA_COACH.visuals}
+        <Cat3DCanvas
           catId="salsa"
+          size={Math.round(dimension * 0.85)}
+          pose={pose}
+          mood={effectiveMood}
+          forceSVG={!use3D}
         />
       </View>
 

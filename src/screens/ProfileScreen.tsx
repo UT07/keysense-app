@@ -40,7 +40,7 @@ import { useCatEvolutionStore, xpToNextStage } from '../stores/catEvolutionStore
 import { EVOLUTION_XP_THRESHOLDS } from '../stores/types';
 import { ACHIEVEMENTS } from '../core/achievements/achievements';
 import type { Achievement } from '../core/achievements/achievements';
-import { CatAvatar } from '../components/Mascot/CatAvatar';
+import { Cat3DCanvas } from '../components/Mascot/3d';
 import { CAT_CHARACTERS, getCatById } from '../components/Mascot/catCharacters';
 import { StreakFlame } from '../components/StreakFlame';
 import { getLevelProgress } from '../core/progression/XpSystem';
@@ -476,14 +476,14 @@ export function ProfileScreen(): React.ReactElement {
         >
           <TouchableOpacity
             style={styles.avatarContainer}
-            onPress={() => navigation.navigate('CatCollection')}
+            onPress={() => navigation.navigate('CatSwitch')}
             activeOpacity={0.7}
             testID="profile-open-cat-switch"
           >
             {/* Circular halo glow behind avatar */}
             <View style={[styles.avatarHalo, { backgroundColor: glowColor(catColor, 0.18) }]} />
             <View style={[styles.avatarHaloInner, { borderColor: glowColor(catColor, 0.25) }]} />
-            <CatAvatar catId={selectedCatId} size="large" showTooltipOnTap={false} evolutionStage={evolutionStage} />
+            <Cat3DCanvas catId={selectedCatId} size={140} evolutionStage={evolutionStage} />
             <View style={styles.editBadge}>
               <MaterialCommunityIcons name="pencil" size={12} color={COLORS.textPrimary} />
             </View>
@@ -766,6 +766,10 @@ export function ProfileScreen(): React.ReactElement {
                   style={[styles.pickerChip, preferredInputMethod === opt.value && styles.pickerChipActive]}
                   onPress={() => {
                     if (opt.value === 'mic') {
+                      // Set 'mic' explicitly — 'auto' mode skips mic to avoid
+                      // iOS audio routing to earpiece. MicSetupScreen handles
+                      // permission; preference must be stored regardless.
+                      setPreferredInputMethod('mic');
                       navigation.navigate('MicSetup');
                       setShowInputPicker(false);
                     } else {
@@ -822,7 +826,7 @@ export function ProfileScreen(): React.ReactElement {
 
           <TouchableOpacity
             style={styles.settingItem}
-            onPress={() => navigation.navigate('CatCollection')}
+            onPress={() => navigation.navigate('CatSwitch')}
             testID="profile-open-cat-switch-row"
           >
             <View style={styles.settingLeft}>

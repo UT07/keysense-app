@@ -90,6 +90,72 @@ export function sectionToExercise(
   };
 }
 
+/**
+ * Merge all sections into a single full-song exercise.
+ * Each section's notes are offset by the section's startBeat so they
+ * form one continuous timeline.
+ */
+export function fullSongToExercise(
+  song: Song,
+  layer: SongLayer,
+  loop: boolean,
+): Exercise {
+  const settings = song.settings ?? {} as Song['settings'];
+
+  // Collect notes from all sections, offset by section.startBeat
+  const allNotes: NoteEvent[] = [];
+  for (const section of song.sections) {
+    const sectionNotes = layer === 'melody' ? section.layers.melody : section.layers.full;
+    if (!sectionNotes) continue;
+    for (const note of sectionNotes) {
+      allNotes.push({
+        ...note,
+        startBeat: note.startBeat + section.startBeat,
+      });
+    }
+  }
+
+  // Sort by startBeat for correct playback order
+  allNotes.sort((a, b) => a.startBeat - b.startBeat || a.note - b.note);
+
+  const avgDifficulty = Math.round(
+    song.sections.reduce((sum, s) => sum + s.difficulty, 0) / song.sections.length,
+  ) as 1 | 2 | 3 | 4 | 5;
+
+  return {
+    id: `${song.id}-full-${layer}`,
+    version: song.version,
+    metadata: {
+      title: `${song.metadata.title} — Full Song`,
+      description: `${layer === 'melody' ? 'Melody' : 'Full arrangement'} of the entire song`,
+      difficulty: avgDifficulty,
+      estimatedMinutes: Math.ceil(song.metadata.durationSeconds / 60),
+      skills: ['songs', song.metadata.genre],
+      prerequisites: [],
+    },
+    settings: {
+      tempo: settings.tempo ?? 80,
+      timeSignature: settings.timeSignature ?? [4, 4],
+      keySignature: settings.keySignature ?? 'C',
+      countIn: settings.countIn ?? 4,
+      metronomeEnabled: settings.metronomeEnabled ?? true,
+      loopEnabled: loop,
+    },
+    notes: allNotes,
+    scoring: {
+      timingToleranceMs: song.scoring?.timingToleranceMs ?? 50,
+      timingGracePeriodMs: song.scoring?.timingGracePeriodMs ?? 150,
+      passingScore: song.scoring?.passingScore ?? 70,
+      starThresholds: song.scoring?.starThresholds ?? [70, 85, 95],
+    },
+    hints: {
+      beforeStart: `Play the full song from start to finish!`,
+      commonMistakes: [],
+      successMessage: 'Amazing! You played the entire song!',
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
@@ -160,9 +226,10 @@ export function SongPlayerScreen() {
   const setCurrentExercise = useExerciseStore((s) => s.setCurrentExercise);
   const uid = useAuthStore((s) => s.user?.uid ?? '');
 
-  const [selectedSectionIndex, setSelectedSectionIndex] = useState(0);
+  // null = full song selected, number = section index
+  const [selectedSectionIndex, setSelectedSectionIndex] = useState<number | null>(0);
   const [layer, setLayer] = useState<SongLayer>('melody');
-  const [loop, setLoop] = useState(true);
+  const [loop, setLoop] = useState(false);
 
   // Load song on mount
   useEffect(() => {
@@ -176,23 +243,37 @@ export function SongPlayerScreen() {
       if (!currentSong) return;
 
       const exerciseState = useExerciseStore.getState();
-      const lastScore = exerciseState.score;
+      const lastScore = exerciseState.lastCompletedScore;
       if (!lastScore || lastScore.overall === 0) return;
 
-      const section = currentSong.sections[selectedSectionIndex];
-      if (!section) return;
+      // Clear the sticky score so it's not re-processed on next focus
+      useExerciseStore.getState().clearLastCompletedScore();
 
-      // Build new section scores
       const existingMastery = getMastery(currentSong.id);
       const oldTier = existingMastery?.tier ?? 'none';
 
-      const newSectionScores: Record<string, number> = {
-        ...(existingMastery?.sectionScores ?? {}),
-        [section.id]: Math.max(
-          existingMastery?.sectionScores?.[section.id] ?? 0,
-          lastScore.overall,
-        ),
-      };
+      let newSectionScores: Record<string, number>;
+
+      if (selectedSectionIndex === null) {
+        // Full song — credit all sections with the full-song score
+        newSectionScores = { ...(existingMastery?.sectionScores ?? {}) };
+        for (const section of currentSong.sections) {
+          newSectionScores[section.id] = Math.max(
+            existingMastery?.sectionScores?.[section.id] ?? 0,
+            lastScore.overall,
+          );
+        }
+      } else {
+        const section = currentSong.sections[selectedSectionIndex];
+        if (!section) return;
+        newSectionScores = {
+          ...(existingMastery?.sectionScores ?? {}),
+          [section.id]: Math.max(
+            existingMastery?.sectionScores?.[section.id] ?? 0,
+            lastScore.overall,
+          ),
+        };
+      }
 
       const sectionIds = currentSong.sections.map((s) => s.id);
       const updated = updateSongMastery(
@@ -221,15 +302,22 @@ export function SongPlayerScreen() {
 
   const handlePlay = useCallback(() => {
     if (!song) return;
-    const section = song.sections[selectedSectionIndex];
-    if (!section) return;
 
-    const exercise = sectionToExercise(song, section, layer, loop);
+    let exercise: Exercise;
+    if (selectedSectionIndex === null) {
+      // Full song mode
+      exercise = fullSongToExercise(song, layer, loop);
+    } else {
+      const section = song.sections[selectedSectionIndex];
+      if (!section) return;
+      exercise = sectionToExercise(song, section, layer, loop);
+    }
 
     // Guard: don't navigate to an exercise with no notes
     if (!exercise.notes || exercise.notes.length === 0) {
-      console.warn('[SongPlayer] Section has no notes:', section.id, layer);
-      Alert.alert('No Notes', 'This section has no playable notes. Try a different section or layer.');
+      const label = selectedSectionIndex === null ? 'Full Song' : song.sections[selectedSectionIndex]?.id;
+      console.warn('[SongPlayer] No notes:', label, layer);
+      Alert.alert('No Notes', 'This selection has no playable notes. Try a different section or layer.');
       return;
     }
 
@@ -294,6 +382,22 @@ export function SongPlayerScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.sectionCarousel}
         >
+          {/* Full Song pill */}
+          <TouchableOpacity
+            style={[styles.sectionPill, styles.fullSongPill, selectedSectionIndex === null && styles.fullSongPillSelected]}
+            onPress={() => setSelectedSectionIndex(null)}
+            testID="section-full-song"
+          >
+            <MaterialCommunityIcons
+              name="music-note-whole"
+              size={14}
+              color={selectedSectionIndex === null ? COLORS.background : COLORS.starGold}
+            />
+            <Text style={[styles.sectionPillLabel, selectedSectionIndex === null && styles.sectionPillLabelSelected]}>
+              Full Song
+            </Text>
+          </TouchableOpacity>
+
           {song.sections.map((section, index) => (
             <SectionPill
               key={section.id}
@@ -385,7 +489,9 @@ export function SongPlayerScreen() {
         <TouchableOpacity style={styles.playButton} onPress={handlePlay} testID="play-button">
           <MaterialCommunityIcons name="play" size={28} color={COLORS.background} />
           <Text style={styles.playButtonText}>
-            Play {song.sections[selectedSectionIndex]?.label ?? 'Section'}
+            {selectedSectionIndex === null
+              ? 'Play Full Song'
+              : `Play ${song.sections[selectedSectionIndex]?.label ?? 'Section'}`}
           </Text>
         </TouchableOpacity>
       </View>
@@ -495,6 +601,16 @@ const styles = StyleSheet.create({
   sectionPillSelected: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
+  },
+  fullSongPill: {
+    flexDirection: 'row',
+    borderColor: COLORS.starGold,
+    borderWidth: 1.5,
+    gap: 6,
+  },
+  fullSongPillSelected: {
+    backgroundColor: COLORS.starGold,
+    borderColor: COLORS.starGold,
   },
   sectionPillLabel: {
     ...TYPOGRAPHY.body.sm,

@@ -6,6 +6,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "channel": "development",
       "ios": {
         "simulator": true
       }
@@ -13,18 +14,29 @@
     "development-device": {
       "developmentClient": true,
       "distribution": "internal",
+      "channel": "development",
       "ios": {
         "simulator": false
       }
     },
     "preview": {
       "distribution": "internal",
+      "channel": "preview",
       "ios": {
         "simulator": false
       }
     },
     "production": {
+      "channel": "production",
       "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "REPLACE_WITH_YOUR_APPLE_ID",
+        "ascAppId": "REPLACE_WITH_YOUR_ASC_APP_ID"
+      }
     }
   }
 }

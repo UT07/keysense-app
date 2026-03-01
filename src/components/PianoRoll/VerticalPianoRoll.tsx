@@ -41,15 +41,24 @@ const DEFAULT_MIDI_MAX = 72; // C5
 
 const COLORS = {
   upcoming: '#5C6BC0', // Indigo
+  upcomingLight: '#7986CB', // Lighter indigo (top gradient)
+  upcomingDark: '#3949AB', // Darker indigo (bottom gradient)
   active: '#FF5252', // Bright red
-  activeGlow: 'rgba(255, 82, 82, 0.3)',
+  activeLight: '#FF8A80', // Light red (top gradient)
+  activeDark: '#D32F2F', // Dark red (bottom gradient)
+  activeGlow: 'rgba(255, 82, 82, 0.35)',
+  activeHalo: 'rgba(255, 82, 82, 0.15)',
   pastFaded: 'rgba(102, 187, 106, 0.4)',
+  pastLight: 'rgba(129, 199, 132, 0.5)',
+  pastDark: 'rgba(76, 175, 80, 0.3)',
   pressLine: '#40C4FF', // Key down line
   pressLineGlow: 'rgba(64, 196, 255, 0.2)',
   beatLine: 'rgba(255, 255, 255, 0.08)',
   beatLineAccent: 'rgba(255, 255, 255, 0.2)',
   background: '#0D0D0D',
-  ghost: 'rgba(255, 255, 255, 0.3)',
+  ghost: 'rgba(255, 255, 255, 0.15)',
+  ghostBorder: 'rgba(255, 255, 255, 0.08)',
+  innerHighlight: 'rgba(255, 255, 255, 0.25)',
 };
 
 // ---------------------------------------------------------------------------
@@ -270,13 +279,19 @@ export const VerticalPianoRoll = React.memo(
         const isActive = currentBeat >= 0 && note.startBeat <= currentBeat && currentBeat < noteEnd;
 
         let color = COLORS.upcoming;
+        let gradientTop = COLORS.upcomingLight;
+        let gradientBottom = COLORS.upcomingDark;
         let borderColor = 'rgba(255, 255, 255, 0.2)';
         if (isPast) {
           color = COLORS.pastFaded;
+          gradientTop = COLORS.pastLight;
+          gradientBottom = COLORS.pastDark;
           borderColor = 'transparent';
         }
         if (isActive) {
           color = COLORS.active;
+          gradientTop = COLORS.activeLight;
+          gradientBottom = COLORS.activeDark;
           borderColor = '#FFF';
         }
 
@@ -290,6 +305,8 @@ export const VerticalPianoRoll = React.memo(
           noteHeight,
           topPosition,
           color,
+          gradientTop,
+          gradientBottom,
           borderColor,
           isPast,
           isActive,
@@ -365,13 +382,29 @@ export const VerticalPianoRoll = React.memo(
                   height: gn.noteHeight,
                 },
               ]}
-            />
+            >
+              <View style={styles.ghostNoteInner} />
+            </View>
           ))}
 
-          {/* Note bars */}
+          {/* Note bars — 3D capsule style with gradient fills */}
           {visualNotes.map((vn) => (
             <React.Fragment key={`note-${vn.index}`}>
-              {/* Active glow effect */}
+              {/* Outer halo for active notes */}
+              {vn.isActive && (
+                <View
+                  style={[
+                    styles.noteHalo,
+                    {
+                      left: vn.x - 8,
+                      top: vn.topPosition - 8,
+                      width: vn.width + 16,
+                      height: vn.noteHeight + 16,
+                    },
+                  ]}
+                />
+              )}
+              {/* Inner glow for active notes */}
               {vn.isActive && (
                 <View
                   style={[
@@ -385,6 +418,7 @@ export const VerticalPianoRoll = React.memo(
                   ]}
                 />
               )}
+              {/* Note capsule with gradient fill */}
               <View
                 testID={`note-bar-${vn.index}`}
                 style={[
@@ -394,26 +428,37 @@ export const VerticalPianoRoll = React.memo(
                     top: vn.topPosition,
                     width: vn.width,
                     height: vn.noteHeight,
-                    backgroundColor: vn.color,
                     borderColor: vn.borderColor,
                     opacity: vn.isPast ? 0.5 : 1,
                   },
+                  vn.isActive && styles.noteActive,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.noteLabel,
-                    vn.isActive && styles.noteLabelActive,
-                  ]}
-                  numberOfLines={1}
+                <LinearGradient
+                  colors={[vn.gradientTop, vn.gradientBottom]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                  style={styles.noteGradient}
                 >
-                  {vn.noteName}
-                </Text>
-                {vn.hand && (
-                  <Text style={styles.handLabel}>
-                    {vn.hand === 'left' ? 'L' : 'R'}
-                  </Text>
-                )}
+                  {/* Inner top highlight for 3D depth */}
+                  <View style={styles.noteInnerHighlight} />
+                  <View style={styles.noteLabelContainer}>
+                    <Text
+                      style={[
+                        styles.noteLabel,
+                        vn.isActive && styles.noteLabelActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {vn.noteName}
+                    </Text>
+                    {vn.hand && (
+                      <Text style={styles.handLabel}>
+                        {vn.hand === 'left' ? 'L' : 'R'}
+                      </Text>
+                    )}
+                  </View>
+                </LinearGradient>
               </View>
             </React.Fragment>
           ))}
@@ -480,36 +525,92 @@ const styles = StyleSheet.create({
   },
   note: {
     position: 'absolute',
-    borderRadius: 6,
+    borderRadius: 8,
     borderWidth: 1.5,
+    overflow: 'hidden',
+    zIndex: 10,
+    // 3D shadow for depth
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  noteActive: {
+    shadowColor: COLORS.active,
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  noteGradient: {
+    flex: 1,
+    borderRadius: 6,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10,
+  },
+  noteInnerHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '40%',
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    backgroundColor: COLORS.innerHighlight,
+  },
+  noteLabelContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  noteHalo: {
+    position: 'absolute',
+    borderRadius: 12,
+    backgroundColor: COLORS.activeHalo,
+    zIndex: 8,
   },
   noteGlow: {
     position: 'absolute',
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: COLORS.activeGlow,
     zIndex: 9,
   },
   ghostNote: {
     position: 'absolute',
-    borderRadius: 6,
+    borderRadius: 8,
     backgroundColor: COLORS.ghost,
+    borderWidth: 1,
+    borderColor: COLORS.ghostBorder,
     zIndex: 5,
+    overflow: 'hidden',
+  },
+  ghostNoteInner: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '35%',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderTopLeftRadius: 7,
+    borderTopRightRadius: 7,
   },
   noteLabel: {
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255, 255, 255, 0.85)',
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: '700',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   noteLabelActive: {
     color: '#FFFFFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
   },
   handLabel: {
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: 'rgba(255, 255, 255, 0.6)',
     fontSize: 8,
-    marginTop: 2,
+    fontWeight: '600',
+    marginTop: 1,
   },
   timingZoneFill: {
     position: 'absolute',

@@ -25,6 +25,9 @@ export interface ExerciseSessionState {
   sessionStartTime: number | null;
   sessionEndTime: number | null;
 
+  // Sticky score: survives clearSession() so callers can capture it after navigation
+  lastCompletedScore: ExerciseScore | null;
+
   // Demo mode & ghost notes (transient, not persisted)
   failCount: number;
   ghostNotesEnabled: boolean;
@@ -44,6 +47,7 @@ export interface ExerciseSessionState {
   setGhostNotesEnabled: (enabled: boolean) => void;
   incrementGhostNotesSuccessCount: () => void;
   setDemoWatched: (watched: boolean) => void;
+  clearLastCompletedScore: () => void;
   reset: () => void;
 }
 

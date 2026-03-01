@@ -5,7 +5,7 @@
  * select/lock states, navigation, header info, and selection behavior.
  *
  * NOTE: All 12 cats now have unlockLevel=1 (gated by gems, not levels).
- * CatSwitchScreen will be replaced by CatCollectionScreen with gem-based locking.
+ * CatSwitchScreen is the unified gallery with gem-based locking.
  */
 
 import React from 'react';
@@ -53,6 +53,16 @@ jest.mock('../../components/Mascot/KeysieSvg', () => ({
     const { View, Text } = require('react-native');
     return React.createElement(View, { testID: `keysie-${props.mood}` },
       React.createElement(Text, null, `KeysieSvg-${props.mood}`),
+    );
+  },
+}));
+
+jest.mock('../../components/Mascot/3d', () => ({
+  Cat3DCanvas: (props: any) => {
+    const React = require('react');
+    const { View, Text } = require('react-native');
+    return React.createElement(View, { testID: `cat3d-${props.pose || 'idle'}` },
+      React.createElement(Text, null, `Cat3D-${props.pose || 'idle'}`),
     );
   },
 }));
@@ -206,9 +216,9 @@ describe('CatSwitchScreen', () => {
     expect(getByText('Selected')).toBeTruthy();
   });
 
-  it('shows KeysieSvg with "celebrating" mood for selected cat', () => {
+  it('shows 3D cat with "celebrate" pose for selected cat', () => {
     const { getByText } = render(<CatSwitchScreen />);
-    expect(getByText('KeysieSvg-celebrating')).toBeTruthy();
+    expect(getByText('Cat3D-celebrate')).toBeTruthy();
   });
 
   // =========================================================================

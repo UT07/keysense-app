@@ -9,6 +9,8 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from './firebase/config';
 import {
   buildSongPrompt,
   validateGeneratedSong,
@@ -37,6 +39,27 @@ export async function generateAndSaveSong(
   params: SongRequestParams,
   uid: string,
 ): Promise<Song | null> {
+  // Try Cloud Function first
+  try {
+    const fn = httpsCallable<SongRequestParams, GeneratedSongABC>(functions, 'generateSong');
+    const result = await fn(params);
+    const rawSong = result.data;
+
+    if (rawSong && validateGeneratedSong(rawSong)) {
+      const song = assembleSong(rawSong, 'gemini');
+      if (song) {
+        // Save to Firestore and increment counter
+        await saveSongToFirestore(song);
+        const today = new Date().toISOString().split('T')[0];
+        await incrementSongRequestCount(uid, today);
+        return song;
+      }
+    }
+  } catch (cfError) {
+    console.warn('[SongGen] Cloud Function unavailable, using direct API:', (cfError as Error)?.message ?? cfError);
+  }
+
+  // Fall back to direct Gemini API call
   // Rate limit check
   const today = new Date().toISOString().split('T')[0];
   const count = await getUserSongRequestCount(uid, today);

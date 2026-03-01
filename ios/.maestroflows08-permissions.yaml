@@ -1,0 +1,50 @@
+# Permissions Test
+# Tests app permissions handling
+
+appId: ${APP_ID}
+name: Permissions Handling
+tags:
+  - permissions
+  - critical
+
+---
+
+- launchApp:
+    clearState: true
+    permissions:
+      location: allow
+      notifications: allow
+      camera: allow
+      photos: allow
+
+# Test camera permission
+# - tapOn: "Take Photo|Camera"
+# - assertVisible: ".*Camera.*"
+# - back
+
+# Test photo library permission
+# - tapOn: "Choose Photo|Gallery"
+# - assertVisible: ".*Photos.*"
+# - back
+
+# Test location permission
+# - tapOn: "Enable Location|Use My Location"
+# App should have location access
+
+# Test notification permission
+# - tapOn: "Enable Notifications"
+# Check if permission was granted
+
+- takeScreenshot: screenshots/permissions-granted
+
+# Test with denied permissions
+- launchApp:
+    clearState: true
+    permissions:
+      location: deny
+      camera: deny
+
+# - tapOn: "Use Location"
+# - assertVisible: "Permission.*Denied|Enable.*Settings"
+
+- takeScreenshot: screenshots/permissions-denied

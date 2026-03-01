@@ -1,8 +1,8 @@
 # Purrrfect Keys — Design System
 
-**Version:** 3.1
-**Last Updated:** February 21, 2026
-**Status:** Phase 7 Batches 1-6 complete — Concert Hall palette (black + crimson), lava lamp gradient, typography, shadows, composable cat SVG, Salsa NPC
+**Version:** 3.2
+**Last Updated:** February 28, 2026
+**Status:** Phase 10 Arcade Concert Hall complete — Concert Hall palette (black + crimson), lava lamp gradient, typography, shadows, composable cat SVG, Salsa NPC, rarity borders, combo escalation, 3D cats, sound design
 
 ---
 
@@ -170,25 +170,30 @@ Font: System default (no custom fonts). Future: consider adding a branded font.
 | LessonCompleteScreen | `components/transitions/LessonCompleteScreen.tsx` | Full lesson celebration |
 | FunFactCard | `components/FunFact/FunFactCard.tsx` | Music fun fact display |
 
-### Screens (15 total)
+### Screens (21 total)
 | Screen | Purpose |
 |--------|---------|
-| AuthScreen | Login/signup entry point |
+| AuthScreen | Login/signup with Salsa hero, shimmer title, floating notes |
 | EmailAuthScreen | Email/password auth form |
-| OnboardingScreen | 4-step new user onboarding |
+| OnboardingScreen | 4-step new user onboarding (input method, cat selection) |
 | SkillAssessmentScreen | Initial skill calibration |
-| HomeScreen | Main dashboard with Salsa, daily goal, continue learning |
-| DailySessionScreen | "Today's Practice" AI-picked session |
-| LevelMapScreen | Duolingo-style vertical lesson map |
-| LearnScreen | Legacy lesson list (superseded by LevelMap) |
-| PlayScreen | Free play keyboard |
-| ExercisePlayer | Core exercise experience |
-| ProfileScreen | User stats, settings, account |
-| AccountScreen | Account management |
-| CatCollectionScreen | Cat gallery with evolution + abilities |
-| CatSwitchScreen | Quick cat switcher |
+| HomeScreen | Command center with Salsa, daily goal, music spotlight, continue learning |
+| DailySessionScreen | "Today's Practice" AI-picked session with GameCard rarity |
+| LevelMapScreen | Trophy road with 15 themed tiers, winding path, cat companions |
+| PlayScreen | Free play keyboard with optional song reference |
+| ExercisePlayer | Core exercise with combo escalation, loot reveal completion |
+| ProfileScreen | Player card with stat badges, achievement shimmer, streak flame |
+| AccountScreen | Account management + account deletion |
+| CatSwitchScreen | Unified cat gallery: swipeable cards, evolution, abilities, buy flow |
 | MidiSetupScreen | MIDI device wizard |
+| MicSetupScreen | Microphone permission wizard |
 | LessonIntroScreen | Pre-lesson objectives |
+| SongLibraryScreen | Music library: genre carousel, search, mastery badges |
+| SongPlayerScreen | Section-based song playback with layer toggle |
+| SocialScreen | Social hub: league card, friends, challenges |
+| LeaderboardScreen | Weekly league standings with promotion/demotion zones |
+| AddFriendScreen | Friend code display/copy + code lookup |
+| FriendsScreen | Friends list + activity feed (two-tab) |
 
 ---
 
@@ -232,12 +237,55 @@ Moods: happy, neutral, sleepy, excited, sad, teaching, encouraging, curious
 #### Evolution Stages
 baby → teen → adult → master, with XP thresholds. Each stage unlocks accessories and abilities.
 
-### Future: Rive Animated Characters
-The `RiveCatAvatar` component exists as placeholder — `.riv` files need Rive editor design work.
+### Current: 3D Cat System (Phase 10 — react-three-fiber)
+
+The 3D cat system uses react-three-fiber v8 + @react-three/drei for native 3D rendering:
+
+#### Architecture
+- **`CatAvatar3D.tsx`** — Wraps R3F Canvas with SVG CatAvatar fallback when expo-gl unavailable
+- **4 GLB body types**: `salsa-cat.glb` (standard), `slim-cat.glb`, `round-cat.glb`, `chonky-cat.glb`
+- **Material color overrides**: Per-cat body/ear/eye/nose colors applied at runtime
+- **`CatAccessories3D.tsx`** — Programmatic Three.js geometry for 30+ evolution accessories
+- **Evolution glow**: pointLight + aura sphere for adult/master stages
+- **Performance**: ONE 3D canvas per screen max, 30fps target
+
+#### Fallback
+SVG composable system (`KeysieSvg.tsx`) used when `forceSVG=true` or WebGL unavailable.
 
 ---
 
-## 5. Visual Debt Status (Phase 7 Progress)
+## 5. Known Patterns & Gotchas
+
+### textShadowColor + Reanimated
+**Do NOT animate `textShadowColor`, `textShadowOffset`, or `textShadowRadius` inside `useAnimatedStyle`.** Reanimated does not support text shadow animation properties. This was discovered on the AuthScreen where animated text shadows caused a runtime error.
+
+**Pattern:** Use a static `style` prop for text shadows, not `useAnimatedStyle`:
+```typescript
+// BAD — will crash
+const animStyle = useAnimatedStyle(() => ({
+  textShadowColor: 'rgba(220,20,60,0.5)',
+  textShadowRadius: 10,
+}));
+
+// GOOD — static style, animate other properties separately
+const staticShadow = { textShadowColor: 'rgba(220,20,60,0.5)', textShadowRadius: 10 };
+<Animated.Text style={[animatedOpacity, staticShadow]} />
+```
+
+### Auth Gating for Social Screens
+Anonymous users must not access Firestore social features (friend codes, leagues, challenges). All social screens (AddFriendScreen, SocialScreen, FriendsScreen, LeaderboardScreen) should check `isAnonymous` from `authStore` and show a sign-in prompt instead of attempting Firestore operations.
+
+**Pattern:**
+```typescript
+const { user, isAnonymous } = useAuthStore();
+if (!user || isAnonymous) {
+  return <SignInPrompt message="Sign in to add friends" />;
+}
+```
+
+---
+
+## 6. Visual Debt Status (Phase 7 Progress)
 
 ### Resolved (Batches 1-6)
 1. ~~Cat avatars are static pixel art~~ → **FIXED:** Composable SVG part system, 12 unique profiles, Reanimated poses
@@ -250,13 +298,13 @@ The `RiveCatAvatar` component exists as placeholder — `.riv` files need Rive e
 8. ~~Profile screen is plain settings list~~ → **FIXED:** Cat avatar with evolution badge, stats grid
 9. ~~Exercise completion feels abrupt~~ → **FIXED:** ExerciseLoadingScreen interstitial + enhanced CompletionModal
 
-### Remaining (Phase 7 Batches 7-10)
-10. Auth screens still need Salsa hero illustration and warm gradients (Batch 7)
-11. LevelMapScreen needs warm background and shadowed nodes (Batch 7)
-12. No screen transition animations (Batch 8)
-13. No button press sound effects
-14. No loading/skeleton states (Batch 9)
-15. No animated progress bars (Batch 9)
+### Resolved (Phase 10 — Arcade Concert Hall)
+10. ~~Auth screens still need Salsa hero~~ → **FIXED:** AuthScreen has larger Salsa (2x), shimmer title, floating musical notes
+11. ~~LevelMapScreen needs warm background~~ → **FIXED:** 15 unique tier themes with per-tier colors, backgrounds, zone labels
+12. ~~No screen transition animations~~ → **PARTIALLY FIXED:** FadeInUp stagger on DailySession, LevelMap nodes
+13. ~~No button press sound effects~~ → **FIXED:** SoundManager with haptic pairing, PressableScale auto-plays button_press
+14. No loading/skeleton states (stretch)
+15. No animated progress bars (stretch)
 
 ### Low Priority
 16. No dark/light mode support
@@ -267,7 +315,7 @@ The `RiveCatAvatar` component exists as placeholder — `.riv` files need Rive e
 
 ---
 
-## 6. Design Principles (Target)
+## 7. Design Principles (Target)
 
 1. **Salsa is the app.** Every screen should feel like Salsa is your companion. She's large, animated, and central — not a tiny icon in the corner.
 

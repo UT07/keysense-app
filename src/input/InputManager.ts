@@ -18,7 +18,7 @@ import type { MidiNoteEvent } from '../core/exercises/types';
 import { getMidiInput } from './MidiInput';
 import type { MidiInput } from './MidiInput';
 import { MicrophoneInput, createMicrophoneInput } from './MicrophoneInput';
-import { ensureAudioModeConfigured } from '../audio/createAudioEngine';
+import { configureAudioSessionForRecording } from './AudioCapture';
 import { useSettingsStore } from '../stores/settingsStore';
 
 // ---------------------------------------------------------------------------
@@ -125,9 +125,14 @@ export class InputManager {
     } else if (preferred === 'mic') {
       // Mic explicitly requested — request permission
       try {
-        // Reconfigure iOS audio session to allow recording alongside playback
+        // Configure react-native-audio-api's AudioManager for PlayAndRecord.
+        // IMPORTANT: Do NOT call expo-av's ensureAudioModeConfigured() here — expo-av
+        // and react-native-audio-api share the same iOS AVAudioSession singleton but
+        // maintain separate internal state. Calling expo-av updates the native session
+        // but NOT react-native-audio-api's AudioSessionManager, causing it to reject
+        // AudioRecorder creation because it still thinks the session is Playback-only.
         console.log('[InputManager] Configuring audio session for recording...');
-        await ensureAudioModeConfigured(true);
+        configureAudioSessionForRecording();
 
         const detectionMode = useSettingsStore.getState().micDetectionMode ?? 'monophonic';
         this.micInput = await createMicrophoneInput({
@@ -265,7 +270,7 @@ export class InputManager {
     } else if (method === 'mic') {
       if (!this.micInput) {
         try {
-          await ensureAudioModeConfigured(true);
+          configureAudioSessionForRecording();
           const detectionMode = useSettingsStore.getState().micDetectionMode ?? 'monophonic';
           this.micInput = await createMicrophoneInput({
             defaultVelocity: this.config.micDefaultVelocity ?? 80,

@@ -9,13 +9,14 @@
  * Auth gate: anonymous users see a sign-in prompt instead.
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   SafeAreaView,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -23,6 +24,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuthStore } from '../stores/authStore';
 import { useSocialStore } from '../stores/socialStore';
 import { useLeagueStore } from '../stores/leagueStore';
+import { useSettingsStore } from '../stores/settingsStore';
+import { getFriends, getUserPublicProfile } from '../services/firebase/socialService';
+import {
+  getCurrentLeagueMembership,
+  assignToLeague,
+  getLeagueStandings,
+} from '../services/firebase/leagueService';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../theme/tokens';
 import { PressableScale } from '../components/common/PressableScale';
 import type { RootStackParamList } from '../navigation/AppNavigator';
@@ -68,7 +76,11 @@ function AuthGate({ onSignIn }: { onSignIn: () => void }): React.JSX.Element {
 
 function LeagueCard(): React.JSX.Element {
   const navigation = useNavigation<NavigationProp>();
+  const user = useAuthStore((s) => s.user);
   const membership = useLeagueStore((s) => s.membership);
+  const setMembership = useLeagueStore((s) => s.setMembership);
+  const [isJoining, setIsJoining] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   const tier = membership?.tier ?? 'bronze';
   const config = LEAGUE_TIER_CONFIG[tier];
@@ -76,6 +88,30 @@ function LeagueCard(): React.JSX.Element {
   const handleViewLeaderboard = useCallback(() => {
     navigation.navigate('Leaderboard');
   }, [navigation]);
+
+  const handleJoinLeague = useCallback(async () => {
+    if (!user?.uid || isJoining) return;
+    setIsJoining(true);
+    setJoinError(null);
+    try {
+      // First try to find existing membership
+      let m = await getCurrentLeagueMembership(user.uid);
+      if (!m) {
+        const catId = useSettingsStore.getState().selectedCatId ?? 'mini-meowww';
+        m = await assignToLeague(
+          user.uid,
+          user.displayName ?? 'Player',
+          catId,
+          'bronze',
+        );
+      }
+      setMembership(m);
+    } catch {
+      setJoinError('Failed to join league. Check your connection and try again.');
+    } finally {
+      setIsJoining(false);
+    }
+  }, [user?.uid, user?.displayName, isJoining, setMembership]);
 
   if (!membership) {
     return (
@@ -89,8 +125,25 @@ function LeagueCard(): React.JSX.Element {
           <Text style={styles.leagueTitle}>Weekly League</Text>
         </View>
         <Text style={styles.leagueNoMembership}>
-          Complete exercises to join this week's league!
+          Compete with other players in a weekly XP league!
         </Text>
+        <PressableScale
+          onPress={handleJoinLeague}
+          style={[styles.joinLeagueButton, isJoining && styles.joinLeagueButtonDisabled]}
+          testID="social-join-league"
+        >
+          {isJoining ? (
+            <ActivityIndicator color={COLORS.textPrimary} size="small" />
+          ) : (
+            <>
+              <MaterialCommunityIcons name="shield-plus" size={18} color={COLORS.textPrimary} />
+              <Text style={styles.joinLeagueButtonText}>Join This Week's League</Text>
+            </>
+          )}
+        </PressableScale>
+        {joinError && (
+          <Text style={styles.joinLeagueError}>{joinError}</Text>
+        )}
       </View>
     );
   }
@@ -162,7 +215,7 @@ function FriendsSection(): React.JSX.Element {
   );
 
   const pendingCount = useMemo(
-    () => friends.filter((f) => f.status === 'pending_incoming').length,
+    () => friends.filter((f) => f.status === 'pending_incoming' || f.status === 'pending_outgoing').length,
     [friends],
   );
 
@@ -351,7 +404,64 @@ function ActiveChallengesSection(): React.JSX.Element {
 
 export function SocialScreen(): React.JSX.Element {
   const navigation = useNavigation<NavigationProp>();
+  const user = useAuthStore((s) => s.user);
   const isAnonymous = useAuthStore((s) => s.isAnonymous);
+  const setFriends = useSocialStore((s) => s.setFriends);
+  const setMembership = useLeagueStore((s) => s.setMembership);
+  const setStandings = useLeagueStore((s) => s.setStandings);
+
+  // Sync friends + league from Firestore on mount
+  useEffect(() => {
+    if (!user?.uid || isAnonymous) return;
+    let cancelled = false;
+
+    (async () => {
+      // Sync friends
+      try {
+        const remoteFriends = await getFriends(user.uid);
+        if (!cancelled && remoteFriends.length > 0) {
+          const enriched = await Promise.all(
+            remoteFriends.map(async (f) => {
+              if (f.displayName && f.displayName !== 'Friend' && f.displayName !== 'Player') {
+                return f;
+              }
+              try {
+                const profile = await getUserPublicProfile(f.uid);
+                if (profile) {
+                  return { ...f, displayName: profile.displayName, selectedCatId: profile.selectedCatId || f.selectedCatId };
+                }
+              } catch {
+                // keep original
+              }
+              return f;
+            }),
+          );
+          if (!cancelled) setFriends(enriched);
+        }
+      } catch {
+        // Silently fail — local data still available
+      }
+
+      // Sync league membership + standings
+      try {
+        const m = await getCurrentLeagueMembership(user.uid);
+        if (!cancelled && m) {
+          setMembership(m);
+          // Also fetch standings so the leaderboard has data
+          try {
+            const s = await getLeagueStandings(m.leagueId);
+            if (!cancelled) setStandings(s);
+          } catch {
+            // standings fetch failed — not critical
+          }
+        }
+      } catch {
+        // League sync failed — non-blocking
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [user?.uid, isAnonymous, setFriends, setMembership, setStandings]);
 
   const handleSignIn = useCallback(() => {
     navigation.navigate('Auth');
@@ -479,6 +589,31 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.body.md,
     color: COLORS.textSecondary,
     marginTop: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  joinLeagueButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    backgroundColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    minHeight: 48,
+  },
+  joinLeagueButtonDisabled: {
+    opacity: 0.6,
+  },
+  joinLeagueButtonText: {
+    ...TYPOGRAPHY.button.lg,
+    color: COLORS.textPrimary,
+  },
+  joinLeagueError: {
+    ...TYPOGRAPHY.body.sm,
+    color: COLORS.error,
+    marginTop: SPACING.sm,
+    textAlign: 'center',
   },
   leagueStats: {
     flexDirection: 'row',

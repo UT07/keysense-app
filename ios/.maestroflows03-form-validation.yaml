@@ -1,0 +1,53 @@
+# Form Input and Validation Test
+# Tests various form inputs and validation logic
+
+appId: ${APP_ID}
+name: Form Input and Validation
+tags:
+  - forms
+  - validation
+
+---
+
+- launchApp
+
+# Navigate to a form screen (adjust based on your app)
+# - tapOn: "Create|Add|New"
+
+# Test text input
+# - tapOn: "Title"
+# - inputText: "Test Item"
+# - assertVisible: "Test Item"
+
+# Test textarea/multiline input
+# - tapOn: "Description"
+# - inputText: "This is a test description\nwith multiple lines"
+
+# Test number input
+# - tapOn: "Amount"
+# - inputText: "123.45"
+
+# Test date picker (if applicable)
+# - tapOn: "Date"
+# - selectDate: "2026-03-01"
+
+# Test dropdown/picker (if applicable)
+# - tapOn: "Category"
+# - tapOn: "Option 1"
+
+# Test checkbox/switch
+# - tapOn: "Enable Notifications"
+
+# Test form validation - empty required field
+# - tapOn: "Title"
+# - clearTextField
+# - tapOn: "Submit"
+# - assertVisible: "Required|Error"
+
+# Fill form correctly and submit
+# - tapOn: "Title"
+# - inputText: "Valid Entry"
+# - tapOn: "Submit"
+# - assertVisible: "Success|Created"
+
+- takeScreenshot: screenshots/form-complete

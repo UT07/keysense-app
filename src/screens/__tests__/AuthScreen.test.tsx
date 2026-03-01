@@ -29,6 +29,14 @@ jest.mock('../../components/Mascot/CatAvatar', () => {
   };
 });
 
+// Mock Cat3DCanvas (used by SalsaCoach)
+jest.mock('../../components/Mascot/3d', () => {
+  const { View } = require('react-native');
+  return {
+    Cat3DCanvas: (props: any) => <View testID="cat-3d" {...props} />,
+  };
+});
+
 // Mock settingsStore
 jest.mock('../../stores/settingsStore', () => ({
   useSettingsStore: Object.assign(
@@ -386,11 +394,11 @@ describe('AuthScreen', () => {
       expect(getByTestId('salsa-coach')).toBeTruthy();
     });
 
-    it('should render Salsa SVG in hero', () => {
+    it('should render Salsa 3D cat in hero', () => {
       const { getByTestId } = render(<AuthScreen />);
 
       expect(getByTestId('salsa-coach')).toBeTruthy();
-      expect(getByTestId('keysie-svg')).toBeTruthy();
+      expect(getByTestId('cat-3d')).toBeTruthy();
     });
   });
 });

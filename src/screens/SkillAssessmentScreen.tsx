@@ -25,7 +25,8 @@ import { MascotBubble } from '../components/Mascot/MascotBubble';
 import { useLearnerProfileStore } from '../stores/learnerProfileStore';
 import { useProgressStore } from '../stores/progressStore';
 import { useSettingsStore } from '../stores/settingsStore';
-import { createAudioEngine, ensureAudioModeConfigured } from '../audio/createAudioEngine';
+import { createAudioEngine } from '../audio/createAudioEngine';
+import { configureAudioSessionForRecording } from '../input/AudioCapture';
 import type { NoteHandle } from '../audio/types';
 import { getRandomCatMessage } from '../content/catDialogue';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS } from '../theme/tokens';
@@ -491,7 +492,11 @@ export function SkillAssessmentScreen(): React.ReactElement {
 
       // 1. Configure audio mode (with recording if mic may be used)
       try {
-        await ensureAudioModeConfigured(needsMic);
+        if (needsMic) {
+          // Use react-native-audio-api's AudioManager (NOT expo-av) to avoid
+          // AVAudioSession state mismatch between the two libraries.
+          configureAudioSessionForRecording();
+        }
         if (!audioEngineRef.current.isReady()) {
           await audioEngineRef.current.initialize();
         }

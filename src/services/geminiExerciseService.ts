@@ -7,6 +7,8 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from './firebase/config';
 import type { GenerationHints } from '../core/curriculum/SkillTree';
 
 // ============================================================================
@@ -63,12 +65,14 @@ export interface AIExercise {
 
 const MIDI_MIN = 36;
 const MIDI_MAX = 96;
-const MAX_NOTES = 32;
+const MAX_NOTES = 64;
 const MAX_INTERVAL_FAST_TEMPO = 24; // 2 octaves at > 120 BPM
 const MAX_INTERVAL_ANY_TEMPO = 36; // 3 octaves absolute limit
 const FAST_TEMPO_THRESHOLD = 120;
 const TEMPO_MIN = 30;
 const TEMPO_MAX = 200;
+const VALID_DURATIONS = new Set([0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4]);
+const MAX_EXERCISE_BEATS = 128; // ~32 measures of 4/4
 
 /**
  * Environment variable name built via concatenation so that Babel's
@@ -145,6 +149,15 @@ export function validateAIExercise(exercise: unknown, allowedMidi?: number[]): e
       return false;
     }
 
+    // Validate duration is a musically sensible value
+    if (!VALID_DURATIONS.has(n.durationBeats as number)) {
+      // Allow close-enough values (AI might return 0.49 instead of 0.5)
+      const closest = Array.from(VALID_DURATIONS).find(
+        (d) => Math.abs(d - (n.durationBeats as number)) < 0.05,
+      );
+      if (!closest) return false;
+    }
+
     // Check interval from previous note
     if (i > 0) {
       const prevNote = notes[i - 1].note as number;
@@ -158,6 +171,13 @@ export function validateAIExercise(exercise: unknown, allowedMidi?: number[]): e
         return false;
       }
     }
+  }
+
+  // Check total exercise length is reasonable
+  const lastNote = notes[notes.length - 1];
+  const totalBeats = (lastNote.startBeat as number) + (lastNote.durationBeats as number);
+  if (totalBeats > MAX_EXERCISE_BEATS || totalBeats <= 0) {
+    return false;
   }
 
   return true;
@@ -194,6 +214,7 @@ export function buildPrompt(params: GenerationParams): string {
     hints?.keySignature ?? params.keySignature ?? keySignatureForDifficulty(params.difficulty);
   const difficulty = hints?.minDifficulty ?? params.difficulty;
   const hand = hints?.hand ?? 'right';
+  const totalBeats = Math.ceil(params.noteCount * 1.5); // rough estimate for 4-bar phrasing
 
   let prompt = `Generate a piano exercise as JSON for a student with this profile:
 - Weak notes (MIDI): ${JSON.stringify(params.weakNotes)} (focus extra repetitions on these)
@@ -235,11 +256,22 @@ Requirements:
 - Time signature: 4/4
 - Key signature: ${keySignature}
 - All MIDI notes between 48-84 (C3 to C6)
-- Notes should flow melodically (mostly stepwise motion, occasional skips)
-- Include at least 2 repetitions of each weak note
 - All notes should use hand: "${hand}"
+- Include at least 2 repetitions of each weak note
+- Exercise should span approximately ${totalBeats} beats (${Math.ceil(totalBeats / 4)} measures of 4/4)
 
-Return JSON: { notes: [{note, startBeat, durationBeats, hand}], settings: {tempo, timeSignature, keySignature}, metadata: {title, difficulty, skills}, scoring: {passingScore, timingToleranceMs, starThresholds} }`;
+Musical quality rules (IMPORTANT):
+- Structure in 4-bar phrases with question-and-answer patterns
+- End each phrase on a stable scale degree (tonic or dominant)
+- End the exercise on the tonic note of the key
+- Use rhythmic variety: mix quarter notes (1 beat), half notes (2 beats), eighth notes (0.5 beats), and dotted quarters (1.5 beats). Do NOT use only quarter notes.
+- Use mostly stepwise motion (seconds) with occasional thirds and one or two wider skips per phrase
+- durationBeats must be a standard musical value: 0.25, 0.5, 0.75, 1, 1.5, 2, 3, or 4
+- startBeat values must not cause overlapping notes for the same hand
+- First note should start on beat 0
+
+Return ONLY valid JSON (no markdown, no explanation):
+{ "notes": [{"note": <midi>, "startBeat": <number>, "durationBeats": <number>, "hand": "${hand}"}], "settings": {"tempo": ${tempo}, "timeSignature": [4,4], "keySignature": "${keySignature}"}, "metadata": {"title": "<descriptive title>", "difficulty": ${difficulty}, "skills": ["<relevant-skill>"]}, "scoring": {"passingScore": ${difficulty <= 2 ? 60 : difficulty <= 4 ? 70 : 80}, "timingToleranceMs": ${difficulty <= 2 ? 75 : difficulty <= 4 ? 50 : 30}, "starThresholds": [70, 85, 95]} }`;
 
   return prompt;
 }
@@ -295,6 +327,20 @@ export async function generateChallenge(profile: {
 // ============================================================================
 
 export async function generateExercise(params: GenerationParams): Promise<AIExercise | null> {
+  // Try Cloud Function first
+  try {
+    const fn = httpsCallable<GenerationParams, AIExercise>(functions, 'generateExercise');
+    const result = await fn(params);
+    const exercise = result.data;
+
+    if (exercise && validateAIExercise(exercise, params.generationHints?.targetMidi)) {
+      return exercise;
+    }
+  } catch (cfError) {
+    console.warn('[GeminiExercise] Cloud Function unavailable, using direct API:', (cfError as Error)?.message ?? cfError);
+  }
+
+  // Fall back to direct Gemini API call
   try {
     // Dynamic access prevents Babel from inlining the env var at build time
     const apiKey = process.env[API_KEY_ENV];

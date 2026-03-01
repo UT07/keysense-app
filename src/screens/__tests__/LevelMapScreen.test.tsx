@@ -123,6 +123,15 @@ jest.mock('../../components/Mascot/CatAvatar', () => {
   };
 });
 
+jest.mock('../../components/Mascot/3d', () => {
+  const mockReact = require('react');
+  const RN = require('react-native');
+  return {
+    Cat3DCanvas: (props: any) =>
+      mockReact.createElement(RN.View, { testID: `cat-3d-${props.catId}`, ...props }),
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Zustand store mocks
 // ---------------------------------------------------------------------------
@@ -250,20 +259,20 @@ describe('LevelMapScreen', () => {
 
   it('renders cat avatar at tier 1 (mini-meowww)', () => {
     const { getAllByTestId } = render(<LevelMapScreen />);
-    const cats = getAllByTestId('cat-avatar-mini-meowww');
+    const cats = getAllByTestId('cat-3d-mini-meowww');
     expect(cats.length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders different cats at different tiers', () => {
     const { getByTestId } = render(<LevelMapScreen />);
     // Tier 2 = luna, Tier 3 = jazzy
-    expect(getByTestId('cat-avatar-luna')).toBeTruthy();
-    expect(getByTestId('cat-avatar-jazzy')).toBeTruthy();
+    expect(getByTestId('cat-3d-luna')).toBeTruthy();
+    expect(getByTestId('cat-3d-jazzy')).toBeTruthy();
   });
 
   it('renders legendary cat at tier 15', () => {
     const { getByTestId } = render(<LevelMapScreen />);
-    expect(getByTestId('cat-avatar-chonky-monke')).toBeTruthy();
+    expect(getByTestId('cat-3d-chonky-monke')).toBeTruthy();
   });
 
   // =========================================================================
