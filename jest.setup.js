@@ -139,6 +139,37 @@ jest.mock('@react-native-async-storage/async-storage', () => {
   };
 });
 
+// Mock @shopify/react-native-skia (GPU-accelerated 2D — not available in Jest)
+jest.mock('@shopify/react-native-skia', () => {
+  const React = require('react');
+  return {
+    Canvas: ({ children, ...props }) => React.createElement('View', props, children),
+    Circle: (props) => React.createElement('View', props),
+    Rect: (props) => React.createElement('View', props),
+    RoundedRect: (props) => React.createElement('View', props),
+    Path: (props) => React.createElement('View', props),
+    Line: (props) => React.createElement('View', props),
+    Group: ({ children, ...props }) => React.createElement('View', props, children),
+    LinearGradient: (props) => React.createElement('View', props),
+    RadialGradient: (props) => React.createElement('View', props),
+    Blur: (props) => React.createElement('View', props),
+    BackdropFilter: ({ children, ...props }) => React.createElement('View', props, children),
+    BackdropBlur: ({ children, ...props }) => React.createElement('View', props, children),
+    Shadow: (props) => React.createElement('View', props),
+    useSharedValueEffect: jest.fn(),
+    useClockValue: jest.fn(() => ({ current: 0 })),
+    useComputedValue: jest.fn((fn) => ({ current: fn() })),
+    useValue: jest.fn((val) => ({ current: val })),
+    Skia: {
+      Path: { Make: jest.fn(() => ({ moveTo: jest.fn(), lineTo: jest.fn(), close: jest.fn() })) },
+      Color: jest.fn((c) => c),
+    },
+    vec: jest.fn((x, y) => ({ x, y })),
+    useFont: jest.fn(() => null),
+    matchFont: jest.fn(() => null),
+  };
+});
+
 // Mock 3D rendering modules (not available in Jest node environment)
 jest.mock('@react-three/fiber/native', () => ({
   Canvas: jest.fn(({ children }) => children),
