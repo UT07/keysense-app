@@ -17,6 +17,7 @@ import {
   ScrollView,
   ActivityIndicator,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import Reanimated, {
   FadeIn,
@@ -42,7 +43,7 @@ import { useProgressStore } from '../../stores/progressStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { getLessonIdForExercise } from '../../content/ContentLoader';
 import { soundManager } from '../../audio/SoundManager';
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, GLOW, RARITY, glowColor } from '../../theme/tokens';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, GLOW, RARITY, glowColor } from '../../theme/tokens';
 import type { Exercise, ExerciseScore } from '../../core/exercises/types';
 import type { ChestType } from '../../core/rewards/chestSystem';
 
@@ -460,7 +461,16 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
             >
               {/* Animated Score Circle */}
               <View style={styles.scoreSection}>
-                <View style={[styles.scoreCircle, { borderColor: scoreColor }]}>
+                <View style={[
+                  styles.scoreCircle,
+                  { borderColor: scoreColor },
+                  Platform.OS === 'ios' && {
+                    shadowColor: scoreColor,
+                    shadowOpacity: 0.5,
+                    shadowRadius: 12,
+                    shadowOffset: { width: 0, height: 0 },
+                  },
+                ]}>
                   <View style={styles.scoreRow}>
                     <Text style={[styles.scoreNumber, { color: scoreColor }]}>{displayScore}</Text>
                     <Text style={[styles.scorePercent, { color: scoreColor }]}>%</Text>
@@ -484,11 +494,13 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
                             key={i}
                             style={{ transform: [{ scale: isEarned ? starScale : 1 }] }}
                           >
-                            <MaterialCommunityIcons
-                              name={isEarned ? 'star' : 'star-outline'}
-                              size={44}
-                              color={isEarned ? COLORS.starGold : COLORS.starEmpty}
-                            />
+                            <View style={isEarned ? styles.starGlow : undefined}>
+                              <MaterialCommunityIcons
+                                name={isEarned ? 'star' : 'star-outline'}
+                                size={48}
+                                color={isEarned ? COLORS.starGold : COLORS.starEmpty}
+                              />
+                            </View>
                           </Animated.View>
                         );
                       })}
@@ -886,14 +898,22 @@ const styles = StyleSheet.create({
   container: {
     width: '100%',
     maxWidth: 500,
-    backgroundColor: COLORS.surface,
+    backgroundColor: 'rgba(20, 20, 20, 0.88)',
     borderRadius: BORDER_RADIUS.xl,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     gap: SPACING.md - 4,
-    ...SHADOWS.lg,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    ...Platform.select({
+      ios: {
+        shadowColor: COLORS.primary,
+        shadowOpacity: 0.2,
+        shadowRadius: 20,
+        shadowOffset: { width: 0, height: 0 },
+      },
+      default: { elevation: 12 },
+    }),
   },
   header: {
     alignItems: 'center',
@@ -917,10 +937,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scoreCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: COLORS.cardSurface,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: 'rgba(24, 24, 24, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 4,
@@ -943,7 +963,18 @@ const styles = StyleSheet.create({
   starsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
+  },
+  starGlow: {
+    ...Platform.select({
+      ios: {
+        shadowColor: COLORS.starGold,
+        shadowOpacity: 0.6,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 0 },
+      },
+      default: {},
+    }),
   },
   resultSection: {
     flexDirection: 'row',
@@ -959,15 +990,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACING.sm,
-    paddingVertical: SPACING.sm,
-    backgroundColor: glowColor(COLORS.starGold, 0.15),
+    paddingVertical: SPACING.sm + 2,
+    backgroundColor: glowColor(COLORS.starGold, 0.12),
     borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    borderColor: glowColor(COLORS.starGold, 0.3),
+    ...Platform.select({
+      ios: {
+        shadowColor: COLORS.starGold,
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 0 },
+      },
+      default: { elevation: 4 },
+    }),
   },
   newRecordText: {
     ...TYPOGRAPHY.heading.md,
     fontWeight: '800',
     color: COLORS.starGold,
-    letterSpacing: 2,
+    letterSpacing: 3,
   },
   chestBanner: {
     flexDirection: 'row',
@@ -993,10 +1035,12 @@ const styles = StyleSheet.create({
   },
   breakdownSection: {
     gap: SPACING.sm,
-    backgroundColor: COLORS.cardSurface,
+    backgroundColor: 'rgba(24, 24, 24, 0.7)',
     paddingHorizontal: SPACING.md - 4,
     paddingVertical: SPACING.sm + 2,
     borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   breakdownTitle: {
     ...TYPOGRAPHY.body.sm,
@@ -1017,14 +1061,14 @@ const styles = StyleSheet.create({
   },
   breakdownBar: {
     flex: 1,
-    height: 6,
-    backgroundColor: COLORS.cardBorder,
-    borderRadius: 3,
+    height: 7,
+    backgroundColor: 'rgba(42, 42, 42, 0.6)',
+    borderRadius: 4,
     overflow: 'hidden',
   },
   breakdownFill: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: 4,
   },
   breakdownValue: {
     ...TYPOGRAPHY.caption.lg,
@@ -1042,9 +1086,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: SPACING.xs,
     paddingHorizontal: SPACING.md - 4,
-    paddingVertical: 6,
-    backgroundColor: glowColor(COLORS.primary, 0.08),
+    paddingVertical: 8,
+    backgroundColor: 'rgba(220, 20, 60, 0.08)',
     borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(220, 20, 60, 0.12)',
     flex: 1,
   },
   statLabel: {
