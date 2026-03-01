@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -19,12 +19,15 @@ export function ComboGlow({ combo }: ComboGlowProps): React.ReactElement | null 
 
   const shouldShow = tier.name !== 'NORMAL' && combo >= 5;
 
+  // Faster pulse at higher tiers
+  const pulseDuration = tier.name === 'LEGENDARY' ? 500 : tier.name === 'SUPER' ? 600 : 800;
+
   useEffect(() => {
     if (shouldShow) {
       opacity.value = withRepeat(
         withSequence(
-          withTiming(0.8, { duration: 800 }),
-          withTiming(0.3, { duration: 800 }),
+          withTiming(0.85, { duration: pulseDuration }),
+          withTiming(0.25, { duration: pulseDuration }),
         ),
         -1,
         true,
@@ -32,7 +35,7 @@ export function ComboGlow({ combo }: ComboGlowProps): React.ReactElement | null 
     } else {
       opacity.value = withTiming(0, { duration: 300 });
     }
-  }, [shouldShow, opacity]);
+  }, [shouldShow, opacity, pulseDuration]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -45,7 +48,16 @@ export function ComboGlow({ combo }: ComboGlowProps): React.ReactElement | null 
     <Animated.View
       testID="combo-glow"
       pointerEvents="none"
-      style={[styles.glow, animatedStyle]}
+      style={[
+        styles.glow,
+        animatedStyle,
+        Platform.OS === 'ios' && {
+          shadowColor: tier.borderColor,
+          shadowOffset: { width: 0, height: 0 },
+          shadowRadius: 20,
+          shadowOpacity: 0.5,
+        },
+      ]}
     />
   );
 }
@@ -53,7 +65,7 @@ export function ComboGlow({ combo }: ComboGlowProps): React.ReactElement | null 
 const styles = StyleSheet.create({
   glow: {
     ...StyleSheet.absoluteFillObject,
-    borderWidth: 3,
+    borderWidth: 4,
     borderRadius: 0,
     zIndex: 5,
   },

@@ -196,15 +196,19 @@ const styles = StyleSheet.create({
   },
   compactProgress: {
     flex: 1,
-    height: 4,
+    height: 5,
     backgroundColor: COLORS.cardBorder,
-    borderRadius: 2,
+    borderRadius: 3,
     overflow: 'hidden',
   },
   compactProgressBar: {
     height: '100%',
     backgroundColor: COLORS.primary,
-    borderRadius: 2,
+    borderRadius: 3,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 4,
   },
   compactPercent: {
     fontSize: 11,

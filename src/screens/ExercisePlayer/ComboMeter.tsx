@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
 import { getComboTier } from '../../theme/tokens';
 import { soundManager } from '../../audio/SoundManager';
 import type { SoundName } from '../../audio/SoundManager';
@@ -15,10 +15,19 @@ const COMBO_SOUNDS: Record<string, SoundName> = {
   LEGENDARY: 'combo_20',
 };
 
+const TIER_ICONS: Record<string, string> = {
+  NORMAL: '',
+  GOOD: '\uD83D\uDD25',
+  FIRE: '\uD83D\uDC80',
+  SUPER: '\uD83D\uDC51',
+  LEGENDARY: '\uD83C\uDF08',
+};
+
 export function ComboMeter({ combo }: ComboMeterProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const prevTierRef = useRef('NORMAL');
   const tier = getComboTier(combo);
+  const icon = TIER_ICONS[tier.name] || '';
 
   // Animate + play sound on tier change
   useEffect(() => {
@@ -28,7 +37,7 @@ export function ComboMeter({ combo }: ComboMeterProps) {
 
       Animated.sequence([
         Animated.spring(scale, {
-          toValue: 1.3,
+          toValue: 1.4,
           useNativeDriver: true,
           speed: 20,
           bounciness: 15,
@@ -49,7 +58,7 @@ export function ComboMeter({ combo }: ComboMeterProps) {
     if (combo >= 3) {
       Animated.sequence([
         Animated.spring(scale, {
-          toValue: 1.1,
+          toValue: 1.12,
           useNativeDriver: true,
           speed: 20,
           bounciness: 10,
@@ -71,10 +80,26 @@ export function ComboMeter({ combo }: ComboMeterProps) {
       <Animated.View
         style={[
           styles.badge,
-          { backgroundColor: tier.color, transform: [{ scale }] },
+          {
+            backgroundColor: tier.color,
+            transform: [{ scale }],
+            ...Platform.select({
+              ios: {
+                shadowColor: tier.glowColor !== 'transparent' ? tier.borderColor : 'transparent',
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0.6,
+                shadowRadius: 8,
+              },
+              android: { elevation: tier.name !== 'NORMAL' ? 6 : 2 },
+              default: {},
+            }),
+          },
         ]}
       >
-        <Text style={styles.count}>{combo}x</Text>
+        <View style={styles.badgeRow}>
+          {icon ? <Text style={styles.icon}>{icon}</Text> : null}
+          <Text style={styles.count}>{combo}x</Text>
+        </View>
       </Animated.View>
       {tier.label ? (
         <Text style={[styles.label, { color: tier.color }]}>{tier.label}</Text>
@@ -92,23 +117,33 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   badge: {
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    minWidth: 48,
+    borderRadius: 22,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    minWidth: 56,
     alignItems: 'center',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  icon: {
+    fontSize: 16,
   },
   count: {
     color: '#000',
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 20,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '800',
-    marginTop: 2,
-    textShadowColor: 'rgba(0,0,0,0.5)',
+    fontSize: 15,
+    fontWeight: '900',
+    marginTop: 3,
+    letterSpacing: 1,
+    textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    textShadowRadius: 6,
   },
 });

@@ -68,6 +68,10 @@ import { ExerciseIntroOverlay } from './ExerciseIntroOverlay';
 import { ExerciseLoadingScreen } from './ExerciseLoadingScreen';
 import { ComboMeter } from './ComboMeter';
 import { ComboGlow } from './ComboGlow';
+import { HitParticles } from './HitParticles';
+import { ScreenShake, type ScreenShakeRef } from '../../components/effects';
+import { GlassmorphismCard } from '../../components/effects';
+import ReAnimated, { FadeIn } from 'react-native-reanimated';
 import { SKILL_TREE, getSkillsForExercise, getSkillById, getGenerationHints } from '../../core/curriculum/SkillTree';
 import type { SkillCategory } from '../../core/curriculum/SkillTree';
 import { getTierMasteryTestSkillId, isTierMasteryTestAvailable, hasTierMasteryTestPassed } from '../../core/curriculum/tierMasteryTest';
@@ -1162,6 +1166,12 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   // References
   const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const consumedNoteIndicesRef = useRef<Set<number>>(new Set());
+  const shakeRef = useRef<ScreenShakeRef>(null);
+
+  // Hit particle state
+  const [hitParticle, setHitParticle] = useState({ x: 0, y: 0, color: '#fff', trigger: 0 });
+  // Red flash on miss
+  const [showMissFlash, setShowMissFlash] = useState(false);
 
   // Animation values
   const comboScale = useRef(new Animated.Value(0)).current;
@@ -1517,6 +1527,10 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
 
         // Stronger haptic for correct note
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+
+        // Hit particles — gold for perfect, feedback color for others
+        const particleColor = feedbackType === 'perfect' ? '#FFD700' : getFeedbackColor(feedbackType);
+        setHitParticle({ x: screenWidth / 2, y: screenHeight * 0.82, color: particleColor, trigger: Date.now() });
       } else {
         setComboCount(0);
         setFeedback({
@@ -1528,6 +1542,12 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
 
         // Warning haptic for incorrect
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+
+        // Screen shake + red particles on miss
+        shakeRef.current?.shake('medium');
+        setHitParticle({ x: screenWidth / 2, y: screenHeight * 0.82, color: '#FF5252', trigger: Date.now() });
+        setShowMissFlash(true);
+        setTimeout(() => setShowMissFlash(false), 150);
       }
 
       // Clear feedback after delay
@@ -1863,6 +1883,17 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   return (
     <SafeAreaView style={styles.container} testID="exercise-player">
       <ComboGlow combo={comboCount} />
+      {/* Red flash overlay on miss */}
+      {showMissFlash && (
+        <ReAnimated.View
+          entering={FadeIn.duration(80)}
+          style={styles.missFlash}
+          pointerEvents="none"
+        />
+      )}
+      {/* Hit particles overlay */}
+      <HitParticles x={hitParticle.x} y={hitParticle.y} color={hitParticle.color} trigger={hitParticle.trigger} />
+      <ScreenShake ref={shakeRef}>
       {/* Error banner for non-critical errors */}
       {hasError && errorMessage && (isMidiReady || isAudioReady) && (
         <View style={styles.errorBanner}>
@@ -1893,8 +1924,13 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
 
       {/* Vertical stack — top bar, piano roll, keyboard */}
       <View style={styles.mainColumn}>
-        {/* Clean top bar: exit + score + play/pause only */}
-        <View style={styles.topBar}>
+        {/* Glassmorphism top bar: exit + score + play/pause */}
+        <GlassmorphismCard
+          tint="rgba(10, 10, 10, 0.75)"
+          borderColor="rgba(255, 255, 255, 0.06)"
+          borderRadius={16}
+          style={styles.topBar}
+        >
           <ExerciseControls
             isPlaying={isPlaying}
             isPaused={isPaused}
@@ -1956,7 +1992,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
               {playbackSpeed === 1.0 ? '1x' : `${playbackSpeed}x`}
             </Text>
           </TouchableOpacity>
-        </View>
+        </GlassmorphismCard>
 
         {/* Secondary controls — visible when not playing or paused */}
         {(!isPlaying || isPaused) && (
@@ -2048,14 +2084,21 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         {/* Timing feedback overlay between piano roll and keyboard */}
         {feedback.type && (
           <View style={styles.feedbackOverlay}>
-            <Text
+            <ReAnimated.Text
+              key={feedback.timestamp}
+              entering={FadeIn.duration(100).springify().damping(12).stiffness(200)}
               style={[
                 styles.feedbackText,
-                { color: getFeedbackColor(feedback.type) },
+                {
+                  color: getFeedbackColor(feedback.type),
+                  textShadowColor: getFeedbackColor(feedback.type),
+                  textShadowOffset: { width: 0, height: 0 },
+                  textShadowRadius: feedback.type === 'perfect' ? 12 : 6,
+                },
               ]}
             >
               {getFeedbackLabel(feedback.type)}
-            </Text>
+            </ReAnimated.Text>
             <ComboMeter combo={comboCount} />
           </View>
         )}
@@ -2100,6 +2143,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
           )}
         </View>
       </View>
+      </ScreenShake>
 
       {/* Quick exercise card (between exercises in a lesson or AI mode) */}
       {showExerciseCard && finalScore && (
@@ -2241,10 +2285,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: COLORS.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.cardBorder,
+    paddingVertical: 8,
+    marginHorizontal: 8,
+    marginTop: 4,
     gap: 8,
   },
   secondaryBar: {
@@ -2270,17 +2313,22 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   feedbackOverlay: {
-    height: 36,
+    height: 40,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
   },
   feedbackText: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 2,
+  },
+  missFlash: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 0, 0, 0.12)',
+    zIndex: 4,
   },
   keyboardContainer: {
     borderTopWidth: 1,
