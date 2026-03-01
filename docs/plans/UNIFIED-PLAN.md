@@ -1,6 +1,6 @@
 # Purrrfect Keys — Unified Plan
 
-**Last Updated:** February 28, 2026
+**Last Updated:** March 1, 2026
 **Goal:** Production-quality piano learning app on App Store & Play Store
 **Target Launch:** June 8, 2026 (16-week roadmap from Feb 17)
 **Codebase Health:** 0 TypeScript errors, 2,630 tests passing, 122 suites
@@ -322,7 +322,7 @@ Tab order: Home, Learn, Songs, Social, Profile.
 >
 > **System Design:** See `docs/system-design-analysis.md` for the full architecture assessment, cost projections, scalability analysis, and 30 prioritized recommendations.
 
-### Completed (Feb 28)
+### Completed (Feb 28 - Mar 1)
 
 #### Account Deletion (GDPR Compliance)
 - **Cloud Function** (`firebase/functions/src/deleteUserData.ts`): Admin SDK deletion of 9 subcollections, friend codes, league membership, challenges, bidirectional friend cleanup, root document
@@ -353,24 +353,43 @@ Tab order: Home, Learn, Songs, Social, Profile.
 - AddFriendScreen anonymous user auth gate (prompt to sign in)
 - Skeleton code cleanup (SignatureExercise, RiveCatAvatar removed)
 
-#### 3D Cat Models
-- `chonky-cat.glb` exported: 9 named meshes, 7 NLA animations, Draco compression
+#### Audio Session Race Condition Fix
+- `createAudioEngine.ts` now uses `AudioManager` from react-native-audio-api (synchronous) instead of expo-av's `Audio.setAudioModeAsync` (async) for all iOS audio session configuration
+- Eliminates race condition where the async expo-av call would resolve late and overwrite `PlayAndRecord` back to `Playback`, silently killing mic input
+- Both expo-av and react-native-audio-api share the same iOS `AVAudioSession` singleton but maintain separate internal state — using AudioManager for ALL session config eliminates the cross-library conflict
+- Falls back to expo-av only when AudioManager is unavailable (Expo Go)
+
+#### 3D Cat Models + Material Override System
+- 4 GLB body types: `salsa-cat.glb`, `slim-cat.glb`, `round-cat.glb`, `chonky-cat.glb` — 9 named meshes, 7 NLA animations, Draco compression
 - Blender MCP integration configured (`.mcp.json`)
+- **Material override system rewritten** (`CatModel3D.tsx`): matches by `material.name` (not mesh `node.name`). Handles 3 naming conventions across 4 body types: `Mat_` prefix (salsa-cat), no-prefix (chonky-cat), and no-materials (slim/round-cat). Added fallback that creates `MeshStandardMaterial` with per-cat body/belly/eye colors for models without named materials
+- **Camera framing fixed**: Auto-centers models using `THREE.Box3` bounding box computation. Camera position adjusted from `[0, 0.5, 3]` to `[0, 0, 3.2]` with `fov: 35`
+- **Locked cats in gallery now render in 3D**: Removed `forceSVG` restriction on locked cats in CatSwitchScreen — all cats (owned and locked) render via `Cat3DCanvas` with opacity dimming for locked state
 
 #### MIDI Hardware Integration
 - `@motiz88/react-native-midi` package (Expo Modules, Web MIDI API)
 - NativeMidiInput rewritten for raw MIDI byte parsing
 - Needs dev build for hardware testing
 
+#### Maestro E2E Test Scaffolding
+- **12 flow YAML files** + **3 helper flows** (login, logout, background-app) + config + scripts created in `ios/.maestro/`
+- Flows cover: app launch, user auth, form validation, list scrolling, network loading, deep linking, gestures, permissions, accessibility, performance, cross-platform, error handling
+- Includes `.maestro.env.example`, `config.yaml`, run scripts (`run-all-tests.sh`, `run-maestro-tests.sh`, `verify-test-setup.sh`)
+- **Status:** Flows need selector customization (testID props on app components) before they can run against the live app
+
 #### Codebase Audit
 - Comprehensive audit identified **40 issues**: 8 P0, 13 P1, 7 P2, 12 P3
 - Categories: crash risks, security, performance, UX, code quality
 
-### In Progress
+#### Test Health
+- **122 test suites, 2,630 tests passing, 0 TypeScript errors**
 
-#### Maestro E2E Testing
-- 12 flow YAML files planned covering: onboarding, exercise player, daily session, song library, social, cat gallery, settings, auth flows, free play, level map, achievements, notifications
-- Setup: `npm install -g @mobile.dev/maestro-cli`
+### In Progress / Remaining
+
+#### Maestro E2E Test Activation
+- Flows scaffolded (12 + 3 helpers) but selectors need app-side `testID` props added to interactive components
+- Once testIDs are wired, run `ios/run-maestro-tests.sh` to execute full suite
+- Setup prerequisite: `npm install -g @mobile.dev/maestro-cli`
 
 #### Deep Testing Strategy (Planned)
 - Crash monitoring (Crashlytics integration)
@@ -385,6 +404,12 @@ Tab order: Home, Learn, Songs, Social, Profile.
 #### Cat Voice TTS Upgrade (Planned)
 - Evaluate ElevenLabs and OpenAI TTS for per-cat unique voices
 - Currently using expo-speech with pitch/rate tuning per cat
+
+#### Cloud Functions Deployment
+- 4 functions written (deleteUserData, generateExercise, generateSong, generateCoachFeedback) — need Firebase project deployment and testing
+
+#### MIDI Hardware Testing
+- `@motiz88/react-native-midi` installed, NativeMidiInput rewritten — needs dev build with native module for actual hardware testing on device
 
 ### Deep Audit Checklist
 
@@ -494,12 +519,14 @@ Every item below must be verified on a physical device (not just simulator) wher
 - [ ] Daily reward calendar: claim rewards, verify gem balance
 
 #### 9. 3D Cat Rendering (Device Required)
-- [ ] HomeScreen: 3D cat renders with correct colors
+- [ ] HomeScreen: 3D cat renders with correct per-cat colors (body, belly, eyes)
 - [ ] CompletionModal: pose matches score (celebrate/play/curious)
-- [ ] CatSwitchScreen: owned cats render in 3D, locked in SVG
+- [ ] CatSwitchScreen: all cats render in 3D (owned at full opacity, locked dimmed at 0.4)
+- [ ] Material override: verify salsa-cat (Mat_ prefix), chonky-cat (no prefix), slim/round-cat (fallback materials) all color correctly
 - [ ] Evolution accessories visible at teen/adult/master stages
 - [ ] Evolution glow visible at adult/master stages
-- [ ] SVG fallback works when forceSVG=true
+- [ ] SVG fallback works when GL context unavailable or `forceSVG=true`
+- [ ] Camera auto-centering: models framed correctly regardless of body type bounding box
 - [ ] No GL context crashes on low-end devices
 - [ ] Performance: single canvas per screen rule respected
 
@@ -633,8 +660,10 @@ Every item below must be verified on a physical device (not just simulator) wher
 
 ```
 [DONE]     Phases 1-10.5 + 3D cats   All complete
-[ACTIVE]   Phase 11: QA + Launch     Account deletion, Cloud Functions, CI/CD, MIDI done
-                                      Maestro E2E, deep testing, TTS upgrade in progress
+[ACTIVE]   Phase 11: QA + Launch     Account deletion, Cloud Functions, CI/CD, MIDI,
+                                      audio session fix, 3D material rewrite, Maestro scaffolding done
+                                      Remaining: Maestro testID wiring, CF deployment,
+                                      deep testing, MIDI hardware, TTS upgrade
 ```
 
 ---
@@ -651,7 +680,7 @@ PH10.5-SOC                                ████  DONE
 PH11-QA                                    ████████  ← ACTIVE
 ```
 
-Currently in **Week 2** (Feb 28). All implementation phases complete. Phase 11 QA in progress — account deletion, Cloud Functions, CI/CD, environment audit, and MIDI integration done. Maestro E2E testing and deep audit underway.
+Currently in **Week 2** (Mar 1). All implementation phases complete. Phase 11 QA in progress — account deletion, Cloud Functions, CI/CD, environment audit, MIDI integration, audio session race condition fix, 3D material override rewrite, and Maestro scaffolding done. Remaining: Maestro testID wiring, Cloud Functions deployment, deep testing strategy, MIDI hardware testing, TTS upgrade.
 
 ---
 
@@ -659,13 +688,13 @@ Currently in **Week 2** (Feb 28). All implementation phases complete. Phase 11 Q
 
 1. **react-native-screens** pinned to 4.4.0 (Fabric codegen bug with RN 0.76)
 2. **Native MIDI module**: `@motiz88/react-native-midi` installed, NativeMidiInput rewritten for Web MIDI API — needs dev build for actual hardware
-3. **Native audio engine** (react-native-audio-api) requires RN 0.77+. ExpoAudioEngine is primary
+3. **Native audio engine** (react-native-audio-api) requires RN 0.77+. ExpoAudioEngine is primary. Audio session config uses AudioManager (synchronous) to avoid race conditions with expo-av
 4. **Jest worker teardown warning** — timer leak, non-blocking
 5. **~45 open GitHub issues** — to be triaged during QA sprint (40 identified in codebase audit: 8 P0, 13 P1, 7 P2, 12 P3)
 6. **R3F v8.18.0** pinned (v9 requires React 19 + RN 0.78+)
 7. **Sound assets**: SoundManager has procedural synthesis improvements, but dedicated .wav files not yet sourced (~30 sounds needed)
 8. **ONNX Basic Pitch model**: Downloaded (`assets/models/basic-pitch.onnx`, 230KB), needs real-device testing
-9. **3D cat models**: 4 body types only (not 13 unique per-cat meshes). Color overrides differentiate cats
+9. **3D cat models**: 4 body types only (not 13 unique per-cat meshes). Material-name-based color overrides differentiate cats (3 naming conventions handled + fallback for models without materials)
 10. **Cloud Functions**: 4 functions written (deleteUserData, generateExercise, generateSong, generateCoachFeedback) — need Firebase project deployment
 11. **Cat voice TTS**: Currently expo-speech; ElevenLabs/OpenAI evaluation planned for higher-quality per-cat voices
 
@@ -677,7 +706,8 @@ Currently in **Week 2** (Feb 28). All implementation phases complete. Phase 11 Q
 - 4 GLB body types: `salsa-cat.glb` (standard), `slim-cat.glb`, `round-cat.glb`, `chonky-cat.glb`
 - Created via Blender MCP, stored in `assets/models/`
 - R3F v8.18.0 + expo-gl rendering in React Native
-- Material color override system (13 cats + Salsa NPC)
+- Material color override system (13 cats + Salsa NPC) — matches by `material.name` with 3 naming convention support (Mat_ prefix, no-prefix, no-materials fallback)
+- Auto-centering via THREE.Box3 bounding box computation — consistent framing across body types
 - SVG fallback for devices without WebGL
 
 ### Phase B: Evolution Accessories — COMPLETE

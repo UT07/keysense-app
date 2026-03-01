@@ -3,6 +3,16 @@
 **Purpose:** Concrete steps YOU need to execute before launch — things that require your Firebase Console, GCP access, Apple Developer account, physical devices, or human judgment.
 **Companion:** `docs/system-design-analysis.md` (architecture analysis), `docs/plans/UNIFIED-PLAN.md` Phase 11 (full QA audit)
 
+**Last updated:** March 1, 2026
+**Codebase health:** 122 test suites, 2,630 tests, 0 failures, 0 TypeScript errors
+**Key completions since initial draft:**
+- CI/CD workflows created (`.github/workflows/ci.yml` + `build.yml`)
+- Account deletion Cloud Function + client-side fallback implemented (10 tests)
+- 4 Cloud Functions for Gemini API written (`generateExercise`, `generateSong`, `generateCoachFeedback`, `deleteUserData`)
+- Audio session cross-library race condition fixed (AudioManager synchronous config)
+- 3D cat models functional (4 GLBs, material override, bounding box camera)
+- Maestro E2E test scaffolding created (12 flows + 3 helpers, needs selector work)
+
 ---
 
 ## Legend
@@ -53,17 +63,19 @@ The current `firebase/firestore.rules` is **missing rules for 6+ collections** a
 
 The Gemini API key is currently embedded in the client bundle (`EXPO_PUBLIC_GEMINI_API_KEY`). Anyone who decompiles the APK can extract it and run arbitrary Gemini prompts on your billing.
 
-**Decision needed:**
-- [ ] Option A (Recommended): Move Gemini calls to Cloud Functions (2-3 days work)
-  - Create `generateExercise` and `getCoachFeedback` Cloud Functions
-  - Client calls Firebase Functions instead of Gemini directly
-  - Remove `EXPO_PUBLIC_GEMINI_API_KEY` from client `.env`
-- [ ] Option B (Quick fix): Set strict API key restrictions in Google Cloud Console
+**Cloud Functions written** (Option A code is done): `generateExercise.ts`, `generateSong.ts`, `generateCoachFeedback.ts`, `deleteUserData.ts` in `firebase/functions/src/`. Client services (`geminiExerciseService`, `songGenerationService`, `GeminiCoach`) already fall back to direct Gemini API if Cloud Function is unavailable.
+
+**Remaining steps:**
+- [ ] Deploy Cloud Functions: `cd firebase/functions && npm install && cd ../.. && firebase deploy --only functions`
+- [ ] Set `GEMINI_API_KEY` as a Firebase secret: `firebase functions:secrets:set GEMINI_API_KEY`
+- [ ] Verify Cloud Functions respond correctly (test exercise generation, song generation, coaching)
+- [ ] Once confirmed, remove `EXPO_PUBLIC_GEMINI_API_KEY` from client `.env` — client will use Cloud Functions exclusively
+- [ ] As a fallback/short-term measure: set strict API key restrictions in Google Cloud Console
   - Go to GCP Console → APIs & Services → Credentials
   - Edit the Gemini API key → Application restrictions → iOS/Android apps only
   - Add bundle ID restrictions
   - Set per-key quota: 100 RPM, $50/day budget
-- [ ] Whichever option: verify `EXPO_PUBLIC_GEMINI_API_KEY` is in `.gitignore` and never committed
+- [ ] Verify `EXPO_PUBLIC_GEMINI_API_KEY` is in `.gitignore` and never committed
 
 ### A4. Firebase Budget Alerts [CRITICAL]
 
@@ -86,23 +98,17 @@ Prevents unauthorized apps from using your Firebase backend.
 
 ### A6. Account Deletion [BLOCKER]
 
-App Store requires functional account deletion. Current `deleteUserData` only deletes the root `users/{uid}` doc — subcollections are orphaned.
+App Store requires functional account deletion.
 
-- [ ] Verify `deleteUserData` recursively deletes:
-  - `users/{uid}/progress/*`
-  - `users/{uid}/gamification/*`
-  - `users/{uid}/syncLog/*`
-  - `users/{uid}/xpLog/*`
-  - `users/{uid}/songMastery/*`
-  - `users/{uid}/songRequests/*`
-  - `users/{uid}/friends/*`
-  - `users/{uid}/activityFeed/*`
-  - `users/{uid}/settings/*`
-- [ ] Also clean up:
-  - Remove user from `leagues/{leagueId}/members/{uid}`
-  - Remove user's `friendCodes/{code}` entry
-  - Remove user from all `challenges/{id}` where they're a participant
-- [ ] **Test:** Create test account → add data → delete account → verify Firestore is clean
+**Status: Code complete.** Cloud Function `deleteUserData` (`firebase/functions/src/deleteUserData.ts`) handles GDPR-compliant deletion via Admin SDK. Client-side fallback `deleteUserDataClientSide()` in `src/services/firebase/firestore.ts` mirrors the Cloud Function logic using client Firestore SDK. `authStore.deleteAccount()` calls `deleteUserData(uid)` → resets all stores → `user.delete()`. 10 unit tests in `src/services/firebase/__tests__/deleteUserData.test.ts`.
+
+**Implemented deletions:** 9 subcollections (progress, settings, songs, mastery, friends, activity, achievements, learnerProfile, catEvolution), `friendCodes/{code}`, league membership, challenges (bidirectional), friend list cleanup (removes user from all friends' lists), root user document.
+
+**Remaining steps:**
+- [ ] Deploy Cloud Function: `firebase deploy --only functions:deleteUserData`
+- [ ] **Test on real account:** Create test account → add progress, friends, song mastery, league membership → delete account → verify Firestore is clean (all subcollections, friend codes, league entries, challenges removed)
+- [ ] Verify `AccountScreen.tsx` delete button triggers the full flow correctly
+- [ ] Verify anonymous users cannot trigger account deletion (or handle gracefully)
 
 ---
 
@@ -110,25 +116,11 @@ App Store requires functional account deletion. Current `deleteUserData` only de
 
 ### B1. CI/CD Pipeline [IMPORTANT]
 
-There are **zero GitHub Actions workflows** in the repo. Every push is unvalidated.
+**Status: Implemented.** `.github/workflows/ci.yml` runs `npm ci` → `typecheck` → `lint` → `test --ci --maxWorkers=2` on every push and PR. `.github/workflows/build.yml` triggers EAS Build on version tags (`v*`) using `expo/expo-github-action@v8`.
 
-- [ ] Create `.github/workflows/ci.yml`:
-  ```yaml
-  on: [push, pull_request]
-  jobs:
-    test:
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v4
-        - uses: actions/setup-node@v4
-          with: { node-version: 20 }
-        - run: npm ci
-        - run: npm run typecheck
-        - run: npm run lint
-        - run: npm run test -- --ci --maxWorkers=2
-  ```
-- [ ] Create `.github/workflows/build.yml` (on tag push → EAS Build)
-- [ ] Push and verify first CI run passes
+- [x] ~~Create `.github/workflows/ci.yml`~~ — Done
+- [x] ~~Create `.github/workflows/build.yml`~~ — Done
+- [ ] Push and verify first CI run passes (check GitHub Actions tab)
 - [ ] Add branch protection on `master`: require CI pass before merge
 
 ### B2. Environment Management [IMPORTANT]
@@ -218,18 +210,24 @@ No Crashlytics integration exists. Production crashes will be invisible.
 
 ### D3. Microphone
 
+**Audio session fix applied:** The cross-library race condition between expo-av and react-native-audio-api has been resolved. `createAudioEngine.ts` now uses `AudioManager.setAudioSessionOptions()` (synchronous) for all iOS session configuration, eliminating the async overwrite bug where expo-av's `Audio.setAudioModeAsync()` would clobber react-native-audio-api's `AudioSessionManager` internal state. `AudioCapture.ts` uses `AudioManager.requestRecordingPermissions()` and `configureAudioSessionForRecording()` from the same library.
+
 - [ ] Grant mic permission via MicSetupScreen
 - [ ] Quiet room: play single notes on acoustic piano → verify detection
 - [ ] Noisy environment: verify AmbientNoiseCalibrator adjusts thresholds
 - [ ] Polyphonic mode: play 2-3 note chords → verify ONNX model detects multiple pitches
 - [ ] ONNX model loading: verify `basic-pitch.onnx` loads from assets without crash
 - [ ] If ONNX fails: verify automatic fallback to YIN monophonic
+- [ ] Verify audio session does NOT revert to earpiece after mic initialization (the old race condition)
 
 ### D4. 3D Rendering
 
+**Status: Functional.** Material override system handles 3 mesh naming conventions (Mat_ prefix, no-prefix, no-materials). Camera framing uses bounding box auto-centering. 4 GLB models (salsa-cat, slim-cat, round-cat, chonky-cat) rendering correctly with per-cat color overrides via `cat3DConfig.ts`.
+
 - [ ] HomeScreen: 3D cat renders without GL crashes
-- [ ] CompletionModal: 3D cat with correct pose
-- [ ] CatSwitchScreen: 3D cats for owned, SVG for locked
+- [ ] CompletionModal: 3D cat with correct pose (score-based)
+- [ ] CatSwitchScreen: 3D cats for owned, SVG for locked (verify no multiple GL contexts)
+- [ ] Verify per-cat colors: body, belly, ears, eyes, nose, blush all match 2D profiles
 - [ ] Low-end device (if available): verify no excessive battery drain from 3D
 - [ ] Background → foreground: GL context survives app backgrounding
 
@@ -240,6 +238,16 @@ No Crashlytics integration exists. Production crashes will be invisible.
 - [ ] Play 10 exercises in a row: verify no memory growth (check Xcode Instruments)
 - [ ] Leave app open 30 minutes: verify no battery drain spikes
 - [ ] Airplane mode: verify full core loop works offline
+
+### D6. Maestro E2E Tests
+
+**Status: Scaffolded, needs selector work.** 12 flow files + 3 helper files + config + scripts exist in `ios/.maestro/`. Covers app launch, user auth, form validation, list scrolling, network loading, deep linking, gestures, permissions, accessibility, performance, cross-platform, and error handling.
+
+- [ ] Add `testID` props to key interactive elements in React components (buttons, inputs, screens)
+- [ ] Update Maestro YAML selectors to match actual `testID` values
+- [ ] Run `ios/run-maestro-tests.sh` against simulator → fix any selector mismatches
+- [ ] Verify at least flows 01 (app launch) and 02 (user auth) pass end-to-end
+- [ ] Integrate Maestro into CI (optional — can be post-launch)
 
 ---
 
@@ -345,27 +353,28 @@ No Crashlytics integration exists. Production crashes will be invisible.
 
 ## Quick Reference: Priority Order
 
-| Priority | Section | Est. Time | Must Complete Before |
-|----------|---------|-----------|---------------------|
-| 1 | A1: Firestore Rules | 2-3 hours | Any beta testing |
-| 2 | A2: Firestore Indexes | 30 min | Any beta testing |
-| 3 | A6: Account Deletion | 1 day | App Store submission |
-| 4 | C1: Privacy Policy | 1 day | App Store submission |
-| 5 | A3: Gemini Key Security | 2-3 days (Option A) or 1 hour (Option B) | Public launch |
-| 6 | A4: Budget Alerts | 15 min | Public launch |
-| 7 | B1: CI/CD | 1 day | Before team grows |
-| 8 | B3: Crash Reporting | 2 hours | Before beta |
-| 9 | C2-C3: App Store Assets | 2-3 days | App Store submission |
-| 10 | D1-D5: Device Testing | 2-3 days | Before beta |
-| 11 | A5: App Check | 2 hours | Public launch |
-| 12 | E1-E3: Data Integrity | 1 day | Before beta |
-| 13 | F1-F3: Security Checks | half day | Before beta |
-| 14 | B2: Environment Mgmt | half day | Before public launch |
-| 15 | G1-G3: Third-party verify | 2 hours | Before beta |
-| 16 | B4-B5: OTA + Build | half day | Before beta |
-| 17 | H1-H3: Monitoring | 1 day | Within 1 week of launch |
+| Priority | Section | Est. Time | Status | Must Complete Before |
+|----------|---------|-----------|--------|---------------------|
+| 1 | A1: Firestore Rules | 2-3 hours | TODO | Any beta testing |
+| 2 | A2: Firestore Indexes | 30 min | TODO | Any beta testing |
+| 3 | A6: Account Deletion | Deploy + test | CODE DONE | App Store submission |
+| 4 | C1: Privacy Policy | 1 day | TODO | App Store submission |
+| 5 | A3: Gemini Key Security | Deploy + test | CODE DONE (4 Cloud Functions) | Public launch |
+| 6 | A4: Budget Alerts | 15 min | TODO | Public launch |
+| 7 | B1: CI/CD | Verify runs | DONE (ci.yml + build.yml) | Before team grows |
+| 8 | B3: Crash Reporting | 2 hours | TODO | Before beta |
+| 9 | C2-C3: App Store Assets | 2-3 days | TODO | App Store submission |
+| 10 | D1-D5: Device Testing | 2-3 days | TODO | Before beta |
+| 11 | D6: Maestro E2E | 1-2 days | SCAFFOLDED (needs selectors) | Before beta |
+| 12 | A5: App Check | 2 hours | TODO | Public launch |
+| 13 | E1-E3: Data Integrity | 1 day | TODO | Before beta |
+| 14 | F1-F3: Security Checks | half day | TODO | Before beta |
+| 15 | B2: Environment Mgmt | half day | TODO | Before public launch |
+| 16 | G1-G3: Third-party verify | 2 hours | TODO | Before beta |
+| 17 | B4-B5: OTA + Build | half day | TODO | Before beta |
+| 18 | H1-H3: Monitoring | 1 day | TODO | Within 1 week of launch |
 
-**Total estimated effort: ~12-15 working days**
+**Total estimated effort: ~10-12 working days** (reduced from 12-15 due to CI/CD, account deletion, and Cloud Functions already implemented)
 
 ---
 

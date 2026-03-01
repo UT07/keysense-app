@@ -432,6 +432,13 @@
 #### 3D Cat Models
 - **`chonky-cat.glb` exported with materials**: 9 named meshes (Body, Head, LeftEar, RightEar, LeftEye, RightEye, Nose, Tail, Belly), 7 NLA animations (idle, celebrate, teach, sleep, sad, play, curious), Draco compression
 - **Blender MCP integration**: `.mcp.json` configured with `uvx blender-mcp` command, addon installed in Blender for programmatic model creation
+- **Material override system rewritten (Mar 1)**: CatModel3D now matches by `material.name` (not mesh `node.name`). Handles 3 naming conventions: `Mat_` prefix (salsa-cat), no-prefix (chonky-cat), and no-materials (slim/round-cat). Added fallback that creates MeshStandardMaterial with per-cat body/belly/eye colors for models without named materials.
+- **Camera framing fixed (Mar 1)**: Auto-centers models using `THREE.Box3` bounding box computation, then offsets scene so center is at origin. Camera adjusted from `[0, 0.5, 3]` to `[0, 0, 3.2]`. Locked cats in gallery now show 3D preview (removed forceSVG restriction).
+
+#### Audio Session Race Condition Fix (Mar 1)
+- **Root cause**: `createAudioEngine()` fired `ensureAudioModeConfigured()` using expo-av's `Audio.setAudioModeAsync` (async, fire-and-forget), setting session to Playback. Later, `InputManager` called `configureAudioSessionForRecording()` using `AudioManager.setAudioSessionOptions` (synchronous), setting PlayAndRecord. The async expo-av call resolved AFTER the sync call, overwriting PlayAndRecord back to Playback — silently killing mic input.
+- **Fix**: Replaced expo-av with `AudioManager.setAudioSessionOptions()` (react-native-audio-api, synchronous) for ALL audio session config. Falls back to expo-av only when AudioManager is unavailable (Expo Go).
+- **useExercisePlayback**: Now passes `allowRecording=true` when mic is the preferred input method, so session starts in PlayAndRecord from the beginning.
 
 #### MIDI Hardware Integration
 - **Package:** `@motiz88/react-native-midi` (Expo Modules, Web MIDI API pattern)
@@ -451,8 +458,8 @@
 4. **Open bugs on GitHub**: ~45 remaining open issues
 5. **Phase 8 remaining**: Real-device testing (mic accuracy >95%, ONNX model loading on device, ambient calibration UX)
 6. **Sound assets**: SoundManager has procedural synthesis improvements, but dedicated .wav files not yet sourced (~30 sounds needed)
-7. **3D cat models**: 4 body type GLBs created (salsa, slim, round, chonky), color override system working — per-cat unique meshes and skeletal animations are stretch goals
-8. **Maestro E2E testing**: 12 flow YAML files planned, setup in progress
+7. **3D cat models**: 4 body type GLBs created (salsa, slim, round, chonky), material override system fully working (3 naming conventions), camera auto-framing — per-cat unique meshes and skeletal animations are stretch goals
+8. **Maestro E2E testing**: 12 flow YAML files + 3 helpers + configs scaffolded in ios/.maestro/, needs testID selector customization
 9. **Cat voice TTS upgrade**: ElevenLabs/OpenAI evaluation planned for higher-quality per-cat voices (currently expo-speech)
 10. **Cloud Functions deployment**: 4 functions written (deleteUserData, generateExercise, generateSong, generateCoachFeedback) — need Firebase project deployment
 11. **Phase 11 QA**: Comprehensive codebase audit identified 40 issues (8 P0, 13 P1, 7 P2, 12 P3) — in progress
