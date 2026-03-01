@@ -362,8 +362,8 @@ describe('Keyboard', () => {
         <Keyboard expectedNotes={expected} testID="kb" />,
       );
       const tree = safeStringify(toJSON());
-      expect(tree).toContain('#C8E6C9');
-      expect(tree).toContain('#2E7D32');
+      // Neon glow: expected keys get #40C4FF border
+      expect(tree).toContain('#40C4FF');
     });
 
     it('renders expected style for expected black notes', () => {
@@ -372,7 +372,8 @@ describe('Keyboard', () => {
         <Keyboard expectedNotes={expected} testID="kb" />,
       );
       const tree = safeStringify(toJSON());
-      expect(tree).toContain('#1B5E20');
+      // Neon glow: expected black keys also get #40C4FF border
+      expect(tree).toContain('#40C4FF');
     });
 
     it('does not apply expected style when expectedNotes is empty', () => {
@@ -381,7 +382,8 @@ describe('Keyboard', () => {
         <Keyboard expectedNotes={expected} testID="kb" />,
       );
       const tree = safeStringify(toJSON());
-      expect(tree).not.toContain('#C8E6C9');
+      // No neon glow when no expected notes
+      expect(tree).not.toContain('#40C4FF');
     });
   });
 
@@ -532,7 +534,7 @@ describe('Keyboard', () => {
       );
       const tree = safeStringify(toJSON());
       expect(tree).toContain('rgba(76, 175, 80, 0.3)');
-      expect(tree).toContain('#C8E6C9');
+      expect(tree).toContain('#40C4FF');
     });
 
     it('black key overlays have 65% height of keyboard', () => {

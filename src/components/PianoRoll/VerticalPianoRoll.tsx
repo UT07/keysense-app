@@ -40,22 +40,41 @@ const DEFAULT_MIDI_MAX = 72; // C5
 // ---------------------------------------------------------------------------
 
 const COLORS = {
-  upcoming: '#5C6BC0', // Indigo
-  upcomingLight: '#7986CB', // Lighter indigo (top gradient)
-  upcomingDark: '#3949AB', // Darker indigo (bottom gradient)
-  active: '#FF5252', // Bright red
-  activeLight: '#FF8A80', // Light red (top gradient)
-  activeDark: '#D32F2F', // Dark red (bottom gradient)
-  activeGlow: 'rgba(255, 82, 82, 0.35)',
-  activeHalo: 'rgba(255, 82, 82, 0.15)',
+  // Right hand: blue-purple
+  rightUpcoming: '#7C4DFF',
+  rightUpcomingLight: '#7C4DFF',
+  rightUpcomingDark: '#536DFE',
+  rightActive: '#E040FB',
+  rightActiveLight: '#E040FB',
+  rightActiveDark: '#AA00FF',
+  rightPastLight: 'rgba(124, 77, 255, 0.3)',
+  rightPastDark: 'rgba(83, 109, 254, 0.2)',
+  // Left hand: teal-green
+  leftUpcoming: '#26C6DA',
+  leftUpcomingLight: '#26C6DA',
+  leftUpcomingDark: '#00BFA5',
+  leftActive: '#69F0AE',
+  leftActiveLight: '#69F0AE',
+  leftActiveDark: '#00E676',
+  leftPastLight: 'rgba(38, 198, 218, 0.3)',
+  leftPastDark: 'rgba(0, 191, 165, 0.2)',
+  // Generic (when hand not specified)
+  upcoming: '#7986CB',
+  upcomingLight: '#7986CB',
+  upcomingDark: '#3949AB',
+  active: '#FF8A80',
+  activeLight: '#FF8A80',
+  activeDark: '#D32F2F',
+  activeGlow: 'rgba(224, 64, 251, 0.35)',
+  activeHalo: 'rgba(224, 64, 251, 0.15)',
   pastFaded: 'rgba(102, 187, 106, 0.4)',
   pastLight: 'rgba(129, 199, 132, 0.5)',
   pastDark: 'rgba(76, 175, 80, 0.3)',
-  pressLine: '#40C4FF', // Key down line
-  pressLineGlow: 'rgba(64, 196, 255, 0.2)',
-  beatLine: 'rgba(255, 255, 255, 0.08)',
-  beatLineAccent: 'rgba(255, 255, 255, 0.2)',
-  background: '#0D0D0D',
+  pressLine: '#40C4FF',
+  pressLineGlow: 'rgba(64, 196, 255, 0.3)',
+  beatLine: 'rgba(255, 255, 255, 0.06)',
+  beatLineAccent: 'rgba(255, 255, 255, 0.15)',
+  background: 'transparent',
   ghost: 'rgba(255, 255, 255, 0.15)',
   ghostBorder: 'rgba(255, 255, 255, 0.08)',
   innerHighlight: 'rgba(255, 255, 255, 0.25)',
@@ -278,20 +297,22 @@ export const VerticalPianoRoll = React.memo(
         const isPast = currentBeat >= 0 && noteEnd < currentBeat;
         const isActive = currentBeat >= 0 && note.startBeat <= currentBeat && currentBeat < noteEnd;
 
-        let color = COLORS.upcoming;
-        let gradientTop = COLORS.upcomingLight;
-        let gradientBottom = COLORS.upcomingDark;
+        // Per-hand coloring: right=purple, left=teal, unspecified=indigo
+        const hand = note.hand;
+        let color = hand === 'right' ? COLORS.rightUpcoming : hand === 'left' ? COLORS.leftUpcoming : COLORS.upcoming;
+        let gradientTop = hand === 'right' ? COLORS.rightUpcomingLight : hand === 'left' ? COLORS.leftUpcomingLight : COLORS.upcomingLight;
+        let gradientBottom = hand === 'right' ? COLORS.rightUpcomingDark : hand === 'left' ? COLORS.leftUpcomingDark : COLORS.upcomingDark;
         let borderColor = 'rgba(255, 255, 255, 0.2)';
         if (isPast) {
           color = COLORS.pastFaded;
-          gradientTop = COLORS.pastLight;
-          gradientBottom = COLORS.pastDark;
+          gradientTop = hand === 'right' ? COLORS.rightPastLight : hand === 'left' ? COLORS.leftPastLight : COLORS.pastLight;
+          gradientBottom = hand === 'right' ? COLORS.rightPastDark : hand === 'left' ? COLORS.leftPastDark : COLORS.pastDark;
           borderColor = 'transparent';
         }
         if (isActive) {
-          color = COLORS.active;
-          gradientTop = COLORS.activeLight;
-          gradientBottom = COLORS.activeDark;
+          color = hand === 'right' ? COLORS.rightActive : hand === 'left' ? COLORS.leftActive : COLORS.active;
+          gradientTop = hand === 'right' ? COLORS.rightActiveLight : hand === 'left' ? COLORS.leftActiveLight : COLORS.activeLight;
+          gradientBottom = hand === 'right' ? COLORS.rightActiveDark : hand === 'left' ? COLORS.leftActiveDark : COLORS.activeDark;
           borderColor = '#FFF';
         }
 
