@@ -327,9 +327,9 @@ export async function generateChallenge(profile: {
 // ============================================================================
 
 export async function generateExercise(params: GenerationParams): Promise<AIExercise | null> {
-  // Try Cloud Function first
+  // Try Cloud Function first (5s timeout — undeployed functions hang for 70s by default)
   try {
-    const fn = httpsCallable<GenerationParams, AIExercise>(functions, 'generateExercise');
+    const fn = httpsCallable<GenerationParams, AIExercise>(functions, 'generateExercise', { timeout: 5000 });
     const result = await fn(params);
     const exercise = result.data;
 

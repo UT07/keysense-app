@@ -41,7 +41,7 @@ export async function generateAndSaveSong(
 ): Promise<Song | null> {
   // Try Cloud Function first
   try {
-    const fn = httpsCallable<SongRequestParams, GeneratedSongABC>(functions, 'generateSong');
+    const fn = httpsCallable<SongRequestParams, GeneratedSongABC>(functions, 'generateSong', { timeout: 5000 });
     const result = await fn(params);
     const rawSong = result.data;
 

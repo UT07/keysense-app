@@ -405,14 +405,15 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       }
     };
 
-    // Safety timeout: if AI exercise doesn't load within 15s, fall back to template
+    // Safety timeout: if AI exercise doesn't load within 8s, fall back to template
+    // (Cloud Functions have 5s timeout, direct Gemini ~3-5s, so 8s covers both paths)
     const loadTimeout = setTimeout(() => {
       if (cancelled) return;
-      console.warn('[ExercisePlayer] AI exercise load timed out after 15s — using template fallback');
+      console.warn('[ExercisePlayer] AI exercise load timed out after 8s — using template fallback');
       const profile = useLearnerProfileStore.getState();
       const difficulty = (profile.totalExercisesCompleted > 20 ? 3 : profile.totalExercisesCompleted > 10 ? 2 : 1) as 1 | 2 | 3;
       setAiExercise({ ...getTemplateExercise(difficulty, profile.weakNotes), id: `tmpl-timeout-${Date.now()}` });
-    }, 15000);
+    }, 8000);
 
     loadAIExercise().finally(() => clearTimeout(loadTimeout));
 

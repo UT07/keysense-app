@@ -271,7 +271,7 @@ export class GeminiCoach {
 
     // Try Cloud Function first
     try {
-      const fn = httpsCallable<CoachRequest, { feedback: string }>(functions, 'generateCoachFeedback');
+      const fn = httpsCallable<CoachRequest, { feedback: string }>(functions, 'generateCoachFeedback', { timeout: 5000 });
       const result = await fn(request);
       const text = result.data.feedback;
 

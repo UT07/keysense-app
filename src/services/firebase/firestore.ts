@@ -847,6 +847,7 @@ export async function deleteUserData(uid: string): Promise<void> {
     const deleteAllData = httpsCallable<unknown, { success: boolean; deletedDocuments: number }>(
       functions,
       'deleteUserAllData',
+      { timeout: 10000 },
     );
 
     const result = await deleteAllData({});

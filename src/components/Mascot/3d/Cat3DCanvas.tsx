@@ -94,10 +94,12 @@ class ThreeErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryStat
 }
 
 // ────────────────────────────────────────────────
-// Loading timeout (max 3s before SVG fallback)
+// Loading timeout — GLB models need: asset resolution → download → parse → GPU upload.
+// On a real device first load can take 5-8 seconds. 10s is generous but avoids
+// premature SVG fallback. After first load, useGLTF caches the parsed scene.
 // ────────────────────────────────────────────────
 
-const LOAD_TIMEOUT_MS = 3000;
+const LOAD_TIMEOUT_MS = 10000;
 
 /** Spinner shown while GLB model loads */
 function LoadingFallback({ size }: { size: number }) {
