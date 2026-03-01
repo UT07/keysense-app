@@ -142,6 +142,8 @@ export function AppNavigator() {
       <RootStack.Navigator
         screenOptions={{
           headerShown: false,
+          animation: 'slide_from_right',
+          animationDuration: 350,
         }}
       >
         {!isAuthenticated ? (
@@ -158,7 +160,8 @@ export function AppNavigator() {
               name="Onboarding"
               component={OnboardingScreen}
               options={{
-                presentation: 'modal',
+                presentation: 'transparentModal',
+                animation: 'fade',
                 gestureEnabled: false,  // Prevent swipe-to-dismiss — must complete all steps
               }}
             />
@@ -175,17 +178,17 @@ export function AppNavigator() {
             <RootStack.Screen
               name="MidiSetup"
               component={MidiSetupScreen}
-              options={{ presentation: 'modal', headerShown: true, title: 'MIDI Setup' }}
+              options={{ presentation: 'transparentModal', animation: 'fade', headerShown: true, title: 'MIDI Setup' }}
             />
             <RootStack.Screen
               name="MicSetup"
               component={MicSetupScreen}
-              options={{ presentation: 'modal' }}
+              options={{ presentation: 'transparentModal', animation: 'fade' }}
             />
             <RootStack.Screen
               name="Account"
               component={AccountScreen}
-              options={{ presentation: 'modal' }}
+              options={{ presentation: 'transparentModal', animation: 'fade' }}
             />
             <RootStack.Screen
               name="SkillAssessment"

@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -16,7 +16,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { COLORS, SHADOWS } from '../theme/tokens';
+import { COLORS } from '../theme/tokens';
 
 // ---------------------------------------------------------------------------
 // Icon config per tab route
@@ -38,9 +38,10 @@ const TAB_ICONS: Record<string, TabIconConfig> = {
 };
 
 const ICON_SIZE = 26;
-const TAB_BAR_HEIGHT = 60;
-const DOT_SIZE = 4;
-const DOT_OFFSET = 4;
+const TAB_BAR_HEIGHT = 64;
+const INDICATOR_WIDTH = 24;
+const INDICATOR_HEIGHT = 3;
+const INDICATOR_OFFSET = 6;
 
 const SPRING_CONFIG = { damping: 12, stiffness: 200 };
 const TIMING_CONFIG = { duration: 200 };
@@ -69,14 +70,18 @@ function TabButton({
   const iconAnimatedStyle = useAnimatedStyle(() => {
     return {
       transform: [
-        { scale: withSpring(isFocused ? 1.15 : 1.0, SPRING_CONFIG) },
+        { scale: withSpring(isFocused ? 1.2 : 1.0, SPRING_CONFIG) },
+        { translateY: withSpring(isFocused ? -2 : 0, SPRING_CONFIG) },
       ],
     };
   }, [isFocused]);
 
-  const dotAnimatedStyle = useAnimatedStyle(() => {
+  const indicatorAnimatedStyle = useAnimatedStyle(() => {
     return {
       opacity: withTiming(isFocused ? 1 : 0, TIMING_CONFIG),
+      transform: [
+        { scaleX: withSpring(isFocused ? 1 : 0.3, SPRING_CONFIG) },
+      ],
     };
   }, [isFocused]);
 
@@ -103,8 +108,11 @@ function TabButton({
           color={isFocused ? COLORS.primary : COLORS.textMuted}
           testID={`tab-icon-${routeName}`}
         />
+        {isFocused && (
+          <View style={styles.iconGlow} />
+        )}
       </Animated.View>
-      <Animated.View style={[styles.dot, dotAnimatedStyle]} />
+      <Animated.View style={[styles.indicator, indicatorAnimatedStyle]} />
     </TouchableOpacity>
   );
 }
@@ -124,7 +132,6 @@ export function CustomTabBar({
     <View
       style={[
         styles.container,
-        SHADOWS.sm as Record<string, unknown>,
         { paddingBottom: insets.bottom },
       ]}
       testID="custom-tab-bar"
@@ -179,9 +186,9 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     height: TAB_BAR_HEIGHT,
-    backgroundColor: COLORS.surface,
+    backgroundColor: 'rgba(14, 14, 14, 0.92)',
     borderTopWidth: 1,
-    borderTopColor: COLORS.cardBorder,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
   },
   tabButton: {
     flex: 1,
@@ -192,11 +199,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dot: {
-    width: DOT_SIZE,
-    height: DOT_SIZE,
-    borderRadius: DOT_SIZE / 2,
+  iconGlow: {
+    position: 'absolute',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: COLORS.primary,
-    marginTop: DOT_OFFSET,
+    opacity: 0.12,
+    ...Platform.select({
+      ios: {
+        shadowColor: COLORS.primary,
+        shadowOpacity: 0.4,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 0 },
+      },
+      default: {},
+    }),
+  },
+  indicator: {
+    width: INDICATOR_WIDTH,
+    height: INDICATOR_HEIGHT,
+    borderRadius: INDICATOR_HEIGHT / 2,
+    backgroundColor: COLORS.primary,
+    marginTop: INDICATOR_OFFSET,
+    ...Platform.select({
+      ios: {
+        shadowColor: COLORS.primary,
+        shadowOpacity: 0.6,
+        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 0 },
+      },
+      default: {
+        elevation: 2,
+      },
+    }),
   },
 });
