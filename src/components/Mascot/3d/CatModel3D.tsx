@@ -225,37 +225,34 @@ function CatModel3DInner({
   const gltf = useGLTF(modelUri);
   const { scene, animations } = gltf;
 
-  // Clone the scene so each cat instance gets its own materials
-  // Auto-center and normalize scale so the camera frames the full model
-  const clonedScene = useMemo(() => {
+  // Clone scene for materials, compute bounding box for framing.
+  // Transforms are applied via R3F <group> elements (not on the clone)
+  // because <primitive> doesn't reliably pick up JS object transforms.
+  const { materializedClone, centerOffset, normalizeScale } = useMemo(() => {
     const clone = scene.clone(true);
     applyMaterials(clone, config.materials, config.hasBlush);
 
-    // Compute bounding box to determine model size and center
+    // Compute bounding box from the raw geometry
     const box = new THREE.Box3().setFromObject(clone);
     const center = box.getCenter(new THREE.Vector3());
     const bboxSize = box.getSize(new THREE.Vector3());
 
-    // Normalize: scale so the largest dimension fits TARGET_SIZE world units.
+    // Scale so largest dimension fits TARGET_SIZE world units.
     // Camera at z=2.8, FOV 40° sees ~2.04 units of height.
-    // TARGET_SIZE=1.8 leaves margin for idle bob animation.
     const TARGET_SIZE = 1.8;
     const maxDim = Math.max(bboxSize.x, bboxSize.y, bboxSize.z);
     const s = maxDim > 0 ? TARGET_SIZE / maxDim : 1;
 
-    // IMPORTANT: Three.js applies transform as: translate(position) * scale(s) * vertex
-    // A vertex at local pos v ends up at: position + s * v
-    // For the geometry center to land at world origin:
-    //   position + s * center = 0  →  position = -s * center
-    clone.scale.setScalar(s);
-    clone.position.set(-center.x * s, -center.y * s, -center.z * s);
-
     console.log(
-      `[CatModel3D] Model bounds: ${bboxSize.x.toFixed(2)} x ${bboxSize.y.toFixed(2)} x ${bboxSize.z.toFixed(2)}, ` +
-      `scale=${s.toFixed(3)}, center=(${center.x.toFixed(2)}, ${center.y.toFixed(2)}, ${center.z.toFixed(2)})`
+      `[CatModel3D] bounds: ${bboxSize.x.toFixed(2)}x${bboxSize.y.toFixed(2)}x${bboxSize.z.toFixed(2)}, ` +
+      `scale=${s.toFixed(3)}, center=(${center.x.toFixed(2)},${center.y.toFixed(2)},${center.z.toFixed(2)})`
     );
 
-    return clone;
+    return {
+      materializedClone: clone,
+      centerOffset: [-center.x, -center.y, -center.z] as [number, number, number],
+      normalizeScale: s,
+    };
   }, [scene, config.materials, config.hasBlush]);
 
   // Set up animation mixer
@@ -294,9 +291,17 @@ function CatModel3DInner({
   // Idle floating bob
   useIdleFloat(groupRef, enableIdle && pose === 'idle');
 
+  // Transform nesting (inside → outside):
+  //   1. Inner group: translate so geometry center is at origin
+  //   2. Middle group: uniform scale to fit camera frustum
+  //   3. Outer group: prop scale + ref for animations/idle bob
   return (
     <group ref={groupRef} scale={scale} dispose={null}>
-      <primitive object={clonedScene} />
+      <group scale={normalizeScale}>
+        <group position={centerOffset}>
+          <primitive object={materializedClone} />
+        </group>
+      </group>
       {accessoryProps && (
         <CatAccessories3D
           accessories={accessoryProps.accessories}
