@@ -226,15 +226,28 @@ function CatModel3DInner({
   const { scene, animations } = gltf;
 
   // Clone the scene so each cat instance gets its own materials
-  // Auto-center vertically so the camera frames the full model
+  // Auto-center and normalize scale so the camera frames the full model
   const clonedScene = useMemo(() => {
     const clone = scene.clone(true);
     applyMaterials(clone, config.materials, config.hasBlush);
 
-    // Compute bounding box and center the model at origin
+    // Compute bounding box, center at origin, then scale to fit camera
     const box = new THREE.Box3().setFromObject(clone);
     const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+
+    // Center the model at origin
     clone.position.set(-center.x, -center.y, -center.z);
+
+    // Normalize: scale the model so its tallest dimension fits within
+    // TARGET_SIZE world units. Camera at z=3.2, FOV 35° sees ~2.0 units
+    // of height. TARGET_SIZE=1.8 leaves margin for idle bob animation.
+    const TARGET_SIZE = 1.8;
+    const maxDim = Math.max(size.x, size.y, size.z);
+    if (maxDim > 0) {
+      const normalizeScale = TARGET_SIZE / maxDim;
+      clone.scale.setScalar(normalizeScale);
+    }
 
     return clone;
   }, [scene, config.materials, config.hasBlush]);
