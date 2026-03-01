@@ -256,18 +256,36 @@ export function configureAudioSessionForRecording(): void {
  * Uses react-native-audio-api's AudioManager for permissions (same native
  * module as the AudioRecorder), with expo-av fallback for broader compatibility.
  */
+/** Race a promise against a timeout. Resolves to the promise value or rejects on timeout. */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
 export async function requestMicrophonePermission(): Promise<boolean> {
   try {
-    // Primary: use react-native-audio-api's own permission API
-    const status = await AudioManager.requestRecordingPermissions();
+    // Primary: use react-native-audio-api's own permission API (5s timeout)
+    const status = await withTimeout(
+      AudioManager.requestRecordingPermissions(),
+      5000,
+      'AudioManager.requestRecordingPermissions',
+    );
     console.log(`[AudioCapture] Mic permission request result (AudioManager): ${status}`);
     return status === 'Granted';
   } catch (error) {
     console.warn('[AudioCapture] AudioManager permission request failed, trying expo-av:', error);
-    // Fallback to expo-av
+    // Fallback to expo-av (also with 5s timeout)
     try {
       const { Audio } = require('expo-av');
-      const { status } = await Audio.requestPermissionsAsync();
+      const { status } = await withTimeout<{ status: string }>(
+        Audio.requestPermissionsAsync(),
+        5000,
+        'Audio.requestPermissionsAsync',
+      );
       console.log(`[AudioCapture] Mic permission request result (expo-av): ${status}`);
       return status === 'granted';
     } catch (fallbackError) {
@@ -282,14 +300,22 @@ export async function requestMicrophonePermission(): Promise<boolean> {
  */
 export async function checkMicrophonePermission(): Promise<boolean> {
   try {
-    const status = await AudioManager.checkRecordingPermissions();
+    const status = await withTimeout(
+      AudioManager.checkRecordingPermissions(),
+      3000,
+      'AudioManager.checkRecordingPermissions',
+    );
     console.log(`[AudioCapture] Mic permission check (AudioManager): ${status}`);
     return status === 'Granted';
   } catch (error) {
     console.warn('[AudioCapture] AudioManager permission check failed, trying expo-av:', error);
     try {
       const { Audio } = require('expo-av');
-      const { status } = await Audio.getPermissionsAsync();
+      const { status } = await withTimeout<{ status: string }>(
+        Audio.getPermissionsAsync(),
+        3000,
+        'Audio.getPermissionsAsync',
+      );
       console.log(`[AudioCapture] Mic permission check (expo-av): ${status}`);
       return status === 'granted';
     } catch (fallbackError) {

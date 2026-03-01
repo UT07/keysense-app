@@ -18,8 +18,21 @@ import type { MidiNoteEvent } from '../core/exercises/types';
 import { getMidiInput } from './MidiInput';
 import type { MidiInput } from './MidiInput';
 import { MicrophoneInput, createMicrophoneInput } from './MicrophoneInput';
-import { configureAudioSessionForRecording } from './AudioCapture';
+import { configureAudioSessionForRecording, checkMicrophonePermission } from './AudioCapture';
 import { useSettingsStore } from '../stores/settingsStore';
+
+/** Race a promise against a timeout. Resolves to the promise value or the fallback on timeout. */
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) =>
+      setTimeout(() => {
+        console.warn(`[InputManager] ${label} timed out after ${ms}ms — using fallback`);
+        resolve(fallback);
+      }, ms),
+    ),
+  ]);
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -114,45 +127,54 @@ export class InputManager {
       (await this.midiInput.getConnectedDevices()).length > 0;
     console.log(`[InputManager] MIDI available: ${midiAvailable}`);
 
-    // Determine active method
-    // 'auto' tries MIDI only, then falls back to touch.
-    // Mic requires explicit 'mic' preference (user opt-in) because
-    // enabling recording reconfigures the iOS audio session to PlayAndRecord,
-    // which routes audio through the earpiece instead of the speaker.
+    // Determine active method.
+    // Priority: MIDI > Mic (if requested or already permitted) > Touch
     if (preferred === 'midi' || (preferred === 'auto' && midiAvailable)) {
       this._activeMethod = 'midi';
       console.log('[InputManager] Selected: midi');
-    } else if (preferred === 'mic') {
-      // Mic explicitly requested — request permission
-      try {
-        // Configure react-native-audio-api's AudioManager for PlayAndRecord.
-        // IMPORTANT: Do NOT call expo-av's ensureAudioModeConfigured() here — expo-av
-        // and react-native-audio-api share the same iOS AVAudioSession singleton but
-        // maintain separate internal state. Calling expo-av updates the native session
-        // but NOT react-native-audio-api's AudioSessionManager, causing it to reject
-        // AudioRecorder creation because it still thinks the session is Playback-only.
-        console.log('[InputManager] Configuring audio session for recording...');
-        configureAudioSessionForRecording();
+    } else if (preferred === 'mic' || (preferred === 'auto' && !midiAvailable)) {
+      // For 'auto' mode: only try mic if permission is already granted (non-blocking check).
+      // For explicit 'mic' mode: always request permission.
+      const shouldTryMic = preferred === 'mic' ||
+        (preferred === 'auto' && await withTimeout(checkMicrophonePermission(), 2000, false, 'checkMicPermission'));
 
-        const detectionMode = useSettingsStore.getState().micDetectionMode ?? 'monophonic';
-        this.micInput = await createMicrophoneInput({
-          defaultVelocity: this.config.micDefaultVelocity ?? 80,
-          latencyCompensationMs: this.config.micLatencyCompensationMs ?? 0,
-          mode: detectionMode,
-        });
-        if (this.micInput) {
-          this._activeMethod = 'mic';
-          console.log(`[InputManager] Selected: mic (${detectionMode} mode, pipeline ready)`);
-        } else {
-          // Permission denied or initialization failed
+      if (shouldTryMic) {
+        try {
+          // Configure react-native-audio-api's AudioManager for PlayAndRecord.
+          // IMPORTANT: Do NOT call expo-av's ensureAudioModeConfigured() here — expo-av
+          // and react-native-audio-api share the same iOS AVAudioSession singleton but
+          // maintain separate internal state.
+          console.log('[InputManager] Configuring audio session for recording...');
+          configureAudioSessionForRecording();
+
+          const detectionMode = useSettingsStore.getState().micDetectionMode ?? 'monophonic';
+          this.micInput = await withTimeout(
+            createMicrophoneInput({
+              defaultVelocity: this.config.micDefaultVelocity ?? 80,
+              latencyCompensationMs: this.config.micLatencyCompensationMs ?? 0,
+              mode: detectionMode,
+            }),
+            8000,
+            null,
+            'createMicrophoneInput',
+          );
+          if (this.micInput) {
+            this._activeMethod = 'mic';
+            console.log(`[InputManager] Selected: mic (${detectionMode} mode, pipeline ready)`);
+          } else {
+            // Permission denied, initialization failed, or timed out
+            this._activeMethod = 'touch';
+            this._micFailureReason = 'Microphone permission denied or timed out. Grant access in Settings > Purrrfect Keys.';
+            console.warn('[InputManager] Mic failed → falling back to touch. Reason:', this._micFailureReason);
+          }
+        } catch (error) {
           this._activeMethod = 'touch';
-          this._micFailureReason = 'Microphone permission denied. Grant access in Settings > Purrrfect Keys.';
-          console.warn('[InputManager] Mic failed → falling back to touch. Reason:', this._micFailureReason);
+          this._micFailureReason = `Microphone initialization error: ${(error as Error).message}`;
+          console.error('[InputManager] Mic init error → falling back to touch:', error);
         }
-      } catch (error) {
+      } else {
         this._activeMethod = 'touch';
-        this._micFailureReason = `Microphone initialization error: ${(error as Error).message}`;
-        console.error('[InputManager] Mic init error → falling back to touch:', error);
+        console.log('[InputManager] Selected: touch (auto mode, mic not pre-granted)');
       }
     } else {
       this._activeMethod = 'touch';
@@ -272,11 +294,16 @@ export class InputManager {
         try {
           configureAudioSessionForRecording();
           const detectionMode = useSettingsStore.getState().micDetectionMode ?? 'monophonic';
-          this.micInput = await createMicrophoneInput({
-            defaultVelocity: this.config.micDefaultVelocity ?? 80,
-            latencyCompensationMs: this.config.micLatencyCompensationMs ?? 0,
-            mode: detectionMode,
-          });
+          this.micInput = await withTimeout(
+            createMicrophoneInput({
+              defaultVelocity: this.config.micDefaultVelocity ?? 80,
+              latencyCompensationMs: this.config.micLatencyCompensationMs ?? 0,
+              mode: detectionMode,
+            }),
+            8000,
+            null,
+            'switchMethod:createMicrophoneInput',
+          );
         } catch (error) {
           this._micFailureReason = `Mic init error: ${(error as Error).message}`;
           console.error('[InputManager] switchMethod mic error:', error);

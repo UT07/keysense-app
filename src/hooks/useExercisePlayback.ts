@@ -177,9 +177,19 @@ export function useExercisePlayback({
 
     const initInput = async () => {
       try {
-        // Initialize InputManager which handles MIDI + Mic detection
+        // Initialize InputManager which handles MIDI + Mic detection.
+        // Wrap in a 10s safety timeout so that if mic permission dialog or
+        // native module hangs, the exercise still loads with touch fallback.
         const manager = new InputManager({ preferred: resolvedInputMethod });
-        await manager.initialize();
+        const initPromise = manager.initialize();
+        const timeoutPromise = new Promise<'timeout'>((resolve) =>
+          setTimeout(() => resolve('timeout'), 10000),
+        );
+        const result = await Promise.race([initPromise, timeoutPromise]);
+
+        if (result === 'timeout') {
+          console.warn('[useExercisePlayback] Input init timed out (10s) — falling back to touch');
+        }
 
         if (mounted) {
           inputManagerRef.current = manager;

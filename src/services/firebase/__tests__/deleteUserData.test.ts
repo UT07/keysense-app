@@ -125,6 +125,7 @@ describe('deleteUserData', () => {
       expect(mockHttpsCallable).toHaveBeenCalledWith(
         expect.anything(),
         'deleteUserAllData',
+        expect.objectContaining({ timeout: 10000 }),
       );
       expect(mockCallable).toHaveBeenCalledWith({});
       // Should NOT call client-side deleteDoc (root document)

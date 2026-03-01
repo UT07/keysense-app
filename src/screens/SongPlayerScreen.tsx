@@ -32,7 +32,7 @@ import {
   masteryLabel,
 } from '../core/songs/songMastery';
 import type { Song, SongSection, SongLayer, MasteryTier } from '../core/songs/songTypes';
-import type { Exercise, NoteEvent } from '../core/exercises/types';
+import type { Exercise, NoteEvent, ExerciseScore } from '../core/exercises/types';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../theme/tokens';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/authStore';
@@ -156,6 +156,61 @@ export function fullSongToExercise(
   };
 }
 
+/**
+ * Compute per-section scores from a full-song ExerciseScore.
+ *
+ * Maps each scored note back to its source section using startBeat ranges
+ * (like F1 sector timing), then computes a weighted score per section using
+ * the same weight distribution as the main scoring engine.
+ */
+export function computePerSectionScores(
+  score: ExerciseScore,
+  sections: SongSection[],
+): Record<string, number> {
+  const result: Record<string, number> = {};
+
+  // Only expected notes (not extra notes the player added)
+  const expectedNotes = score.details.filter((ns) => !ns.isExtraNote);
+
+  for (const section of sections) {
+    // Notes whose offset startBeat falls within this section's beat range
+    const sectionNotes = expectedNotes.filter(
+      (ns) =>
+        ns.expected.startBeat >= section.startBeat &&
+        ns.expected.startBeat < section.endBeat,
+    );
+
+    if (sectionNotes.length === 0) {
+      result[section.id] = 0;
+      continue;
+    }
+
+    const played = sectionNotes.filter((ns) => !ns.isMissedNote);
+    const correct = played.filter((ns) => ns.isCorrectPitch);
+
+    const accuracy = (correct.length / sectionNotes.length) * 100;
+    const timing =
+      played.length > 0
+        ? played.reduce((sum, ns) => sum + ns.timingScore, 0) / played.length
+        : 0;
+    const completeness = (played.length / sectionNotes.length) * 100;
+    const duration =
+      played.length > 0
+        ? played.reduce((sum, ns) => sum + (ns.durationScore ?? 100), 0) /
+          played.length
+        : 0;
+
+    // Same weights as ExerciseValidator (0.35/0.30/0.10/0.10/0.15) with
+    // extraNotes weight redistributed proportionally to the other four.
+    const sectionScore =
+      accuracy * 0.39 + timing * 0.33 + completeness * 0.11 + duration * 0.17;
+
+    result[section.id] = Math.round(Math.min(100, Math.max(0, sectionScore)));
+  }
+
+  return result;
+}
+
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
@@ -255,12 +310,18 @@ export function SongPlayerScreen() {
       let newSectionScores: Record<string, number>;
 
       if (selectedSectionIndex === null) {
-        // Full song — credit all sections with the full-song score
+        // Full song — compute per-section scores from note-level details
+        // (like F1 sector timing: split the full-song score by section boundaries)
+        const perSection = lastScore.details?.length
+          ? computePerSectionScores(lastScore, currentSong.sections)
+          : null;
+
         newSectionScores = { ...(existingMastery?.sectionScores ?? {}) };
         for (const section of currentSong.sections) {
+          const sectionScore = perSection?.[section.id] ?? lastScore.overall;
           newSectionScores[section.id] = Math.max(
             existingMastery?.sectionScores?.[section.id] ?? 0,
-            lastScore.overall,
+            sectionScore,
           );
         }
       } else {

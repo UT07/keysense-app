@@ -140,10 +140,24 @@ describe('InputManager', () => {
       manager.dispose();
     });
 
-    it('selects touch (not mic) in auto mode when no MIDI available', async () => {
-      // Auto mode only tries MIDI then touch — mic requires explicit 'mic' preference
-      // to avoid iOS PlayAndRecord audio routing (earpiece instead of speaker)
+    it('selects mic in auto mode when no MIDI and mic permission already granted', async () => {
+      // Auto mode tries MIDI > Mic (if already permitted) > Touch
       mockMicPermissionGranted = true;
+
+      const manager = new InputManager({ preferred: 'auto' });
+      await manager.initialize();
+
+      expect(manager.activeMethod).toBe('mic');
+
+      manager.dispose();
+    });
+
+    it('selects touch in auto mode when no MIDI and mic permission not granted', async () => {
+      // Mic permission not granted — auto mode doesn't request it, just falls back to touch
+      mockMicPermissionGranted = false;
+      // Override checkMicrophonePermission to return false
+      const { checkMicrophonePermission } = require('../AudioCapture');
+      (checkMicrophonePermission as jest.Mock).mockResolvedValueOnce(false);
 
       const manager = new InputManager({ preferred: 'auto' });
       await manager.initialize();

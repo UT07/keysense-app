@@ -108,6 +108,30 @@ export function glowColor(hex: string, opacity = 0.3): string {
 }
 
 // ─────────────────────────────────────────────────
+// SCREEN ACCENTS & NEON
+// ─────────────────────────────────────────────────
+
+/** Per-screen animated gradient mesh palettes */
+export const SCREEN_ACCENTS = {
+  home: { from: '#2D1B4E', to: '#0E0B1A' },
+  social: { from: '#0D2B3E', to: '#0E0B1A' },
+  learn: { from: '#0D2E1A', to: '#0E0B1A' },
+  songs: { from: '#2E2000', to: '#0E0B1A' },
+  catStudio: { from: '#2E0D2B', to: '#0E0B1A' },
+  exercise: { from: '#1A0A2E', to: '#0A0A14' },
+} as const;
+
+/** Neon glow colors (for NeonGlow component) */
+export const NEON = {
+  crimson: '#DC143C',
+  purple: '#9B59B6',
+  blue: '#4FC3F7',
+  gold: '#FFD700',
+  green: '#2ECC71',
+  orange: '#FF8C00',
+} as const;
+
+// ─────────────────────────────────────────────────
 // TYPOGRAPHY
 // ─────────────────────────────────────────────────
 
