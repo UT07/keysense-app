@@ -236,10 +236,10 @@ export function useExercisePlayback({
     const initAudio = async () => {
       try {
         // Ensure iOS audio session is configured BEFORE engine init.
-        // This must complete before any audio plays or iOS may suspend output.
-        // Note: mic recording session config is now handled by InputManager
-        // via react-native-audio-api's AudioManager (avoids cross-library conflict).
-        await ensureAudioModeConfigured();
+        // When mic is the preferred input, configure for recording from the start
+        // so the session category is PlayAndRecord (not overridden to Playback later).
+        const needsRecording = resolvedInputMethod === 'mic';
+        await ensureAudioModeConfigured(needsRecording);
 
         // If already initialized (singleton was kept alive), skip re-init
         if (audioEngine.isReady()) {

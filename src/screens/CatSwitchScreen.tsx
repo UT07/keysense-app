@@ -424,7 +424,6 @@ function CatCard({ cat, isSelected, isOwned, evolutionXp, stage, unlockedAbiliti
                 size={140}
                 mood="happy"
                 pose="idle"
-                forceSVG
               />
             </View>
             <View style={styles.lockedBadge}>

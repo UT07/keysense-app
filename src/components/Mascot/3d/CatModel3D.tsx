@@ -52,44 +52,113 @@ function hexToColor(hex: string): THREE.Color {
 }
 
 /**
- * Mesh name → material property mapping.
- * GLB meshes are named by convention during Blender export.
+ * Material name → config property mapping.
+ * GLB models use different naming conventions depending on how they were exported:
+ *   - salsa-cat: Mat_Body, Mat_Belly, Mat_EarInner, Mat_Iris, Mat_Nose, Mat_Blush
+ *   - chonky-cat: Body, Belly, Ear_Inner_L, Eye_Iris_L, Nose, Blush_L
+ *   - slim/round: No materials (single uncolored mesh)
  */
-const MESH_MATERIAL_MAP: Record<string, keyof Cat3DMaterials> = {
-  Body: 'body',
-  Belly: 'belly',
+const MATERIAL_NAME_MAP: Record<string, keyof Cat3DMaterials> = {
+  // salsa-cat format (Mat_ prefix, shared per side)
+  'Mat_Body': 'body',
+  'Mat_Belly': 'belly',
+  'Mat_EarInner': 'earInner',
+  'Mat_Iris': 'eye',
+  'Mat_Nose': 'nose',
+  'Mat_Blush': 'blush',
+  // chonky-cat format (no prefix, separate per side)
+  'Body': 'body',
+  'Belly': 'belly',
   'Ear_Inner_L': 'earInner',
   'Ear_Inner_R': 'earInner',
   'Eye_Iris_L': 'eye',
   'Eye_Iris_R': 'eye',
-  Nose: 'nose',
+  'Nose': 'nose',
   'Blush_L': 'blush',
   'Blush_R': 'blush',
 };
 
+const BLUSH_MATERIAL_NAMES = new Set([
+  'Mat_Blush', 'Blush_L', 'Blush_R',
+]);
+
 /** Apply per-cat colors to the loaded GLTF scene */
 function applyMaterials(scene: THREE.Group, materials: Cat3DMaterials, hasBlush: boolean): void {
+  let anyMaterialMatched = false;
+
   scene.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
 
-    const materialKey = MESH_MATERIAL_MAP[node.name];
-    if (!materialKey) return;
+    // Handle multi-material meshes (material array) and single-material meshes
+    const nodeMaterials = Array.isArray(node.material) ? node.material : [node.material];
 
-    // Hide blush meshes if cat doesn't have blush
-    if ((node.name === 'Blush_L' || node.name === 'Blush_R') && !hasBlush) {
-      node.visible = false;
-      return;
-    }
+    for (let i = 0; i < nodeMaterials.length; i++) {
+      const mat = nodeMaterials[i];
+      if (!mat || !mat.name) continue;
 
-    const colorHex = materials[materialKey];
-    if (!colorHex) return;
+      const materialKey = MATERIAL_NAME_MAP[mat.name];
+      if (!materialKey) continue;
 
-    // Clone material to avoid affecting other instances
-    if (node.material instanceof THREE.MeshStandardMaterial) {
-      node.material = node.material.clone();
-      node.material.color = hexToColor(colorHex);
+      // Hide blush materials if cat doesn't have blush
+      if (BLUSH_MATERIAL_NAMES.has(mat.name) && !hasBlush) {
+        if (mat instanceof THREE.MeshStandardMaterial) {
+          const cloned = mat.clone();
+          cloned.transparent = true;
+          cloned.opacity = 0;
+          if (Array.isArray(node.material)) {
+            node.material[i] = cloned;
+          } else {
+            node.material = cloned;
+          }
+        }
+        anyMaterialMatched = true;
+        continue;
+      }
+
+      const colorHex = materials[materialKey];
+      if (!colorHex) continue;
+
+      // Clone material to avoid affecting other instances
+      if (mat instanceof THREE.MeshStandardMaterial) {
+        const cloned = mat.clone();
+        cloned.color = hexToColor(colorHex);
+        if (Array.isArray(node.material)) {
+          node.material[i] = cloned;
+        } else {
+          node.material = cloned;
+        }
+        anyMaterialMatched = true;
+      }
     }
   });
+
+  // Fallback for models with no named materials (slim-cat, round-cat):
+  // Apply the body color to all meshes so the cat isn't dark/default grey
+  if (!anyMaterialMatched) {
+    const bodyColor = hexToColor(materials.body);
+    const bellyColor = hexToColor(materials.belly);
+    const eyeColor = hexToColor(materials.eye);
+
+    scene.traverse((node) => {
+      if (!(node instanceof THREE.Mesh)) return;
+
+      // Choose color based on node name for variety
+      const name = node.name.toLowerCase();
+      let color = bodyColor;
+      if (name.includes('eye') || name.includes('iris')) {
+        color = eyeColor;
+      } else if (name.includes('belly') || name.includes('chest')) {
+        color = bellyColor;
+      }
+
+      const newMat = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.7,
+        metalness: 0.0,
+      });
+      node.material = newMat;
+    });
+  }
 }
 
 /** Idle floating animation (gentle sine-wave bob) */
@@ -157,9 +226,16 @@ function CatModel3DInner({
   const { scene, animations } = gltf;
 
   // Clone the scene so each cat instance gets its own materials
+  // Auto-center vertically so the camera frames the full model
   const clonedScene = useMemo(() => {
     const clone = scene.clone(true);
     applyMaterials(clone, config.materials, config.hasBlush);
+
+    // Compute bounding box and center the model at origin
+    const box = new THREE.Box3().setFromObject(clone);
+    const center = box.getCenter(new THREE.Vector3());
+    clone.position.set(-center.x, -center.y, -center.z);
+
     return clone;
   }, [scene, config.materials, config.hasBlush]);
 

@@ -19,7 +19,6 @@
  */
 
 import { Platform } from 'react-native';
-import { Audio } from 'expo-av';
 import type { IAudioEngine } from './types';
 import { ExpoAudioEngine } from './ExpoAudioEngine';
 
@@ -29,9 +28,6 @@ import { ExpoAudioEngine } from './ExpoAudioEngine';
 let factoryInstance: IAudioEngine | null = null;
 let audioModeConfigured = false;
 let audioModeRecordingEnabled = false;
-
-/** Promise from the latest ensureAudioModeConfigured() call — so consumers can await it */
-let audioModePromise: Promise<void> = Promise.resolve();
 
 /**
  * Try to create a WebAudioEngine. Returns null if react-native-audio-api
@@ -58,53 +54,70 @@ function tryCreateWebAudioEngine(): IAudioEngine | null {
 
 /**
  * Configure iOS audio session for playback and optional recording.
- * Must be called (and awaited) before any audio engine initialization.
- * Uses expo-av's Audio.setAudioModeAsync which works regardless of
- * which engine (WebAudio/ExpoAV) is ultimately used for synthesis.
  *
- * When allowRecording is true, iOS sets category to PlayAndRecord instead
- * of Playback, enabling microphone input alongside speaker output.
+ * Uses react-native-audio-api's AudioManager (SYNCHRONOUS) instead of expo-av's
+ * Audio.setAudioModeAsync (async) to avoid a race condition:
  *
- * Exported so useExercisePlayback can await it before engine.initialize().
+ *   createAudioEngine() fires ensureAudioModeConfigured() → starts ASYNC expo-av call
+ *   InputManager calls configureAudioSessionForRecording() → SYNC AudioManager call
+ *   The async expo-av call resolves later → OVERWRITES PlayAndRecord back to Playback
+ *   → Mic input dies silently
+ *
+ * Both expo-av and react-native-audio-api share the same iOS AVAudioSession singleton
+ * but maintain separate internal state. Using AudioManager for ALL session config
+ * eliminates the cross-library conflict entirely.
+ *
+ * Falls back to expo-av only when AudioManager is unavailable (e.g., Expo Go).
  */
 export async function ensureAudioModeConfigured(allowRecording = false): Promise<void> {
   // Re-configure if recording was requested but not previously enabled
   if (audioModeConfigured && !allowRecording) return;
   if (audioModeConfigured && allowRecording && audioModeRecordingEnabled) return;
 
-  // Wait for any in-flight configuration before changing it
-  await audioModePromise;
-
-  // Track the pending promise to prevent concurrent configuration
   audioModeConfigured = true;
   if (allowRecording) audioModeRecordingEnabled = true;
 
-  const configPromise = (async () => {
+  // Primary: use AudioManager from react-native-audio-api (SYNCHRONOUS — no race condition)
   try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { AudioManager } = require('react-native-audio-api');
+    AudioManager.setAudioSessionOptions({
+      iosCategory: allowRecording ? 'playAndRecord' : 'playback',
+      iosMode: 'default',
+      iosOptions: allowRecording
+        ? ['defaultToSpeaker', 'allowBluetooth']
+        : ['defaultToSpeaker'],
+      iosAllowHaptics: true,
+    });
+    console.log(
+      `[createAudioEngine] Audio session configured via AudioManager ` +
+      `(category=${allowRecording ? 'playAndRecord' : 'playback'})`
+    );
+    return;
+  } catch (audioManagerError) {
+    console.warn('[createAudioEngine] AudioManager unavailable, falling back to expo-av:', audioManagerError);
+  }
+
+  // Fallback: expo-av (async — only used when react-native-audio-api is not available)
+  try {
+    const { Audio } = require('expo-av');
     await Audio.setAudioModeAsync({
       playsInSilentModeIOS: true,
       allowsRecordingIOS: allowRecording,
       staysActiveInBackground: false,
       shouldDuckAndroid: true,
-      // Ensure audio plays through speaker even when recording is enabled.
-      // Without this, iOS routes to earpiece in PlayAndRecord mode.
       ...(allowRecording ? { interruptionModeIOS: 1 } : {}),
     });
     console.log(
-      `[createAudioEngine] iOS audio mode configured ` +
-      `(playsInSilentModeIOS=true, allowsRecordingIOS=${allowRecording})`
+      `[createAudioEngine] iOS audio mode configured via expo-av ` +
+      `(allowsRecordingIOS=${allowRecording})`
     );
   } catch (error) {
     console.warn('[createAudioEngine] Audio mode configuration failed:', error);
-    // Reset flags so a retry can succeed
     if (allowRecording) {
       audioModeRecordingEnabled = false;
     }
   }
-  })();
-
-  audioModePromise = configPromise;
-  return configPromise;
 }
 
 /**
