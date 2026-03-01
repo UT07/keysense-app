@@ -91,7 +91,10 @@ export const MascotBubble: React.FC<MascotBubbleProps> = ({
     const timer = setTimeout(() => {
       ttsService.speak(message, { catId: catId ?? 'salsa' });
     }, 600);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      ttsService.stop();
+    };
   }, [speakMessage, message, showBubble, catId]);
 
   useEffect(() => {

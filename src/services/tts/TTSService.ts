@@ -29,6 +29,27 @@ export interface TTSOptions {
 
 class TTSServiceImpl {
   private _isSpeaking = false;
+  private _availableVoiceIds: Set<string> | null = null;
+
+  /**
+   * Pre-cache available voice identifiers so we can validate before speaking.
+   * iOS may not have "enhanced" voices downloaded — fall back to compact voices.
+   */
+  private async _ensureVoiceCache(): Promise<void> {
+    if (this._availableVoiceIds || !Speech) return;
+    try {
+      const voices = await Speech.getAvailableVoicesAsync();
+      this._availableVoiceIds = new Set(voices.map(v => v.identifier));
+    } catch {
+      this._availableVoiceIds = new Set();
+    }
+  }
+
+  /** Check if a specific voice ID is available on this device */
+  private _isVoiceAvailable(voiceId: string | undefined): boolean {
+    if (!voiceId || !this._availableVoiceIds) return false;
+    return this._availableVoiceIds.has(voiceId);
+  }
 
   /**
    * Speak text aloud using the device TTS engine.
@@ -42,13 +63,28 @@ class TTSServiceImpl {
       this.stop();
     }
 
+    // Cache available voices on first speak
+    await this._ensureVoiceCache();
+
     const catVoice: CatVoiceSettings = options.catId
       ? getCatVoiceSettings(options.catId)
-      : { pitch: 1.0, rate: 0.95, language: 'en-US' };
+      : { pitch: 1.0, rate: 0.95, language: 'en-IE' };
 
     this._isSpeaking = true;
 
-    const voiceId = options.voice ?? catVoice.voice;
+    // Validate the requested voice exists on this device.
+    // Enhanced Siri voices must be downloaded by the user — fall back to compact.
+    let voiceId = options.voice ?? catVoice.voice;
+    if (voiceId && !this._isVoiceAvailable(voiceId)) {
+      // Try compact version (drop ".enhanced" from the identifier)
+      const compact = voiceId.replace('.enhanced.', '.compact.');
+      if (this._isVoiceAvailable(compact)) {
+        voiceId = compact;
+      } else {
+        // Let the system pick the best voice for the language
+        voiceId = undefined;
+      }
+    }
 
     return new Promise<void>((resolve) => {
       Speech!.speak(text, {

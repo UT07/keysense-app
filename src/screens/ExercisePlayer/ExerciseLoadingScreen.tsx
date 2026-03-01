@@ -52,7 +52,11 @@ export function ExerciseLoadingScreen({
     const timer = setTimeout(() => {
       ttsService.speak(spokenText, { catId: 'salsa' });
     }, 600);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      // Stop TTS when screen is dismissed to prevent audio overlap with gameplay
+      ttsService.stop();
+    };
   }, [spokenText]);
 
   // Minimum display timer

@@ -12,7 +12,11 @@
  * iOS voice IDs: Use enhanced/premium Siri voices for natural speech.
  * Omit `voice` to use system default. expo-speech uses the `voice` property
  * to select a specific voice by identifier.
+ *
+ * Target audience: Ireland-based users. Default language is en-IE.
  */
+
+import { Platform, NativeModules } from 'react-native';
 
 export interface CatVoiceSettings {
   pitch: number;   // 0.5-2.0 (1.0 = normal)
@@ -20,6 +24,27 @@ export interface CatVoiceSettings {
   language: string; // BCP-47 language tag
   voice?: string;  // Platform voice identifier (iOS: com.apple.voice.*)
 }
+
+/** Detect device locale, defaulting to en-IE for target market */
+function getDeviceLanguage(): string {
+  try {
+    if (Platform.OS === 'ios') {
+      const locale =
+        NativeModules.SettingsManager?.settings?.AppleLocale ??
+        NativeModules.SettingsManager?.settings?.AppleLanguages?.[0] ??
+        'en-IE';
+      return locale.replace('_', '-');
+    }
+    // Android
+    const locale = NativeModules.I18nManager?.localeIdentifier ?? 'en-IE';
+    return locale.replace('_', '-');
+  } catch {
+    return 'en-IE';
+  }
+}
+
+/** Default language based on device locale */
+export const DEFAULT_LANGUAGE = getDeviceLanguage().startsWith('en') ? getDeviceLanguage() : 'en-IE';
 
 const CAT_VOICE_MAP: Record<string, CatVoiceSettings> = {
   // Mini Meowww — friendly beginner companion, warm and approachable
@@ -58,14 +83,14 @@ const CAT_VOICE_MAP: Record<string, CatVoiceSettings> = {
   // Chonky Monke — goofy, enthusiastic, big energy
   'chonky-monke': { pitch: 0.97, rate: 1.15, language: 'en-GB', voice: 'com.apple.voice.enhanced.en-GB.Daniel' },
 
-  // Salsa — NPC coach, sassy, confident, steady
-  salsa: { pitch: 1.0, rate: 1.02, language: 'en-US', voice: 'com.apple.voice.enhanced.en-US.Ava' },
+  // Salsa — NPC coach, sassy, confident, steady. Uses Irish English for target market.
+  salsa: { pitch: 1.0, rate: 1.02, language: 'en-IE', voice: 'com.apple.voice.enhanced.en-IE.Moira' },
 };
 
 const DEFAULT_VOICE: CatVoiceSettings = {
   pitch: 1.0,
   rate: 1.0,
-  language: 'en-US',
+  language: DEFAULT_LANGUAGE,
 };
 
 /** Get voice settings for a specific cat. Falls back to default. */

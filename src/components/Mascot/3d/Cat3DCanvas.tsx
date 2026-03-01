@@ -227,7 +227,7 @@ export const Cat3DCanvas = React.memo(function Cat3DCanvas({
           <CanvasComponent
             frameloop="always"
             gl={{ antialias: true, alpha: true }}
-            camera={{ position: [0, 0, 2.8], fov: 40 }}
+            camera={{ position: [0, 0, 5], fov: 50 }}
             onCreated={(state: any) => {
               state.gl.setClearColor(0x000000, 0);
               handleCanvasCreated();

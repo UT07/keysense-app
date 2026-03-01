@@ -288,7 +288,10 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
     const timer = setTimeout(() => {
       ttsService.speak(coachFeedback, { catId: 'salsa' });
     }, 800);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      ttsService.stop();
+    };
   }, [coachFeedback, coachLoading]);
 
   // Main animation sequence — triggered when score phase is reached

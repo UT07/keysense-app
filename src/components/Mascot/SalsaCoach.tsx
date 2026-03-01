@@ -96,7 +96,10 @@ export function SalsaCoach({
     const timer = setTimeout(() => {
       ttsService.speak(phrase, { catId: 'salsa' });
     }, 500);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      ttsService.stop();
+    };
   }, [shouldSpeak, phrase]);
 
   // Use 3D for medium+ sizes, SVG for tiny/small (performance)
