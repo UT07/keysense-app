@@ -19,7 +19,7 @@ import { AnimatedProgressBar } from '../components/common/AnimatedProgressBar';
 import { GameCard } from '../components/common/GameCard';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { AnimatedGradientBackground } from '../components/common/AnimatedGradientBackground';
+import { GradientMeshBackground } from '../components/effects';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { DailyChallengeCard } from '../components/DailyChallengeCard';
@@ -340,11 +340,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Hero Section with lava lamp gradient */}
+        {/* Hero Section with animated gradient mesh */}
         <Animated.View style={staggerStyle(0)}>
-          <AnimatedGradientBackground
-            style={styles.hero}
-          >
+          <View style={styles.hero}>
+            <GradientMeshBackground accent="home" />
             {/* Top bar: greeting + gem counter + settings */}
             <View style={styles.topBar}>
               <View>
@@ -449,7 +448,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Text style={styles.goalCompleteText}>Goal complete!</Text>
               </View>
             )}
-          </AnimatedGradientBackground>
+          </View>
         </Animated.View>
 
         {/* Today's Practice */}
@@ -656,6 +655,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.md,
     paddingBottom: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    marginHorizontal: SPACING.sm,
+    marginTop: SPACING.sm,
+    overflow: 'hidden',
   },
   topBar: {
     flexDirection: 'row',

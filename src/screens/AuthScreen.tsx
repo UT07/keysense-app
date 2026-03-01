@@ -38,8 +38,8 @@ import Animated, {
   FadeInDown,
 } from 'react-native-reanimated';
 import { SalsaCoach } from '../components/Mascot/SalsaCoach';
-import { AnimatedGradientBackground } from '../components/common/AnimatedGradientBackground';
 import { PressableScale } from '../components/common/PressableScale';
+import { GradientMeshBackground } from '../components/effects';
 import { useAuthStore } from '../stores/authStore';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS } from '../theme/tokens';
 import type { RootStackParamList } from '../navigation/AppNavigator';
@@ -270,7 +270,8 @@ export function AuthScreen(): React.ReactElement {
   }, [signInAnonymously]);
 
   return (
-    <AnimatedGradientBackground style={styles.container} testID="auth-screen">
+    <View style={styles.container} testID="auth-screen">
+      <GradientMeshBackground accent="home" />
       {/* Floating musical notes — decorative, non-interactive */}
       <View style={styles.floatingNotesContainer} pointerEvents="none">
         {notes.map((note) => (
@@ -353,7 +354,7 @@ export function AuthScreen(): React.ReactElement {
           )}
         </View>
       </PressableScale>
-    </AnimatedGradientBackground>
+    </View>
   );
 }
 
@@ -395,9 +396,9 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
   },
   appNameGlow: {
-    textShadowColor: 'rgba(255, 215, 0, 0.5)',
+    textShadowColor: 'rgba(255, 215, 0, 0.6)',
     textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 12,
+    textShadowRadius: 20,
   },
   tagline: {
     ...TYPOGRAPHY.heading.md,
@@ -458,15 +459,15 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   googleButton: {
-    backgroundColor: COLORS.surface,
-    borderColor: COLORS.cardBorder,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   googleButtonText: {
     color: COLORS.textPrimary,
   },
   emailButton: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primaryLight + '40',
+    backgroundColor: 'rgba(220, 20, 60, 0.25)',
+    borderColor: 'rgba(220, 20, 60, 0.4)',
   },
   buttonText: {
     ...TYPOGRAPHY.button.lg,
