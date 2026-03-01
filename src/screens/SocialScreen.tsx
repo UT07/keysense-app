@@ -17,6 +17,7 @@ import {
   SafeAreaView,
   ScrollView,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -31,7 +32,7 @@ import {
   assignToLeague,
   getLeagueStandings,
 } from '../services/firebase/leagueService';
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../theme/tokens';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../theme/tokens';
 import { GradientMeshBackground } from '../components/effects';
 import { PressableScale } from '../components/common/PressableScale';
 import type { RootStackParamList } from '../navigation/AppNavigator';
@@ -40,10 +41,10 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 // League tier display configuration
 const LEAGUE_TIER_CONFIG = {
-  bronze: { color: '#CD7F32', label: 'Bronze', icon: 'shield-outline' as const },
-  silver: { color: '#C0C0C0', label: 'Silver', icon: 'shield-half-full' as const },
-  gold: { color: '#FFD700', label: 'Gold', icon: 'shield-star' as const },
-  diamond: { color: '#B9F2FF', label: 'Diamond', icon: 'shield-crown' as const },
+  bronze: { color: '#CD7F32', label: 'Bronze', icon: 'shield-outline' as const, arenaGlow: 'rgba(205, 127, 50, 0.12)' },
+  silver: { color: '#C0C0C0', label: 'Silver', icon: 'shield-half-full' as const, arenaGlow: 'rgba(192, 192, 192, 0.12)' },
+  gold: { color: '#FFD700', label: 'Gold', icon: 'shield-star' as const, arenaGlow: 'rgba(255, 215, 0, 0.12)' },
+  diamond: { color: '#B9F2FF', label: 'Diamond', icon: 'shield-crown' as const, arenaGlow: 'rgba(185, 242, 255, 0.15)' },
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -151,12 +152,22 @@ function LeagueCard(): React.JSX.Element {
   }
 
   return (
-    <View style={[styles.card, styles.leagueCard, { borderColor: config.color }]}>
+    <View style={[
+      styles.card,
+      styles.leagueCard,
+      { borderColor: config.color, backgroundColor: config.arenaGlow },
+      Platform.OS === 'ios' && {
+        shadowColor: config.color,
+        shadowOpacity: 0.25,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 0 },
+      },
+    ]}>
       <View style={styles.leagueHeader}>
-        <View style={[styles.tierBadge, { backgroundColor: config.color + '20' }]}>
+        <View style={[styles.tierBadge, { backgroundColor: config.color + '25' }]}>
           <MaterialCommunityIcons
             name={config.icon}
-            size={28}
+            size={32}
             color={config.color}
           />
         </View>
@@ -482,7 +493,7 @@ export function SocialScreen(): React.JSX.Element {
         showsVerticalScrollIndicator={false}
         testID="social-scroll"
       >
-        <Text style={styles.screenTitle}>Social</Text>
+        <Text style={styles.screenTitle}>The Arena</Text>
 
         <LeagueCard />
         <FriendsSection />
@@ -544,15 +555,14 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
 
-  // Card base
+  // Card base — glassmorphism
   card: {
-    backgroundColor: COLORS.cardSurface,
+    backgroundColor: 'rgba(24, 24, 24, 0.75)',
     borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     padding: SPACING.md,
     marginBottom: SPACING.md,
-    ...SHADOWS.md,
   },
 
   // League card
@@ -565,8 +575,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   tierBadge: {
-    width: 48,
-    height: 48,
+    width: 52,
+    height: 52,
     borderRadius: BORDER_RADIUS.full,
     justifyContent: 'center',
     alignItems: 'center',
@@ -624,9 +634,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: SPACING.md,
     borderTopWidth: 1,
-    borderTopColor: COLORS.cardBorder,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.cardBorder,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
     marginBottom: SPACING.md,
   },
   leagueStat: {
@@ -645,7 +655,7 @@ const styles = StyleSheet.create({
   leagueStatDivider: {
     width: 1,
     height: 32,
-    backgroundColor: COLORS.cardBorder,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
 
   // Section header
@@ -691,11 +701,15 @@ const styles = StyleSheet.create({
   },
   friendsActionButton: {
     flex: 1,
-    backgroundColor: COLORS.primary + '15',
+    backgroundColor: 'rgba(220, 20, 60, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(220, 20, 60, 0.2)',
   },
   addFriendButton: {
     flex: 1,
-    backgroundColor: COLORS.surfaceElevated,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
 
   // Action button (shared)
@@ -722,10 +736,12 @@ const styles = StyleSheet.create({
 
   // Individual challenge card
   challengeCard: {
-    backgroundColor: COLORS.surfaceElevated,
+    backgroundColor: 'rgba(28, 28, 28, 0.8)',
     borderRadius: BORDER_RADIUS.md,
     padding: SPACING.md,
     marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   challengeHeader: {
     flexDirection: 'row',
@@ -757,7 +773,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: COLORS.cardBorder,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
     paddingTop: SPACING.sm,
   },
   challengeStatus: {
