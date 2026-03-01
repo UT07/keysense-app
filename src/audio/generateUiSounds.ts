@@ -1,12 +1,16 @@
 /**
- * Procedural UI Sound Generator
+ * Procedural UI Sound Generator — Cheerful Arcade Edition
  *
  * Generates WAV audio data for all UI sound effects using mathematical synthesis.
  * No external .wav files needed — everything is created at runtime during preload.
  *
- * Each sound is a short (30-600ms) synthesized waveform using combinations of
- * sine waves, frequency sweeps, harmonics, amplitude envelopes, formant filters,
- * and reverb simulation.
+ * Design philosophy:
+ * - BRIGHT: High-pitched, clear harmonics (think Duolingo, Candy Crush, Mario)
+ * - PUNCHY: Short attack, clean decay — no washed-out reverb tails
+ * - FUN: Major intervals, rising arpeggios, satisfying "pop" and "ding" sounds
+ * - NO CREEPY: No formant vocal synthesis, no sub-bass rumble, no dissonant intervals
+ *
+ * Each sound is 30-500ms of synthesized waveform.
  */
 
 import type { SoundName } from './SoundManager';
@@ -98,70 +102,24 @@ function makeSamples(duration: number, fn: (t: number) => number): Float32Array 
   return out;
 }
 
-// ---------------------------------------------------------------------------
-// Advanced synthesis utilities
-// ---------------------------------------------------------------------------
-
-/**
- * 2nd-order IIR bandpass filter (resonant).
- * Processes an entire Float32Array in-place and returns it.
- * centerFreq: centre frequency in Hz
- * bandwidth: -3dB bandwidth in Hz
- */
-function bandpass(
-  samples: Float32Array,
-  centerFreq: number,
-  bandwidth: number,
-): Float32Array {
-  const omega = TWO_PI * centerFreq / SAMPLE_RATE;
-  const sinOmega = Math.sin(omega);
-  const cosOmega = Math.cos(omega);
-  const alpha = sinOmega * Math.sinh((Math.log(2) / 2) * (bandwidth / centerFreq) * (omega / sinOmega));
-
-  // Transfer function coefficients (normalised by a0)
-  const a0 = 1 + alpha;
-  const b0 = alpha / a0;
-  const b1 = 0;
-  const b2 = -alpha / a0;
-  const a1 = (-2 * cosOmega) / a0;
-  const a2 = (1 - alpha) / a0;
-
-  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
-  for (let i = 0; i < samples.length; i++) {
-    const x0 = samples[i];
-    const y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
-    x2 = x1; x1 = x0;
-    y2 = y1; y1 = y0;
-    samples[i] = y0;
-  }
-  return samples;
-}
-
-/**
- * Simulate simple early-reflection reverb by mixing delayed copies.
- * Returns a NEW buffer (longer than input by the tail).
- * mix: wet/dry ratio (0-1), delayMs: base reflection delay,
- * repeats: number of reflection taps.
- */
+/** Simple early-reflection reverb. Short and bright — no washy tails. */
 function withReverb(
   samples: Float32Array,
-  mix: number = 0.3,
-  delayMs: number = 40,
-  repeats: number = 3,
+  mix: number = 0.2,
+  delayMs: number = 25,
+  repeats: number = 2,
 ): Float32Array {
   const baseSamples = Math.floor((delayMs / 1000) * SAMPLE_RATE);
   const tailSamples = baseSamples * repeats;
   const out = new Float32Array(samples.length + tailSamples);
 
-  // Copy dry signal
   for (let i = 0; i < samples.length; i++) {
     out[i] = samples[i];
   }
 
-  // Add reflection taps — each delayed further and attenuated more
   for (let r = 1; r <= repeats; r++) {
     const delaySamps = baseSamples * r;
-    const atten = mix * Math.pow(0.55, r); // exponential decay per tap
+    const atten = mix * Math.pow(0.4, r);
     for (let i = 0; i < samples.length; i++) {
       out[i + delaySamps] += samples[i] * atten;
     }
@@ -170,547 +128,310 @@ function withReverb(
   return out;
 }
 
-
 // ---------------------------------------------------------------------------
-// Deterministic noise (seeded LCG for reproducible cat sounds)
-// ---------------------------------------------------------------------------
-
-function createNoiseGen(seed: number): () => number {
-  let state = seed | 0 || 1;
-  return () => {
-    state = (state * 1664525 + 1013904223) & 0x7fffffff;
-    return (state / 0x7fffffff) * 2 - 1;
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Sound recipes
+// UI sounds — crisp taps and toggles
 // ---------------------------------------------------------------------------
 
+/** Soft bubble pop — like tapping a bubble */
 function buttonPress(): Float32Array {
-  return makeSamples(0.04, (t) =>
-    sine(t, 1800) * expDecay(t, 80) * attack(t, 0.003) * 0.3,
-  );
-}
-
-function toggleOn(): Float32Array {
-  return makeSamples(0.08, (t) =>
-    sweep(t, 600, 1400, 0.08) * expDecay(t, 20) * attack(t, 0.005) * 0.3,
-  );
-}
-
-function toggleOff(): Float32Array {
-  return makeSamples(0.08, (t) =>
-    sweep(t, 1200, 500, 0.08) * expDecay(t, 20) * attack(t, 0.005) * 0.25,
-  );
-}
-
-function swipeSound(): Float32Array {
-  const noise = createNoiseGen(42);
-  return makeSamples(0.1, (t) => {
-    const n = noise();
-    return n * sweep(t, 400, 1200, 0.1) * expDecay(t, 15) * 0.1;
+  return makeSamples(0.06, (t) => {
+    const pop = sine(t, 1200) * expDecay(t, 60);
+    const click = sine(t, 3200) * expDecay(t, 150) * 0.3;
+    return (pop + click) * attack(t, 0.002) * 0.25;
   });
 }
 
-function backNavigate(): Float32Array {
-  return makeSamples(0.1, (t) =>
-    sweep(t, 1000, 500, 0.1) * expDecay(t, 15) * attack(t, 0.003) * 0.25,
+/** Rising two-tone chirp — "bweep!" */
+function toggleOn(): Float32Array {
+  return makeSamples(0.1, (t) => {
+    const f = t < 0.04 ? 800 : 1200;
+    const local = t < 0.04 ? t : t - 0.04;
+    return sine(t, f) * expDecay(local, 25) * attack(t, 0.003) * 0.25;
+  });
+}
+
+/** Falling two-tone chirp — "bwoop" */
+function toggleOff(): Float32Array {
+  return makeSamples(0.1, (t) => {
+    const f = t < 0.04 ? 1200 : 800;
+    const local = t < 0.04 ? t : t - 0.04;
+    return sine(t, f) * expDecay(local, 25) * attack(t, 0.003) * 0.22;
+  });
+}
+
+/** Quick whoosh — soft high-freq sweep */
+function swipeSound(): Float32Array {
+  return makeSamples(0.08, (t) =>
+    sweep(t, 2000, 4000, 0.08) * expDecay(t, 30) * attack(t, 0.005) * 0.1,
   );
 }
 
+/** Gentle descending "boop" */
+function backNavigate(): Float32Array {
+  return makeSamples(0.08, (t) =>
+    sweep(t, 1400, 800, 0.08) * expDecay(t, 20) * attack(t, 0.003) * 0.2,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Gameplay sounds — clear musical feedback
+// ---------------------------------------------------------------------------
+
+/** Bright single chime — correct note (C6 major-ish) */
 function noteCorrect(): Float32Array {
   return makeSamples(0.12, (t) => {
-    const f = 880;
-    const sig = sine(t, f) + 0.3 * sine(t, f * 2) + 0.1 * sine(t, f * 3);
-    return sig / 1.4 * expDecay(t, 15) * attack(t, 0.005) * 0.3;
-  });
-}
-
-/**
- * note_perfect: Bright "ding" transient at onset + sustained harmonics.
- * The transient is a short high-frequency burst (3-5kHz) that decays fast,
- * followed by a rich tone.
- */
-function notePerfect(): Float32Array {
-  return makeSamples(0.25, (t) => {
-    // Bright transient "ding" — very short, high-frequency burst
-    const transient =
-      (sine(t, 4200) + 0.6 * sine(t, 5600) + 0.3 * sine(t, 7000))
-      * expDecay(t, 120) * 0.4;
-
-    // Main tone — two-step pitch (A5 -> E6) with rich harmonics
-    const f = t < 0.08 ? 880 : 1320;
-    const body =
-      (sine(t, f) + 0.45 * sine(t, f * 2) + 0.2 * sine(t, f * 3) + 0.08 * sine(t, f * 4))
-      * expDecay(t, 7) * attack(t, 0.005) * 0.3;
-
-    return transient + body;
-  });
-}
-
-/**
- * note_miss: Dissonant — root note + minor 2nd interval (semitone clash).
- * More gritty with subtle distortion-like overtones.
- */
-function noteMiss(): Float32Array {
-  return makeSamples(0.18, (t) => {
-    const f1 = 250; // root
-    const f2 = f1 * Math.pow(2, 1 / 12); // minor 2nd (~265 Hz)
-    const f3 = 73; // sub-bass rumble
-
-    // Two clashing tones + sweep down for "sad" feel
-    const root = sine(t, f1) + 0.2 * sine(t, f1 * 3);   // slightly buzzy
-    const clash = sine(t, f2) + 0.15 * sine(t, f2 * 3);
-    const sweepDown = sweep(t, 350, 120, 0.18) * 0.3;
-    const sub = sine(t, f3) * 0.2;
-
-    const sig = root * 0.5 + clash * 0.4 + sweepDown + sub;
-    return sig / 1.6 * expDecay(t, 10) * attack(t, 0.005) * 0.28;
-  });
-}
-
-/**
- * combo_5: Quick 3-note ascending arpeggio (C-E-G) with bright attack.
- * Moderate energy.
- */
-function combo5(): Float32Array {
-  return makeSamples(0.22, (t) => {
-    const n = Math.floor(t / 0.06);
-    const freqs = [880, 1100, 1320]; // A5, ~C#6, E6
-    const f = freqs[Math.min(n, 2)];
-    const local = t - n * 0.06;
-
-    // Add harmonics for brightness
-    const sig = sine(t, f) + 0.35 * sine(t, f * 2) + 0.1 * sine(t, f * 3);
-    return sig / 1.45 * expDecay(local, 22) * attack(local, 0.003) * 0.3;
-  });
-}
-
-/**
- * combo_10: Faster 5-note arpeggio with more harmonics and shimmer.
- * Higher energy, brighter.
- */
-function combo10(): Float32Array {
-  return makeSamples(0.28, (t) => {
-    const stepDur = 0.045;
-    const n = Math.floor(t / stepDur);
-    const freqs = [880, 1047, 1175, 1320, 1568]; // A5, C6, D6, E6, G6
-    const f = freqs[Math.min(n, 4)];
-    const local = t - n * stepDur;
-
-    // Richer harmonics + slight vibrato
-    const vibrato = 1 + 0.01 * sine(t, 12);
-    const sig =
-      sine(t, f * vibrato) +
-      0.45 * sine(t, f * 2 * vibrato) +
-      0.2 * sine(t, f * 3) +
-      0.08 * sine(t, f * 4);
-    return sig / 1.73 * expDecay(local, 28) * attack(local, 0.002) * 0.35;
-  });
-}
-
-/**
- * combo_20: Intense upward sweep with layered harmonics, fast shimmer,
- * and a bright "sparkle" overlay.
- */
-function combo20(): Float32Array {
-  return makeSamples(0.4, (t) => {
-    const dur = 0.4;
-    const f = 880 + (2200 - 880) * (t / dur);
-    const shimmer = 1 + 0.015 * sine(t, 16);
-
-    // Dense harmonic stack
-    const sig =
-      sine(t, f * shimmer) +
-      0.5 * sine(t, f * 1.5 * shimmer) +
-      0.3 * sine(t, f * 2) +
-      0.15 * sine(t, f * 3) +
-      0.08 * sine(t, f * 4);
-
-    // High sparkle layer
-    const sparkle = sine(t, 4000 + 1000 * sine(t, 6)) * expDecay(t, 5) * 0.12;
-
-    return (sig / 2.03 + sparkle) * expDecay(t, 2.5) * attack(t, 0.005) * 0.38;
-  });
-}
-
-function comboBreak(): Float32Array {
-  return makeSamples(0.2, (t) =>
-    sweep(t, 500, 150, 0.2) * expDecay(t, 8) * attack(t, 0.005) * 0.25,
-  );
-}
-
-function countdownTick(): Float32Array {
-  return makeSamples(0.03, (t) =>
-    sine(t, 1200) * expDecay(t, 100) * attack(t, 0.002) * 0.25,
-  );
-}
-
-function countdownGo(): Float32Array {
-  return makeSamples(0.2, (t) => {
     const f = 1047; // C6
-    const sig = sine(t, f) + 0.5 * sine(t, f * 1.5) + 0.2 * sine(t, f * 2);
-    return sig / 1.7 * expDecay(t, 6) * attack(t, 0.005) * 0.4;
+    const sig = sine(t, f) + 0.3 * sine(t, f * 2) + 0.1 * sine(t, f * 3);
+    return sig / 1.4 * expDecay(t, 18) * attack(t, 0.003) * 0.25;
   });
 }
 
-/**
- * star_earn: Shimmering celestial chime with reverb tail.
- */
-function starEarn(): Float32Array {
-  const dry = makeSamples(0.3, (t) => {
-    const shimmer = 1 + 0.025 * sine(t, 9);
-    const f = 1568 * shimmer; // G6 with slow shimmer
-    const sig =
-      sine(t, f) +
-      0.4 * sine(t, f * 2) +
-      0.2 * sine(t, f * 3) +
-      0.1 * sine(t, f * 4);
-    return sig / 1.7 * expDecay(t, 5) * attack(t, 0.008) * 0.3;
+/** Bright two-note rising chime — "ding-DING!" (perfect feedback) */
+function notePerfect(): Float32Array {
+  return makeSamples(0.2, (t) => {
+    // Two-step rising: G6 → C7
+    const f = t < 0.07 ? 1568 : 2093;
+    const local = t < 0.07 ? t : t - 0.07;
+    const sig = sine(t, f) + 0.4 * sine(t, f * 2) + 0.15 * sine(t, f * 3);
+    // Add sparkle overtone
+    const sparkle = sine(t, 4186) * expDecay(t, 40) * 0.15;
+    return (sig / 1.55 * expDecay(local, 12) + sparkle) * attack(t, 0.003) * 0.28;
   });
-  return withReverb(dry, 0.35, 35, 4);
 }
 
-/**
- * gem_clink: Crystalline metallic tap with reverb sparkle.
- */
-function gemClink(): Float32Array {
-  const dry = makeSamples(0.15, (t) => {
-    const f = 3000;
-    // Inharmonic partials for metallic quality
-    const sig =
-      sine(t, f) +
-      0.6 * sine(t, f * 1.5) +
-      0.3 * sine(t, f * 2.7) +
-      0.15 * sine(t, f * 3.4);
-    return sig / 2.05 * expDecay(t, 25) * attack(t, 0.002) * 0.25;
+/** Short "bonk" — wrong note, cartoonish not scary */
+function noteMiss(): Float32Array {
+  return makeSamples(0.12, (t) => {
+    // Descending "bwamp" — think Mario coin-miss
+    const f = 400 - 200 * (t / 0.12);
+    const sig = sine(t, f) + 0.3 * sine(t, f * 1.5);
+    // Wood-block click at onset
+    const knock = sine(t, 800) * expDecay(t, 100) * 0.3;
+    return (sig / 1.3 + knock) * expDecay(t, 15) * attack(t, 0.003) * 0.22;
   });
-  return withReverb(dry, 0.3, 30, 3);
 }
 
-function xpTick(): Float32Array {
-  return makeSamples(0.025, (t) =>
-    sine(t, 2200) * expDecay(t, 120) * 0.12,
+/** Quick 3-note ascending — "dip-dip-DING" (5x combo) */
+function combo5(): Float32Array {
+  return makeSamples(0.2, (t) => {
+    const step = Math.floor(t / 0.055);
+    // C6 → E6 → G6 (major arpeggio, bright and happy)
+    const freqs = [1047, 1319, 1568];
+    const f = freqs[Math.min(step, 2)];
+    const local = t - step * 0.055;
+    const sig = sine(t, f) + 0.3 * sine(t, f * 2);
+    return sig / 1.3 * expDecay(local, 20) * attack(local, 0.002) * 0.25;
+  });
+}
+
+/** 5-note sparkle arpeggio (10x combo) — major pentatonic */
+function combo10(): Float32Array {
+  return makeSamples(0.25, (t) => {
+    const stepDur = 0.04;
+    const step = Math.floor(t / stepDur);
+    // C6 → D6 → E6 → G6 → A6 (pentatonic, always sounds happy)
+    const freqs = [1047, 1175, 1319, 1568, 1760];
+    const f = freqs[Math.min(step, 4)];
+    const local = t - step * stepDur;
+    const sig = sine(t, f) + 0.35 * sine(t, f * 2) + 0.1 * sine(t, f * 3);
+    return sig / 1.45 * expDecay(local, 25) * attack(local, 0.002) * 0.28;
+  });
+}
+
+/** Rapid glissando up + sparkle burst (20x combo — LEGENDARY!) */
+function combo20(): Float32Array {
+  return makeSamples(0.35, (t) => {
+    const dur = 0.35;
+    // Rapid ascending sweep
+    const f = 1047 + (3200 - 1047) * Math.pow(t / dur, 0.7);
+    const sig = sine(t, f) + 0.4 * sine(t, f * 1.5) + 0.2 * sine(t, f * 2);
+    // High sparkle layer that fades in
+    const sparkle = sine(t, 4500 + 500 * sine(t, 8)) * Math.min(1, t / 0.15) * 0.15;
+    return (sig / 1.6 + sparkle) * expDecay(t, 3) * attack(t, 0.005) * 0.3;
+  });
+}
+
+/** Gentle descending "wah-wah" — combo broken, disappointed but not scary */
+function comboBreak(): Float32Array {
+  return makeSamples(0.15, (t) => {
+    // Two descending tones: E5 → C5 (minor 3rd down — sad but not dissonant)
+    const f = t < 0.06 ? 659 : 523;
+    const local = t < 0.06 ? t : t - 0.06;
+    return sine(t, f) * expDecay(local, 12) * attack(t, 0.005) * 0.2;
+  });
+}
+
+/** Crisp tick — metronome-style */
+function countdownTick(): Float32Array {
+  return makeSamples(0.035, (t) =>
+    sine(t, 1800) * expDecay(t, 90) * attack(t, 0.001) * 0.2,
   );
 }
 
-/**
- * level_up: Major arpeggio (C-E-G-C) with full harmonics and reverb tail.
- */
+/** Bright "GO!" chime — rising C6 with harmonics */
+function countdownGo(): Float32Array {
+  return makeSamples(0.18, (t) => {
+    const f = 2093; // C7 — bright and clear
+    const sig = sine(t, f) + 0.35 * sine(t, f * 1.5) + 0.15 * sine(t, f * 2);
+    return sig / 1.5 * expDecay(t, 8) * attack(t, 0.003) * 0.3;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Reward sounds — sparkly and satisfying
+// ---------------------------------------------------------------------------
+
+/** Sparkly star chime — like catching a star in Mario */
+function starEarn(): Float32Array {
+  const dry = makeSamples(0.25, (t) => {
+    // Shimmer effect via slow vibrato
+    const shimmer = 1 + 0.02 * sine(t, 10);
+    const f = 2093 * shimmer; // C7 with shimmer
+    const sig = sine(t, f) + 0.35 * sine(t, f * 2) + 0.15 * sine(t, f * 3);
+    return sig / 1.5 * expDecay(t, 6) * attack(t, 0.005) * 0.25;
+  });
+  return withReverb(dry, 0.2, 20, 2);
+}
+
+/** Crystal clink — short, bright, metallic tap */
+function gemClink(): Float32Array {
+  return makeSamples(0.1, (t) => {
+    const f = 3500;
+    // Inharmonic partials for bell/crystal quality
+    const sig = sine(t, f) + 0.5 * sine(t, f * 1.5) + 0.25 * sine(t, f * 2.3);
+    return sig / 1.75 * expDecay(t, 30) * attack(t, 0.001) * 0.2;
+  });
+}
+
+/** Tiny tick — subtle XP increment */
+function xpTick(): Float32Array {
+  return makeSamples(0.02, (t) =>
+    sine(t, 2800) * expDecay(t, 150) * 0.1,
+  );
+}
+
+/** Triumphant major arpeggio — C→E→G→C (level up!) */
 function levelUp(): Float32Array {
-  const dry = makeSamples(0.5, (t) => {
-    // C-E-G-C arpeggio
-    const step = Math.floor(t / 0.12);
-    const freqs = [523, 659, 784, 1047];
-    const f = freqs[Math.min(step, 3)];
-    const local = t - step * 0.12;
-    const sig =
-      sine(t, f) +
-      0.4 * sine(t, f * 2) +
-      0.2 * sine(t, f * 3) +
-      0.1 * sine(t, f * 4);
-    return sig / 1.7 * expDecay(local, 3.5) * attack(local, 0.008) * 0.35;
-  });
-  return withReverb(dry, 0.35, 45, 4);
-}
-
-/**
- * chest_open: Dramatic upward sweep with reverb "room" effect.
- */
-function chestOpen(): Float32Array {
   const dry = makeSamples(0.45, (t) => {
-    // Two-layer sweep for richness
-    const s1 = sweep(t, 200, 1200, 0.4);
-    const s2 = sweep(t, 300, 1800, 0.4) * 0.3;
-    // Add a bright "click" at onset
-    const click = sine(t, 3500) * expDecay(t, 150) * 0.2;
-    const sig = s1 + s2 + click;
-    return sig / 1.5 * expDecay(t, 2.8) * attack(t, 0.01) * 0.32;
+    const stepDur = 0.1;
+    const step = Math.floor(t / stepDur);
+    // C6 → E6 → G6 → C7
+    const freqs = [1047, 1319, 1568, 2093];
+    const f = freqs[Math.min(step, 3)];
+    const local = t - step * stepDur;
+    const sig = sine(t, f) + 0.35 * sine(t, f * 2) + 0.15 * sine(t, f * 3);
+    return sig / 1.5 * expDecay(local, 4) * attack(local, 0.005) * 0.3;
   });
-  return withReverb(dry, 0.4, 50, 4);
+  return withReverb(dry, 0.25, 30, 2);
 }
 
-/**
- * evolution_start: Grand ascending sweep with harmonic layering and reverb.
- */
+/** Magical unlock — rising sweep + sparkle */
+function chestOpen(): Float32Array {
+  const dry = makeSamples(0.4, (t) => {
+    // Bright rising sweep (think treasure chest in Zelda)
+    const f = 800 + 2000 * Math.pow(t / 0.4, 0.5);
+    const sig = sine(t, f) + 0.3 * sine(t, f * 2);
+    // Crisp onset click
+    const click = sine(t, 4000) * expDecay(t, 120) * 0.2;
+    return (sig / 1.3 + click) * expDecay(t, 3.5) * attack(t, 0.008) * 0.28;
+  });
+  return withReverb(dry, 0.25, 30, 2);
+}
+
+/** Grand rising sweep — evolution fanfare */
 function evolutionStart(): Float32Array {
-  const dry = makeSamples(0.6, (t) => {
-    const dur = 0.6;
-    const s1 = sweep(t, 150, 2000, dur);
-    const s2 = sweep(t, 225, 3000, dur) * 0.5;
-    // Add octave doublings that fade in
-    const s3 = sweep(t, 300, 4000, dur) * 0.2 * Math.min(1, t / 0.3);
-    const gain = t < 0.3 ? t / 0.3 : expDecay(t - 0.3, 3);
-    return (s1 + s2 + s3) / 1.7 * gain * 0.35;
-  });
-  return withReverb(dry, 0.4, 55, 5);
-}
-
-/**
- * exercise_complete: Major chord (C5+E5+G5) with a bright onset and reverb.
- */
-function exerciseComplete(): Float32Array {
   const dry = makeSamples(0.5, (t) => {
-    // Bright transient at the start
-    const onset = sine(t, 3000) * expDecay(t, 100) * 0.15;
-    // Rich major chord
-    const c = sine(t, 523) + 0.2 * sine(t, 1046);
-    const e = sine(t, 659) + 0.15 * sine(t, 1318);
-    const g = sine(t, 784) + 0.15 * sine(t, 1568);
-    const chord = (c + e + g) / 3.5;
-    return (onset + chord) * expDecay(t, 2.8) * attack(t, 0.01) * 0.4;
+    const dur = 0.5;
+    // Two-layer ascending sweep for richness
+    const f1 = 523 + 2000 * Math.pow(t / dur, 0.6);
+    const f2 = 784 + 1500 * Math.pow(t / dur, 0.5);
+    const sig = sine(t, f1) + 0.5 * sine(t, f2) + 0.2 * sine(t, f1 * 2);
+    // Crescendo envelope (builds up, not instant)
+    const env = Math.pow(Math.min(1, t / 0.25), 0.7) * expDecay(Math.max(0, t - 0.35), 4);
+    return sig / 1.7 * env * 0.3;
   });
-  return withReverb(dry, 0.35, 45, 4);
+  return withReverb(dry, 0.25, 35, 3);
+}
+
+/** Bright major chord burst — exercise complete! */
+function exerciseComplete(): Float32Array {
+  const dry = makeSamples(0.4, (t) => {
+    // Onset sparkle
+    const onset = sine(t, 4186) * expDecay(t, 80) * 0.15;
+    // Major chord: C6 + E6 + G6
+    const c = sine(t, 1047) + 0.15 * sine(t, 2093);
+    const e = sine(t, 1319) + 0.1 * sine(t, 2637);
+    const g = sine(t, 1568) + 0.1 * sine(t, 3136);
+    const chord = (c + e + g) / 3.7;
+    return (onset + chord) * expDecay(t, 3.5) * attack(t, 0.008) * 0.3;
+  });
+  return withReverb(dry, 0.2, 25, 2);
 }
 
 // ---------------------------------------------------------------------------
-// Cat sounds — formant-based vocal synthesis
+// Cat sounds — cute cartoon chirps (NOT realistic vocal synthesis)
+//
+// These are stylized, game-like "cat" sounds: short melodic chirps, squeaks,
+// and trills that SUGGEST cat-ness without attempting realistic meow simulation.
+// Think: Neko Atsume, Stardew Valley, or Animal Crossing cat sounds.
 // ---------------------------------------------------------------------------
 
-/**
- * meow_greeting: "Mee-ow" with two-formant vocal tract model.
- * The fundamental sweeps ~400->350Hz (like a real cat meow).
- * F1 sweeps ~800->600Hz (open->closed vowel), F2 ~1800->1200Hz.
- */
+/** Greeting chirp — bright rising "brrp!" like a happy cat trill */
 function meowGreeting(): Float32Array {
-  const dur = 0.3;
-  const noise = createNoiseGen(123);
-
-  // Source: glottal pulse train with slight breathiness
-  const source = (t: number): number => {
-    // Fundamental pitch sweep: "mee" (higher) -> "ow" (lower)
-    const f0 = 420 - 80 * (t / dur);
-    // Glottal pulse approximation: fundamental + harmonics with rolloff
-    let pulse = 0;
-    for (let h = 1; h <= 8; h++) {
-      pulse += sine(t, f0 * h) * (1 / (h * h));
-    }
-    // Add slight breathiness (noise)
-    const breath = noise() * 0.08;
-    return pulse + breath;
-  };
-
-  // Phase 1: "mee" (0 -> 60% duration) — open front vowel
-  // Phase 2: "ow" (60% -> 100%) — rounded back vowel
-  const crossover = 0.6;
-
-  const raw = makeSamples(dur, source);
-
-  // Apply time-varying formants by processing in short chunks
-  const chunkSize = Math.floor(SAMPLE_RATE * 0.01); // 10ms chunks
-  const numChunks = Math.ceil(raw.length / chunkSize);
-  const result = new Float32Array(raw.length);
-
-  for (let c = 0; c < numChunks; c++) {
-    const start = c * chunkSize;
-    const end = Math.min(start + chunkSize, raw.length);
-    const chunkLen = end - start;
-    const tNorm = (c * chunkSize / raw.length); // 0-1
-
-    // Interpolate formant frequencies across the meow
-    let f1Freq: number, f1Bw: number;
-    let f2Freq: number, f2Bw: number;
-
-    if (tNorm < crossover) {
-      // "Mee" phase: F1 ~800Hz, F2 ~1800Hz
-      const p = tNorm / crossover;
-      f1Freq = 800 - 100 * p;
-      f1Bw = 180;
-      f2Freq = 1800 - 200 * p;
-      f2Bw = 220;
-    } else {
-      // "Ow" phase: F1 drops to ~550Hz, F2 drops to ~1100Hz
-      const p = (tNorm - crossover) / (1 - crossover);
-      f1Freq = 700 - 150 * p;
-      f1Bw = 200;
-      f2Freq = 1600 - 500 * p;
-      f2Bw = 250;
-    }
-
-    // Extract chunk, filter through parallel formants, sum
-    const chunk1 = new Float32Array(chunkLen);
-    const chunk2 = new Float32Array(chunkLen);
-    for (let i = 0; i < chunkLen; i++) {
-      chunk1[i] = raw[start + i];
-      chunk2[i] = raw[start + i];
-    }
-
-    bandpass(chunk1, f1Freq, f1Bw);
-    bandpass(chunk2, f2Freq, f2Bw);
-
-    for (let i = 0; i < chunkLen; i++) {
-      result[start + i] = chunk1[i] * 0.6 + chunk2[i] * 0.4;
-    }
-  }
-
-  // Amplitude envelope: quick attack, sustain, smooth release
-  for (let i = 0; i < result.length; i++) {
-    const t = i / SAMPLE_RATE;
-    const env = attack(t, 0.015) * (t < dur * 0.85 ? 1.0 : expDecay(t - dur * 0.85, 15));
-    result[i] *= env * 0.4;
-  }
-
-  return result;
-}
-
-/**
- * purr_happy: Realistic cat purr using amplitude modulation at ~27Hz.
- * The characteristic motor-like purr effect comes from AM on a low rumble.
- */
-function purrHappy(): Float32Array {
-  const dur = 0.45;
-  const noise = createNoiseGen(456);
-  const purrRate = 27; // Hz — real cat purr is 25-30Hz
-
-  return makeSamples(dur, (t) => {
-    // Amplitude modulation envelope: rhythmic on-off at purr rate
-    // Use a squared sine for sharper on/off transitions (more pulse-like)
-    const mod = 0.5 + 0.5 * Math.pow(Math.abs(sine(t, purrRate)), 0.6);
-
-    // Source: low sub-harmonic rumble
-    const fundamental = sine(t, 26) * 0.35;
-    const harmonic2 = sine(t, 52) * 0.25;
-    const harmonic3 = sine(t, 78) * 0.1;
-
-    // Turbulent breathiness — deterministic noise filtered low
-    const breathNoise = noise() * 0.06;
-
-    const sig = (fundamental + harmonic2 + harmonic3 + breathNoise) * mod;
-
-    // Gentle envelope: fade in and fade out
-    const env = attack(t, 0.06) * (1 - Math.pow(t / dur, 2));
-    return sig * env * 0.3;
+  return makeSamples(0.15, (t) => {
+    // Quick rising chirp: F5 → A5 → C6
+    const dur = 0.15;
+    const f = 698 + 350 * Math.pow(t / dur, 0.6);
+    // Two harmonics for brightness
+    const sig = sine(t, f) + 0.4 * sine(t, f * 2) + 0.15 * sine(t, f * 3);
+    // Slight vibrato for liveliness
+    const vib = 1 + 0.015 * sine(t, 18);
+    const env = attack(t, 0.008) * (1 - Math.pow(t / dur, 2));
+    return sig * vib / 1.55 * env * 0.25;
   });
 }
 
-/**
- * meow_sad: Descending "meee-owww" with wider formant spacing and drooping pitch.
- * Longer duration, falling F0 for a plaintive quality.
- */
-function meowSad(): Float32Array {
-  const dur = 0.4;
-  const noise = createNoiseGen(789);
-
-  const source = (t: number): number => {
-    // Drooping fundamental: starts ~380Hz, falls to ~220Hz
-    const f0 = 380 - 160 * (t / dur);
-    let pulse = 0;
-    for (let h = 1; h <= 7; h++) {
-      pulse += sine(t, f0 * h) * (1 / (h * h));
-    }
-    const breath = noise() * 0.1;
-    return pulse + breath;
-  };
-
-  const raw = makeSamples(dur, source);
-
-  // Time-varying formants — drooping open vowel
-  const chunkSize = Math.floor(SAMPLE_RATE * 0.012);
-  const numChunks = Math.ceil(raw.length / chunkSize);
-  const result = new Float32Array(raw.length);
-
-  for (let c = 0; c < numChunks; c++) {
-    const start = c * chunkSize;
-    const end = Math.min(start + chunkSize, raw.length);
-    const chunkLen = end - start;
-    const tNorm = c * chunkSize / raw.length;
-
-    // Sad meow: formants descend throughout
-    const f1Freq = 750 - 200 * tNorm;
-    const f2Freq = 1700 - 600 * tNorm;
-    const f1Bw = 200 + 50 * tNorm;
-    const f2Bw = 250 + 80 * tNorm;
-
-    const chunk1 = new Float32Array(chunkLen);
-    const chunk2 = new Float32Array(chunkLen);
-    for (let i = 0; i < chunkLen; i++) {
-      chunk1[i] = raw[start + i];
-      chunk2[i] = raw[start + i];
-    }
-
-    bandpass(chunk1, f1Freq, f1Bw);
-    bandpass(chunk2, f2Freq, f2Bw);
-
-    for (let i = 0; i < chunkLen; i++) {
-      result[start + i] = chunk1[i] * 0.55 + chunk2[i] * 0.45;
-    }
-  }
-
-  // Envelope: slow attack, long tail
-  for (let i = 0; i < result.length; i++) {
-    const t = i / SAMPLE_RATE;
-    const env = attack(t, 0.03) * (1 - Math.pow(t / dur, 1.5));
-    result[i] *= env * 0.35;
-  }
-
-  return result;
+/** Happy purr — gentle rhythmic hum (cute, not creepy) */
+function purrHappy(): Float32Array {
+  return makeSamples(0.3, (t) => {
+    const dur = 0.3;
+    // Gentle AM tremolo at ~25Hz for the "motor" feel
+    const tremolo = 0.6 + 0.4 * Math.abs(sine(t, 25));
+    // Mid-frequency hum (not sub-bass rumble — that was scary)
+    const f = 220;
+    const sig = sine(t, f) * 0.5 + sine(t, f * 2) * 0.3 + sine(t, f * 3) * 0.1;
+    const env = attack(t, 0.04) * (1 - Math.pow(t / dur, 1.5));
+    return sig / 0.9 * tremolo * env * 0.12;
+  });
 }
 
-/**
- * meow_celebrate: Excited upward chirpy "mrrrow!" with rising pitch.
- * Three formants, short and bright.
- */
+/** Sad mew — gentle descending "mew" (cute, not mournful) */
+function meowSad(): Float32Array {
+  return makeSamples(0.18, (t) => {
+    const dur = 0.18;
+    // Gentle descending chirp: B5 → G5
+    const f = 988 - 200 * (t / dur);
+    const sig = sine(t, f) + 0.35 * sine(t, f * 2) + 0.1 * sine(t, f * 3);
+    const env = attack(t, 0.01) * expDecay(t, 8);
+    return sig / 1.45 * env * 0.2;
+  });
+}
+
+/** Celebrate chirp — excited rapid trill "prrrrp!" rising */
 function meowCelebrate(): Float32Array {
-  const dur = 0.22;
-  const noise = createNoiseGen(321);
-
-  const source = (t: number): number => {
-    // Rising fundamental: ~350Hz -> ~550Hz (excited, rising inflection)
-    const f0 = 350 + 200 * Math.pow(t / dur, 0.7);
-    let pulse = 0;
-    for (let h = 1; h <= 9; h++) {
-      pulse += sine(t, f0 * h) * (1 / (h * h));
-    }
-    // More breath for excitement
-    const breath = noise() * 0.07;
-    return pulse + breath;
-  };
-
-  const raw = makeSamples(dur, source);
-
-  // Three formants for a brighter, more open vowel
-  const chunkSize = Math.floor(SAMPLE_RATE * 0.008);
-  const numChunks = Math.ceil(raw.length / chunkSize);
-  const result = new Float32Array(raw.length);
-
-  for (let c = 0; c < numChunks; c++) {
-    const start = c * chunkSize;
-    const end = Math.min(start + chunkSize, raw.length);
-    const chunkLen = end - start;
-    const tNorm = c * chunkSize / raw.length;
-
-    // Celebratory: formants rise (opening up)
-    const f1Freq = 700 + 200 * tNorm;
-    const f2Freq = 1600 + 400 * tNorm;
-    const f3Freq = 2800 + 200 * tNorm;
-
-    const chunk1 = new Float32Array(chunkLen);
-    const chunk2 = new Float32Array(chunkLen);
-    const chunk3 = new Float32Array(chunkLen);
-    for (let i = 0; i < chunkLen; i++) {
-      chunk1[i] = raw[start + i];
-      chunk2[i] = raw[start + i];
-      chunk3[i] = raw[start + i];
-    }
-
-    bandpass(chunk1, f1Freq, 200);
-    bandpass(chunk2, f2Freq, 250);
-    bandpass(chunk3, f3Freq, 300);
-
-    for (let i = 0; i < chunkLen; i++) {
-      result[start + i] = chunk1[i] * 0.45 + chunk2[i] * 0.35 + chunk3[i] * 0.2;
-    }
-  }
-
-  // Envelope: snappy attack, moderate sustain, quick release
-  for (let i = 0; i < result.length; i++) {
-    const t = i / SAMPLE_RATE;
-    const env = attack(t, 0.01) * expDecay(t, 5);
-    result[i] *= env * 0.4;
-  }
-
-  return result;
+  return makeSamples(0.18, (t) => {
+    const dur = 0.18;
+    // Rapid ascending trill — multiple quick steps
+    const stepDur = 0.035;
+    const step = Math.floor(t / stepDur);
+    // Rising steps: E5 → G5 → B5 → D6 → E6
+    const freqs = [659, 784, 988, 1175, 1319];
+    const f = freqs[Math.min(step, 4)];
+    const local = t - step * stepDur;
+    const sig = sine(t, f) + 0.35 * sine(t, f * 2);
+    const env = attack(t, 0.005) * (1 - Math.pow(t / dur, 1.5));
+    return sig / 1.35 * expDecay(local, 30) * env * 0.25;
+  });
 }
 
 // ---------------------------------------------------------------------------
