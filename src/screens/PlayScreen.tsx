@@ -390,6 +390,10 @@ export function PlayScreen(): React.JSX.Element {
   // --------------------------------------------------------------------------
   const handleNoteOn = useCallback(
     (midiNote: MidiNoteEvent) => {
+      // Suppress mic-sourced events during recording playback to prevent
+      // audio feedback loop (speaker → mic → handleNoteOn → speaker → ∞)
+      if (isPlayingBack && midiNote.inputSource === 'mic') return;
+
       // AUDIO FIRST — play sound before any React state updates for lowest latency
       if (isAudioReady) {
         const existingHandle = activeHandlesRef.current.get(midiNote.note);
@@ -461,7 +465,7 @@ export function PlayScreen(): React.JSX.Element {
         ]);
       }
     },
-    [isAudioReady, isRecording],
+    [isAudioReady, isRecording, isPlayingBack],
   );
 
   const handleNoteOff = useCallback(

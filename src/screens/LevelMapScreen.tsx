@@ -37,6 +37,7 @@ import { hasTierMasteryTestPassed } from '../core/curriculum/tierMasteryTest';
 import { Cat3DCanvas } from '../components/Mascot/3d';
 import { SalsaCoach } from '../components/Mascot/SalsaCoach';
 import { COLORS, GRADIENTS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../theme/tokens';
+import { GradientMeshBackground } from '../components/effects';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
@@ -679,6 +680,7 @@ export function LevelMapScreen() {
 
   return (
     <View style={styles.container} testID="level-map-screen">
+      <GradientMeshBackground accent="learn" />
       {/* Header */}
       <LinearGradient
         colors={[GRADIENTS.header[0], GRADIENTS.header[1], COLORS.background]}

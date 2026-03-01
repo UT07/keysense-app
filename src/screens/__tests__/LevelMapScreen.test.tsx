@@ -221,8 +221,8 @@ describe('LevelMapScreen', () => {
   });
 
   it('renders gradient header', () => {
-    const { getByTestId } = render(<LevelMapScreen />);
-    expect(getByTestId('linear-gradient')).toBeTruthy();
+    const { getAllByTestId } = render(<LevelMapScreen />);
+    expect(getAllByTestId('linear-gradient').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders 15 tier nodes', () => {

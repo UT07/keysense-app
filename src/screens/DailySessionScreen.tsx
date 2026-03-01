@@ -30,6 +30,7 @@ import { useLearnerProfileStore } from '../stores/learnerProfileStore';
 import { useGemStore } from '../stores/gemStore';
 import { SalsaCoach } from '../components/Mascot/SalsaCoach';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, glowColor, type RarityLevel } from '../theme/tokens';
+import { GradientMeshBackground } from '../components/effects';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
@@ -150,6 +151,7 @@ export function DailySessionScreen() {
 
   return (
     <SafeAreaView style={styles.container} testID="daily-session-screen">
+      <GradientMeshBackground accent="exercise" />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}

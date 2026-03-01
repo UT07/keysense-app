@@ -34,6 +34,7 @@ import { useAuthStore } from '../stores/authStore';
 import { masteryColor, masteryLabel } from '../core/songs/songMastery';
 import type { SongGenre, SongSummary, SongRequestParams, MasteryTier } from '../core/songs/songTypes';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../theme/tokens';
+import { GradientMeshBackground } from '../components/effects';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
@@ -460,6 +461,7 @@ export function SongLibraryScreen() {
 
   return (
     <SafeAreaView style={styles.container} testID="song-library-screen">
+      <GradientMeshBackground accent="songs" />
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Music Library</Text>

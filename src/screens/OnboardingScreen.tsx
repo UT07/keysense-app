@@ -39,6 +39,7 @@ import { useSettingsStore } from '../stores/settingsStore';
 import { useCatEvolutionStore } from '../stores/catEvolutionStore';
 import { prefillOnboardingBuffer } from '../services/exerciseBufferManager';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../theme/tokens';
+import { GradientMeshBackground } from '../components/effects';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -736,6 +737,7 @@ export function OnboardingScreen(): React.ReactElement {
 
   return (
     <SafeAreaView style={styles.container} testID="onboarding-screen">
+      <GradientMeshBackground accent="home" />
       <ScrollView
         testID="onboarding-scroll"
         contentContainerStyle={styles.scrollContent}

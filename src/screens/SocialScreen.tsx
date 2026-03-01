@@ -32,6 +32,7 @@ import {
   getLeagueStandings,
 } from '../services/firebase/leagueService';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../theme/tokens';
+import { GradientMeshBackground } from '../components/effects';
 import { PressableScale } from '../components/common/PressableScale';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
@@ -474,6 +475,7 @@ export function SocialScreen(): React.JSX.Element {
 
   return (
     <SafeAreaView style={styles.container} testID="social-screen">
+      <GradientMeshBackground accent="social" />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
