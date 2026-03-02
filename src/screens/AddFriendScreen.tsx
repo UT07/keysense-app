@@ -84,41 +84,9 @@ export function AddFriendScreen(): React.JSX.Element {
   const [success, setSuccess] = useState<string | null>(null);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Auth gate: anonymous users cannot use friend codes
-  if (isAnonymous) {
-    return (
-      <SafeAreaView style={styles.container} testID="add-friend-screen">
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            testID="add-friend-back"
-          >
-            <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Add Friend</Text>
-          <View style={styles.backButton} />
-        </View>
-        <View style={styles.authGateContainer}>
-          <MaterialCommunityIcons name="account-lock" size={64} color={COLORS.textMuted} />
-          <Text style={styles.authGateTitle}>Sign In Required</Text>
-          <Text style={styles.authGateSubtitle}>
-            Sign in to generate your friend code and add friends.
-          </Text>
-          <TouchableOpacity
-            style={styles.authGateButton}
-            onPress={() => navigation.navigate('Auth')}
-          >
-            <Text style={styles.authGateButtonText}>Sign In</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   // Register friend code on mount if not yet set
   useEffect(() => {
+    if (isAnonymous) return;
     if (!friendCode && user?.uid) {
       setIsRegistering(true);
       registerFriendCode(user.uid)
@@ -130,7 +98,7 @@ export function AddFriendScreen(): React.JSX.Element {
         })
         .finally(() => setIsRegistering(false));
     }
-  }, [friendCode, user?.uid, setFriendCode]);
+  }, [isAnonymous, friendCode, user?.uid, setFriendCode]);
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -232,6 +200,39 @@ export function AddFriendScreen(): React.JSX.Element {
       setIsLooking(false);
     }
   }, [inputCode, friendCode, user?.uid, friends, addFriend, displayName, selectedCatId]);
+
+  // Auth gate: anonymous users cannot use friend codes (placed after hooks)
+  if (isAnonymous) {
+    return (
+      <SafeAreaView style={styles.container} testID="add-friend-screen">
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            testID="add-friend-back"
+          >
+            <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Add Friend</Text>
+          <View style={styles.backButton} />
+        </View>
+        <View style={styles.authGateContainer}>
+          <MaterialCommunityIcons name="account-lock" size={64} color={COLORS.textMuted} />
+          <Text style={styles.authGateTitle}>Sign In Required</Text>
+          <Text style={styles.authGateSubtitle}>
+            Sign in to generate your friend code and add friends.
+          </Text>
+          <TouchableOpacity
+            style={styles.authGateButton}
+            onPress={() => navigation.navigate('Auth')}
+          >
+            <Text style={styles.authGateButtonText}>Sign In</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
