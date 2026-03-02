@@ -91,21 +91,76 @@ const BLUSH_MATERIAL_NAMES = new Set([
 ]);
 
 /**
- * Apply per-cat Ghibli toon materials to a GLTF scene clone.
+ * Base texture body color (average warm peach from the SketchFab chibi cat texture).
+ * Used to compute per-cat tint ratios for textured models.
+ * tintColor = catBodyColor / BASE_TEXTURE_COLOR → multiply with texture preserves detail.
+ */
+const BASE_TEXTURE_COLOR = new THREE.Color(0.87, 0.76, 0.66);
+
+/**
+ * Compute a tint color that shifts the base texture toward the target cat color.
+ * result = target / base, clamped to [0, 2] to avoid extreme values.
+ */
+function computeTint(targetHex: string): THREE.Color {
+  const target = new THREE.Color(targetHex);
+  return new THREE.Color(
+    Math.min(2, target.r / Math.max(0.01, BASE_TEXTURE_COLOR.r)),
+    Math.min(2, target.g / Math.max(0.01, BASE_TEXTURE_COLOR.g)),
+    Math.min(2, target.b / Math.max(0.01, BASE_TEXTURE_COLOR.b)),
+  );
+}
+
+/**
+ * Apply per-cat materials to a GLTF scene clone.
  *
  * Material matching strategy (tries in order):
- *   1. Match by material.name using MATERIAL_NAME_MAP → toon materials (salsa-cat, chonky-cat)
- *   2. Split by bone weights → toon materials (slim-cat, round-cat with no named materials)
- *
- * Also adds outline meshes for the anime ink-line look.
+ *   1. Textured model: material has a .map (texture) → apply color tint to preserve texture detail
+ *   2. Named materials: match by material.name using MATERIAL_NAME_MAP → toon materials
+ *   3. Split by bone weights → toon materials (models with no named materials)
  */
 function applyMaterials(scene: THREE.Group, materials: Cat3DMaterials, hasBlush: boolean): void {
+  let anyTextured = false;
   let anyMaterialMatched = false;
 
+  // First pass: check if any mesh has a textured material (SketchFab models)
+  scene.traverse((node) => {
+    if (!(node instanceof THREE.Mesh)) return;
+    const mat = Array.isArray(node.material) ? node.material[0] : node.material;
+    if (mat && 'map' in mat && (mat as THREE.MeshStandardMaterial).map) {
+      anyTextured = true;
+    }
+  });
+
+  // Textured model path: tint the existing texture to match the cat's body color.
+  // This preserves all painted detail (eyes, nose, blush, fur patterns) while
+  // shifting the overall hue per cat.
+  if (anyTextured) {
+    const tint = computeTint(materials.body);
+    scene.traverse((node) => {
+      if (!(node instanceof THREE.Mesh)) return;
+      const mats = Array.isArray(node.material) ? node.material : [node.material];
+      for (let i = 0; i < mats.length; i++) {
+        const mat = mats[i];
+        if (!mat) continue;
+        // Clone the material so each cat instance gets independent tinting
+        const cloned = mat.clone();
+        if ('color' in cloned) {
+          (cloned as THREE.MeshStandardMaterial).color.copy(tint);
+        }
+        if (Array.isArray(node.material)) {
+          node.material[i] = cloned;
+        } else {
+          node.material = cloned;
+        }
+      }
+    });
+    return;
+  }
+
+  // Non-textured model path: match by material name → toon materials
   scene.traverse((node) => {
     if (!(node instanceof THREE.Mesh)) return;
 
-    // Handle multi-material meshes (material array) and single-material meshes
     const nodeMaterials = Array.isArray(node.material) ? node.material : [node.material];
 
     for (let i = 0; i < nodeMaterials.length; i++) {
@@ -115,7 +170,6 @@ function applyMaterials(scene: THREE.Group, materials: Cat3DMaterials, hasBlush:
       const materialKey = MATERIAL_NAME_MAP[mat.name];
       if (!materialKey) continue;
 
-      // Hide blush materials if cat doesn't have blush
       if (BLUSH_MATERIAL_NAMES.has(mat.name) && !hasBlush) {
         const hidden = createHiddenMaterial();
         if (Array.isArray(node.material)) {
@@ -130,7 +184,6 @@ function applyMaterials(scene: THREE.Group, materials: Cat3DMaterials, hasBlush:
       const colorHex = materials[materialKey];
       if (!colorHex) continue;
 
-      // Replace with Ghibli toon material
       const toonMat = materialKey === 'blush'
         ? createBlushMaterial(colorHex)
         : createToonMaterial(colorHex, materialKey);
@@ -144,8 +197,7 @@ function applyMaterials(scene: THREE.Group, materials: Cat3DMaterials, hasBlush:
     }
   });
 
-  // Fallback for single-mesh models with no named materials (slim-cat, round-cat).
-  // Split geometry into material groups using bone weights, then apply toon materials.
+  // Fallback for single-mesh models with no named materials.
   if (!anyMaterialMatched) {
     scene.traverse((node) => {
       if (!(node instanceof THREE.Mesh)) return;
@@ -154,7 +206,6 @@ function applyMaterials(scene: THREE.Group, materials: Cat3DMaterials, hasBlush:
       if (toonMaterials) {
         node.material = toonMaterials;
       } else {
-        // Ultimate fallback: single toon material
         node.material = createToonMaterial(materials.body, 'body');
       }
     });
@@ -271,7 +322,20 @@ function CatModel3DInner({
   const scene = useMemo(() => {
     const cloned = originalScene.clone(true);
     applyMaterials(cloned, config.materials, config.hasBlush);
-    addOutlineMeshes(cloned, config.materials.accent);
+    // Only add outline meshes for non-textured (toon-shaded) models.
+    // Textured SketchFab models have their own shading and outlines look wrong.
+    let hasTexture = false;
+    cloned.traverse((node) => {
+      if (node instanceof THREE.Mesh) {
+        const mat = Array.isArray(node.material) ? node.material[0] : node.material;
+        if (mat && 'map' in mat && (mat as THREE.MeshStandardMaterial).map) {
+          hasTexture = true;
+        }
+      }
+    });
+    if (!hasTexture) {
+      addOutlineMeshes(cloned, config.materials.accent);
+    }
     return cloned;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [originalScene, config.materials.body, config.materials.eye, config.materials.accent, config.hasBlush]);
@@ -292,11 +356,11 @@ function CatModel3DInner({
     };
   }, [scene]);
 
-  // Use hardcoded scale — all 4 GLB models are ~5.4 Blender units tall.
-  // Camera at z=3.5, FOV 50° sees ~3.26 units. Scale 0.5 → model ~2.7 units → fills view nicely.
-  const MODEL_HEIGHT = 5.4;
-  const HARDCODED_SCALE = 0.50;
-  const HARDCODED_Y_OFFSET = -1.35;
+  // Model height: SketchFab chibi cats are ~1.5 Blender units tall.
+  // Camera at z=3.5, FOV 50° sees ~3.26 units. Scale 1.0 → model 1.5 units → fills view.
+  const MODEL_HEIGHT = 1.5;
+  const HARDCODED_SCALE = 1.0;
+  const HARDCODED_Y_OFFSET = -0.75;
 
   // Set up animation mixer — works on cloned scene because bone names are preserved
   const { actions, mixer } = useAnimations(animations, groupRef);

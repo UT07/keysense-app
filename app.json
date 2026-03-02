@@ -79,9 +79,7 @@
       }
     },
     "owner": "ut254",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "0.1.0",
     "updates": {
       "url": "https://u.expo.dev/5283b6e2-cc46-4067-a759-426d1ea3c388"
     }

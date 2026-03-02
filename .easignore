@@ -1,0 +1,16 @@
+# EAS Build ignore — exclude files not needed for the native build
+.venv/
+*.blend
+*.blend1
+*.py
+e2e/
+scripts/
+docs/
+artifacts/
+.maestro/
+firebase-debug.log
+*.png
+!assets/*.png
+!assets/**/*.png
+Purrrfect_Keys_Mentor_Brief_v2.docx
+~$*
