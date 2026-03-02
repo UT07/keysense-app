@@ -23,6 +23,7 @@ import { EmailAuthScreen } from '../screens/EmailAuthScreen';
 import { AccountScreen } from '../screens/AccountScreen';
 import { TierIntroScreen } from '../screens/TierIntroScreen';
 import { CatSwitchScreen } from '../screens/CatSwitchScreen';
+import { CatStudioScreen } from '../screens/CatStudioScreen';
 import { SkillAssessmentScreen } from '../screens/SkillAssessmentScreen';
 import { DailySessionScreen } from '../screens/DailySessionScreen';
 import { SongLibraryScreen } from '../screens/SongLibraryScreen';
@@ -31,7 +32,6 @@ import { SocialScreen } from '../screens/SocialScreen';
 import { LeaderboardScreen } from '../screens/LeaderboardScreen';
 import { FriendsScreen } from '../screens/FriendsScreen';
 import { AddFriendScreen } from '../screens/AddFriendScreen';
-import { CatStudioScreen } from '../screens/CatStudioScreen';
 // Navigation
 import { CustomTabBar } from './CustomTabBar';
 
@@ -64,11 +64,11 @@ export type RootStackParamList = {
   MicSetup: undefined;
   Account: undefined;
   CatSwitch: undefined;
+  CatStudio: undefined;
   SongPlayer: { songId: string };
   Leaderboard: undefined;
   Friends: undefined;
   AddFriend: undefined;
-  CatStudio: undefined;
 };
 
 export type MainTabParamList = {
