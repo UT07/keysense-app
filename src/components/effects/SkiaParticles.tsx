@@ -2,13 +2,12 @@
  * GPU-accelerated particle system using Skia Canvas.
  * Renders floating particles with configurable count, speed, colors, and opacity.
  * Particles drift upward with horizontal sine-wave motion.
+ *
+ * Falls back to null if @shopify/react-native-skia native module is not available
+ * (e.g. Expo Go or dev builds without the native binary).
  */
 import React, { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
-import {
-  Canvas,
-  Circle,
-} from '@shopify/react-native-skia';
 import {
   useSharedValue,
   withRepeat,
@@ -17,6 +16,18 @@ import {
 } from 'react-native-reanimated';
 
 export type ParticleShape = 'circle' | 'star' | 'note' | 'sparkle' | 'paw';
+
+// Lazy-load Skia — crashes if native module isn't in the binary
+let SkiaCanvas: React.ComponentType<any> | null = null;
+let SkiaCircle: React.ComponentType<any> | null = null;
+
+try {
+  const skia = require('@shopify/react-native-skia');
+  SkiaCanvas = skia.Canvas;
+  SkiaCircle = skia.Circle;
+} catch {
+  // Native module not available — SkiaParticles will render null
+}
 
 interface SkiaParticlesProps {
   /** Number of particles (default: 15) */
@@ -84,6 +95,11 @@ export function SkiaParticles({
     () => generateParticles(count, width, height, colors, size),
     [count, width, height, colors, size],
   );
+
+  if (!SkiaCanvas || !SkiaCircle) return null;
+
+  const Canvas = SkiaCanvas;
+  const Circle = SkiaCircle;
 
   return (
     <Canvas style={[StyleSheet.absoluteFill, { opacity }]} pointerEvents="none">
