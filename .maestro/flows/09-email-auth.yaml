@@ -1,0 +1,51 @@
+# Email Auth — Test email sign-in flow
+# Requires TEST_EMAIL and TEST_PASSWORD env vars
+appId: com.purrrfectkeys.app
+name: Email Authentication
+tags:
+  - auth
+  - requires-env
+
+---
+
+- launchApp:
+    clearState: true
+
+# Complete onboarding
+- runFlow: ../helpers/complete-onboarding.yaml
+
+# Should be on auth screen
+- assertVisible:
+    id: "auth-screen"
+- takeScreenshot: screenshots/09-auth-screen
+
+# Tap email sign-in
+- tapOn:
+    id: "email-signin"
+
+# Email auth screen
+- assertVisible:
+    id: "email-auth-screen"
+
+# Enter credentials
+- tapOn:
+    id: "email-input"
+- inputText: ${TEST_EMAIL}
+
+- tapOn:
+    id: "password-input"
+- inputText: ${TEST_PASSWORD}
+
+- takeScreenshot: screenshots/09-auth-filled
+
+# Submit
+- tapOn:
+    id: "submit-button"
+
+# Should navigate to home (or show error if bad creds)
+- extendedWaitUntil:
+    visible:
+      id: "home-screen|error-text"
+    timeout: 10000
+
+- takeScreenshot: screenshots/09-auth-result

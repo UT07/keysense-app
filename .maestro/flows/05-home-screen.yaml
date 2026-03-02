@@ -1,0 +1,43 @@
+# Home Screen — Verify key cards and elements render
+appId: com.purrrfectkeys.app
+name: Home Screen Elements
+tags:
+  - home
+  - smoke
+
+---
+
+- launchApp
+- runFlow: ../helpers/ensure-home.yaml
+
+# Verify key UI elements
+- assertVisible:
+    id: "home-screen"
+
+# Gem counter should be visible
+- assertVisible:
+    id: "gem-counter"
+
+# Practice card
+- assertVisible:
+    id: "practice-game-card"
+
+# Challenge card
+- assertVisible:
+    id: "challenge-game-card"
+
+# Scroll down to see more content
+- scroll:
+    direction: DOWN
+
+# Music library card
+- assertVisible:
+    id: "music-library-game-card"
+    optional: true
+
+# Free play card
+- assertVisible:
+    id: "free-play-card"
+    optional: true
+
+- takeScreenshot: screenshots/05-home-screen-full

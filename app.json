@@ -25,11 +25,6 @@
             "CFBundleURLSchemes": [
               "com.googleusercontent.apps.619761780367-tqf3t4srqtkklkigep0clojvoailsteu"
             ]
-          },
-          {
-            "CFBundleURLSchemes": [
-              "com.googleusercontent.apps.619761780367-tqf3t4srqtkklkigep0clojvoailsteu"
-            ]
           }
         ],
         "NSMicrophoneUsageDescription": "Purrrfect Keys uses your microphone to detect the notes you play on piano, keyboard, or by singing."
@@ -44,10 +39,6 @@
       "googleServicesFile": "./firebase/google-services.json",
       "versionCode": 1,
       "permissions": [
-        "android.permission.RECORD_AUDIO",
-        "android.permission.INTERNET",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "android.permission.RECORD_AUDIO",
         "android.permission.INTERNET",
         "android.permission.FOREGROUND_SERVICE",

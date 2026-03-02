@@ -1,0 +1,29 @@
+# Auth Skip — Skip sign-in and play as guest
+appId: com.purrrfectkeys.app
+name: Auth Skip to Home
+tags:
+  - auth
+  - critical
+
+---
+
+- launchApp:
+    clearState: true
+
+# Complete onboarding first if shown
+- runFlow: ../helpers/complete-onboarding.yaml
+
+# Auth screen should appear
+- assertVisible:
+    id: "auth-screen"
+    optional: true
+
+# Skip sign-in to play as guest
+- tapOn:
+    id: "skip-signin"
+    optional: true
+
+# Should land on home screen
+- assertVisible:
+    id: "home-screen"
+- takeScreenshot: screenshots/03-home-after-skip

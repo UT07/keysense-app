@@ -208,7 +208,10 @@ export const useProgressStore = create<ProgressStoreState>((set, get) => ({
     const userMinutesTarget = useSettingsStore.getState().dailyGoalMinutes ?? 10;
 
     // ── Daily challenge check (before XP so we can apply xpMultiplier) ──
-    const challengeAlreadyDone = useCatEvolutionStore.getState().isDailyChallengeCompleted();
+    // Guard: check lastDailyChallengeDate directly to prevent race conditions
+    // where two rapid completions both read isDailyChallengeCompleted() as false
+    const evState = useCatEvolutionStore.getState();
+    const challengeAlreadyDone = evState.lastDailyChallengeDate === today;
     let xpMultiplier = 1;
 
     if (!challengeAlreadyDone) {

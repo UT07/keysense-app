@@ -6,7 +6,7 @@
  * Mastery is tracked per section, with tier upgrades earning gems.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -286,16 +286,30 @@ export function SongPlayerScreen() {
   const [layer, setLayer] = useState<SongLayer>('melody');
   const [loop, setLoop] = useState(false);
 
+  // Snapshot the context when the user taps Play, so we can verify
+  // on return from Exercise that the score belongs to the right song/section.
+  const playContextRef = useRef<{
+    songId: string;
+    sectionIndex: number | null;
+    layer: SongLayer;
+  } | null>(null);
+
   // Load song on mount
   useEffect(() => {
     loadSong(songId);
     addRecentSong(songId);
   }, [songId]);
 
-  // Capture score when returning from Exercise
+  // Capture score when returning from Exercise.
+  // Uses playContextRef (snapshotted at play-time) to ensure the score is
+  // applied to the correct song/section, even if the user somehow changed
+  // the selection while the Exercise screen was active.
   useFocusEffect(
     useCallback(() => {
-      if (!currentSong) return;
+      const ctx = playContextRef.current;
+      if (!ctx) return; // No play context — user hasn't played yet
+
+      if (!currentSong || currentSong.id !== ctx.songId) return; // Wrong song loaded
 
       const exerciseState = useExerciseStore.getState();
       const lastScore = exerciseState.lastCompletedScore;
@@ -303,13 +317,15 @@ export function SongPlayerScreen() {
 
       // Clear the sticky score so it's not re-processed on next focus
       useExerciseStore.getState().clearLastCompletedScore();
+      // Consume the play context — each score is applied exactly once
+      playContextRef.current = null;
 
       const existingMastery = getMastery(currentSong.id);
       const oldTier = existingMastery?.tier ?? 'none';
 
       let newSectionScores: Record<string, number>;
 
-      if (selectedSectionIndex === null) {
+      if (ctx.sectionIndex === null) {
         // Full song — compute per-section scores from note-level details
         // (like F1 sector timing: split the full-song score by section boundaries)
         const perSection = lastScore.details?.length
@@ -325,7 +341,7 @@ export function SongPlayerScreen() {
           );
         }
       } else {
-        const section = currentSong.sections[selectedSectionIndex];
+        const section = currentSong.sections[ctx.sectionIndex];
         if (!section) return;
         newSectionScores = {
           ...(existingMastery?.sectionScores ?? {}),
@@ -343,7 +359,7 @@ export function SongPlayerScreen() {
         uid,
         newSectionScores,
         sectionIds,
-        layer,
+        ctx.layer,
       );
 
       updateMastery(updated);
@@ -355,7 +371,7 @@ export function SongPlayerScreen() {
           useGemStore.getState().earnGems(reward, 'song-mastery');
         }
       }
-    }, [currentSong, selectedSectionIndex, layer]),
+    }, [currentSong, uid, getMastery, updateMastery]),
   );
 
   const song = currentSong;
@@ -381,6 +397,14 @@ export function SongPlayerScreen() {
       Alert.alert('No Notes', 'This selection has no playable notes. Try a different section or layer.');
       return;
     }
+
+    // Snapshot the current context so useFocusEffect applies the score
+    // to the correct song/section when the user returns.
+    playContextRef.current = {
+      songId: song.id,
+      sectionIndex: selectedSectionIndex,
+      layer,
+    };
 
     console.log(`[SongPlayer] Playing: ${exercise.id}, notes=${exercise.notes.length}, tempo=${exercise.settings.tempo}, countIn=${exercise.settings.countIn}`);
     setCurrentExercise(exercise);

@@ -1,0 +1,44 @@
+# Social Screen — Verify social features render
+appId: com.purrrfectkeys.app
+name: Social Features
+tags:
+  - social
+  - feature
+
+---
+
+- launchApp
+- runFlow: ../helpers/ensure-home.yaml
+
+# Navigate to Social tab
+- tapOn:
+    id: "tab-social"
+- assertVisible:
+    id: "social-screen"
+- takeScreenshot: screenshots/08-social
+
+# View leaderboard (if authenticated)
+- tapOn:
+    id: "social-view-leaderboard"
+    optional: true
+- assertVisible:
+    id: "leaderboard-screen"
+    optional: true
+- takeScreenshot: screenshots/08-leaderboard
+
+# Go back
+- back
+    optional: true
+
+# View friends
+- tapOn:
+    id: "social-view-friends"
+    optional: true
+- assertVisible:
+    id: "friends-screen"
+    optional: true
+- takeScreenshot: screenshots/08-friends
+
+# Go back
+- back
+    optional: true

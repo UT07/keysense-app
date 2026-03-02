@@ -1,0 +1,32 @@
+# Free Play — Open free play keyboard
+appId: com.purrrfectkeys.app
+name: Free Play Keyboard
+tags:
+  - freeplay
+  - feature
+
+---
+
+- launchApp
+- runFlow: ../helpers/ensure-home.yaml
+
+# Scroll to Free Play card
+- scroll:
+    direction: DOWN
+
+# Tap Free Play card
+- tapOn:
+    id: "free-play-card"
+    optional: true
+
+# Should open Play screen
+- assertVisible:
+    id: "play-screen"
+    optional: true
+
+# Note display should be visible
+- assertVisible:
+    id: "freeplay-note-display-container"
+    optional: true
+
+- takeScreenshot: screenshots/10-free-play

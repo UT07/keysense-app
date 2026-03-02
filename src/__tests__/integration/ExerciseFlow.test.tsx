@@ -40,7 +40,7 @@ jest.mock('expo-haptics', () => ({
 }));
 
 // Mock exercise store — Zustand-compatible (selector + getState)
-// eslint-disable-next-line prefer-const
+ 
 let mockExerciseState: Record<string, any> = {
   currentExercise: null,
   setCurrentExercise: jest.fn(),

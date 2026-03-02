@@ -1,0 +1,55 @@
+# Onboarding Flow — Fresh install through cat selection
+appId: com.purrrfectkeys.app
+name: Onboarding Complete Flow
+tags:
+  - onboarding
+  - critical
+
+---
+
+- launchApp:
+    clearState: true
+
+# Step 1: Welcome
+- assertVisible:
+    id: "onboarding-step-1"
+- takeScreenshot: screenshots/02-onboarding-welcome
+- tapOn:
+    id: "onboarding-get-started"
+
+# Step 2: Experience level
+- assertVisible:
+    id: "onboarding-step-2"
+- tapOn:
+    id: "onboarding-experience-beginner"
+- tapOn:
+    id: "onboarding-experience-next"
+
+# Step 3: Input method
+- assertVisible:
+    id: "onboarding-step-3"
+- tapOn:
+    id: "onboarding-input-touch"
+- tapOn:
+    id: "onboarding-input-next"
+
+# Step 4: Goal
+- assertVisible:
+    id: "onboarding-step-4"
+- tapOn:
+    id: "onboarding-goal-songs"
+- tapOn:
+    id: "onboarding-goal-next"
+
+# Step 5: Cat selection + finish
+- assertVisible:
+    id: "onboarding-step-5"
+- takeScreenshot: screenshots/02-onboarding-cat-select
+- tapOn:
+    id: "onboarding-finish"
+
+# Should land on Auth or Home
+- assertVisible:
+    id: "auth-screen|home-screen"
+    optional: true
+- takeScreenshot: screenshots/02-onboarding-complete

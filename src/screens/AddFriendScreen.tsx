@@ -41,7 +41,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 let ClipboardModule: { setStringAsync: (s: string) => Promise<boolean> } | null = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+   
   ClipboardModule = require('expo-clipboard');
 } catch {
   ClipboardModule = null;

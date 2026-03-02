@@ -1,0 +1,49 @@
+# Song Library — Browse songs and open player
+appId: com.purrrfectkeys.app
+name: Song Library Browse
+tags:
+  - songs
+  - feature
+
+---
+
+- launchApp
+- runFlow: ../helpers/ensure-home.yaml
+
+# Navigate to Songs tab
+- tapOn:
+    id: "tab-songs"
+- assertVisible:
+    id: "song-library-screen"
+
+# Search input should be visible
+- assertVisible:
+    id: "search-input"
+
+# Song list should render
+- assertVisible:
+    id: "song-list"
+
+- takeScreenshot: screenshots/06-song-library
+
+# Tap a genre filter
+- tapOn:
+    id: "genre-classical"
+    optional: true
+
+- takeScreenshot: screenshots/06-song-library-filtered
+
+# Tap first song card (if available)
+- tapOn:
+    text: ".*"
+    index: 0
+    optional: true
+    childOf:
+      id: "song-list"
+
+# Song player should open (if a song was tapped)
+- assertVisible:
+    id: "song-player-screen"
+    optional: true
+
+- takeScreenshot: screenshots/06-song-player

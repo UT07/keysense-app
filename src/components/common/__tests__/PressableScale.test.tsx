@@ -442,7 +442,7 @@ describe('PressableScale', () => {
     });
 
     it('skips manual Haptics when soundOnPress is active', () => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+       
       const HapticsMock = require('expo-haptics');
       HapticsMock.impactAsync.mockClear();
 
@@ -460,7 +460,7 @@ describe('PressableScale', () => {
     });
 
     it('falls back to manual Haptics when soundOnPress=false and haptic=true', () => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+       
       const HapticsMock = require('expo-haptics');
       HapticsMock.impactAsync.mockClear();
 

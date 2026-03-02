@@ -10,6 +10,7 @@ jest.mock('../../services/firebase/config', () => ({
   auth: { currentUser: null },
   db: {},
   functions: {},
+  firebaseAvailable: true,
 }));
 jest.mock('../../services/firebase/socialService', () => ({
   postActivity: jest.fn().mockResolvedValue(undefined),

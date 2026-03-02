@@ -27,7 +27,6 @@ import { ExpoAudioEngine } from './ExpoAudioEngine';
  */
 let factoryInstance: IAudioEngine | null = null;
 let audioModeConfigured = false;
-let audioModeRecordingEnabled = false;
 
 /**
  * Try to create a WebAudioEngine. Returns null if react-native-audio-api
@@ -38,7 +37,7 @@ function tryCreateWebAudioEngine(): IAudioEngine | null {
   try {
     // Dynamic require so Metro includes the module only if it's in node_modules,
     // and the import doesn't crash at bundle time if the native module is missing.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+     
     const { WebAudioEngine } = require('./WebAudioEngine');
     const engine = new WebAudioEngine();
     console.log(`[createAudioEngine] WebAudioEngine created in ${Date.now() - start}ms`);
@@ -70,16 +69,16 @@ function tryCreateWebAudioEngine(): IAudioEngine | null {
  * Falls back to expo-av only when AudioManager is unavailable (e.g., Expo Go).
  */
 export async function ensureAudioModeConfigured(allowRecording = false): Promise<void> {
-  // Re-configure if recording was requested but not previously enabled
+  // Skip reconfiguration only for playback-only when already configured.
+  // ALWAYS reconfigure when recording is requested — the native AVAudioSession
+  // may have been changed by another library or system event since we last set it.
   if (audioModeConfigured && !allowRecording) return;
-  if (audioModeConfigured && allowRecording && audioModeRecordingEnabled) return;
 
   audioModeConfigured = true;
-  if (allowRecording) audioModeRecordingEnabled = true;
 
   // Primary: use AudioManager from react-native-audio-api (SYNCHRONOUS — no race condition)
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+     
     const { AudioManager } = require('react-native-audio-api');
     AudioManager.setAudioSessionOptions({
       iosCategory: allowRecording ? 'playAndRecord' : 'playback',
@@ -114,9 +113,6 @@ export async function ensureAudioModeConfigured(allowRecording = false): Promise
     );
   } catch (error) {
     console.warn('[createAudioEngine] Audio mode configuration failed:', error);
-    if (allowRecording) {
-      audioModeRecordingEnabled = false;
-    }
   }
 }
 

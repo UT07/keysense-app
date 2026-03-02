@@ -1,0 +1,59 @@
+# Tab Navigation — Verify all 5 tabs are accessible
+appId: com.purrrfectkeys.app
+name: Tab Navigation
+tags:
+  - navigation
+  - critical
+
+---
+
+- launchApp
+
+# Ensure we're on HomeScreen (skip auth/onboarding if needed)
+- runFlow: ../helpers/ensure-home.yaml
+
+# Home tab
+- assertVisible:
+    id: "home-screen"
+- takeScreenshot: screenshots/04-tab-home
+
+# Learn tab
+- tapOn:
+    id: "tab-learn"
+- extendedWaitUntil:
+    visible: "level-map-screen|learn-screen"
+    timeout: 5000
+- takeScreenshot: screenshots/04-tab-learn
+
+# Songs tab
+- tapOn:
+    id: "tab-songs"
+- extendedWaitUntil:
+    visible:
+      id: "song-library-screen"
+    timeout: 5000
+- takeScreenshot: screenshots/04-tab-songs
+
+# Social tab
+- tapOn:
+    id: "tab-social"
+- extendedWaitUntil:
+    visible:
+      id: "social-screen"
+    timeout: 5000
+- takeScreenshot: screenshots/04-tab-social
+
+# Profile tab
+- tapOn:
+    id: "tab-profile"
+- extendedWaitUntil:
+    visible:
+      id: "profile-screen"
+    timeout: 5000
+- takeScreenshot: screenshots/04-tab-profile
+
+# Back to home
+- tapOn:
+    id: "tab-home"
+- assertVisible:
+    id: "home-screen"

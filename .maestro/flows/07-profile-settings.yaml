@@ -1,0 +1,41 @@
+# Profile & Settings — Verify profile screen and navigation
+appId: com.purrrfectkeys.app
+name: Profile and Settings
+tags:
+  - profile
+  - settings
+
+---
+
+- launchApp
+- runFlow: ../helpers/ensure-home.yaml
+
+# Navigate to Profile tab
+- tapOn:
+    id: "tab-profile"
+- assertVisible:
+    id: "profile-screen"
+- takeScreenshot: screenshots/07-profile
+
+# Tap cat gallery button
+- tapOn:
+    id: "profile-open-cat-switch"
+    optional: true
+- takeScreenshot: screenshots/07-cat-gallery
+
+# Go back to profile
+- back
+
+# Navigate to Account screen
+- scroll:
+    direction: DOWN
+- tapOn:
+    id: "profile-open-account"
+    optional: true
+- assertVisible:
+    id: "account-screen"
+    optional: true
+- takeScreenshot: screenshots/07-account
+
+# Go back
+- back

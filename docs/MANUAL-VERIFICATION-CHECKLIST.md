@@ -3,14 +3,15 @@
 **Purpose:** Concrete steps YOU need to execute before launch — things that require your Firebase Console, GCP access, Apple Developer account, physical devices, or human judgment.
 **Companion:** `docs/system-design-analysis.md` (architecture analysis), `docs/plans/UNIFIED-PLAN.md` Phase 11 (full QA audit)
 
-**Last updated:** March 1, 2026
-**Codebase health:** 122 test suites, 2,630 tests, 0 failures, 0 TypeScript errors
+**Last updated:** March 2, 2026
+**Codebase health:** 121 test suites, 2,591 tests, 0 failures, 0 TypeScript errors
 **Key completions since initial draft:**
 - CI/CD workflows created (`.github/workflows/ci.yml` + `build.yml`)
 - Account deletion Cloud Function + client-side fallback implemented (10 tests)
 - 4 Cloud Functions for Gemini API written (`generateExercise`, `generateSong`, `generateCoachFeedback`, `deleteUserData`)
 - Audio session cross-library race condition fixed (AudioManager synchronous config)
-- 3D cat models functional (4 GLBs, material override, bounding box camera)
+- 3D cat models functional (4 GLBs, Ghibli toon materials, bone-weight mesh splitting, bounding box camera)
+- ElevenLabs TTS integrated (13 per-cat neural voices, expo-speech fallback, file-based caching)
 - Maestro E2E test scaffolding created (12 flows + 3 helpers, needs selector work)
 
 ---
@@ -220,14 +221,29 @@ No Crashlytics integration exists. Production crashes will be invisible.
 - [ ] If ONNX fails: verify automatic fallback to YIN monophonic
 - [ ] Verify audio session does NOT revert to earpiece after mic initialization (the old race condition)
 
-### D4. 3D Rendering
+### D4. Text-to-Speech (ElevenLabs + expo-speech)
 
-**Status: Functional.** Material override system handles 3 mesh naming conventions (Mat_ prefix, no-prefix, no-materials). Camera framing uses bounding box auto-centering. 4 GLB models (salsa-cat, slim-cat, round-cat, chonky-cat) rendering correctly with per-cat color overrides via `cat3DConfig.ts`.
+**Status: Implemented.** Two-tier TTS pipeline: ElevenLabs neural TTS (primary, `eleven_turbo_v2_5` model) with expo-speech fallback. 13 cats mapped to unique ElevenLabs voices matched to personality. File-based audio caching via expo-file-system. Lazy module loading avoids Jest mock interference.
 
-- [ ] HomeScreen: 3D cat renders without GL crashes
+- [ ] **Voice quality:** Play a coaching message with each cat voice — verify neural quality, not robotic
+- [ ] **Personality match:** Salsa (Jessica=playful), Jazzy (Will=laid-back), Luna (Lily=ethereal), Shibu (River=calm) — voices match character
+- [ ] **Caching:** Repeat same phrase with same cat → second play should be instant (cached mp3)
+- [ ] **Fallback:** Remove/invalidate API key → verify expo-speech fallback works seamlessly
+- [ ] **No audio overlap:** TTS speech stops when new speech starts or exercise begins
+- [ ] **Stop functionality:** Call `ttsService.stop()` → audio stops immediately (both ElevenLabs and expo-speech)
+- [ ] **Network failure:** Disable WiFi mid-TTS → verify no crash, fallback to expo-speech on next call
+- [ ] **API key security:** Verify `EXPO_PUBLIC_ELEVENLABS_API_KEY` is in `.gitignore` and `.env.local` only
+
+### D5. 3D Rendering
+
+**Status: Functional.** Material override system handles 3 mesh naming conventions (Mat_ prefix, no-prefix, no-materials). Camera framing uses bounding box auto-centering. 4 GLB models (salsa-cat, slim-cat, round-cat, chonky-cat) rendering with Ghibli-style toon materials (MeshToonMaterial, 3-step gradient ramp, warm lighting). Bone-weight mesh splitting for models without named materials.
+
+- [ ] HomeScreen: 3D cat renders without GL crashes, Ghibli toon shading visible (cel-shaded edges)
 - [ ] CompletionModal: 3D cat with correct pose (score-based)
-- [ ] CatSwitchScreen: 3D cats for owned, SVG for locked (verify no multiple GL contexts)
+- [ ] CatSwitchScreen: 3D cats for owned and locked (locked at dimmed opacity)
+- [ ] Verify Ghibli materials: warm hemisphere lighting, cel-shaded toon ramp, pastel warmth
 - [ ] Verify per-cat colors: body, belly, ears, eyes, nose, blush all match 2D profiles
+- [ ] Verify bone-weight splitting works for slim-cat/round-cat (models without named materials)
 - [ ] Low-end device (if available): verify no excessive battery drain from 3D
 - [ ] Background → foreground: GL context survives app backgrounding
 
@@ -316,7 +332,15 @@ No Crashlytics integration exists. Production crashes will be invisible.
 - [ ] Verify offline fallback: disable WiFi → AI coach shows template response
 - [ ] Verify content safety: generated exercises don't contain offensive text
 
-### G3. Expo/EAS
+### G3. ElevenLabs TTS
+
+- [ ] Verify ElevenLabs dashboard shows API usage (check quota consumption)
+- [ ] Verify rate limits: ElevenLabs free tier allows 10K chars/month — set up usage alerts
+- [ ] Verify all 13 voice IDs are valid and active in ElevenLabs account
+- [ ] If upgrading to paid plan: update API key and verify increased quota
+- [ ] Verify no PII is sent to ElevenLabs (only coaching text, no user identifiers)
+
+### G4. Expo/EAS
 
 - [ ] Verify EAS project is linked: `eas whoami`
 - [ ] Verify push notification credentials (if using push): `eas credentials`
@@ -364,7 +388,7 @@ No Crashlytics integration exists. Production crashes will be invisible.
 | 7 | B1: CI/CD | Verify runs | DONE (ci.yml + build.yml) | Before team grows |
 | 8 | B3: Crash Reporting | 2 hours | TODO | Before beta |
 | 9 | C2-C3: App Store Assets | 2-3 days | TODO | App Store submission |
-| 10 | D1-D5: Device Testing | 2-3 days | TODO | Before beta |
+| 10 | D1-D6: Device Testing (incl. TTS + 3D) | 2-3 days | TODO | Before beta |
 | 11 | D6: Maestro E2E | 1-2 days | SCAFFOLDED (needs selectors) | Before beta |
 | 12 | A5: App Check | 2 hours | TODO | Public launch |
 | 13 | E1-E3: Data Integrity | 1 day | TODO | Before beta |

@@ -1,0 +1,24 @@
+# Helper: Ensure we're on the HomeScreen
+# Handles onboarding and auth skip if needed
+
+# Complete onboarding if shown
+- runFlow:
+    when:
+      visible:
+        id: "onboarding-screen"
+    file: complete-onboarding.yaml
+
+# Skip auth if shown
+- runFlow:
+    when:
+      visible:
+        id: "auth-screen"
+    commands:
+      - tapOn:
+          id: "skip-signin"
+
+# Wait for home screen
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 10000

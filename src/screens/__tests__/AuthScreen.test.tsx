@@ -387,17 +387,10 @@ describe('AuthScreen', () => {
   // 10. Cat avatar renders in hero section
   // -----------------------------------------------------------------------
 
-  describe('Salsa coach in hero section', () => {
-    it('should render SalsaCoach component', () => {
+  describe('Salsa cat in hero section', () => {
+    it('should render 3D cat in hero', () => {
       const { getByTestId } = render(<AuthScreen />);
 
-      expect(getByTestId('salsa-coach')).toBeTruthy();
-    });
-
-    it('should render Salsa 3D cat in hero', () => {
-      const { getByTestId } = render(<AuthScreen />);
-
-      expect(getByTestId('salsa-coach')).toBeTruthy();
       expect(getByTestId('cat-3d')).toBeTruthy();
     });
   });

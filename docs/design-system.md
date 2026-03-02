@@ -1,8 +1,8 @@
 # Purrrfect Keys — Design System
 
-**Version:** 3.2
-**Last Updated:** February 28, 2026
-**Status:** Phase 10 Arcade Concert Hall complete — Concert Hall palette (black + crimson), lava lamp gradient, typography, shadows, composable cat SVG, Salsa NPC, rarity borders, combo escalation, 3D cats, sound design
+**Version:** 3.3
+**Last Updated:** March 2, 2026
+**Status:** Phase 10 Arcade Concert Hall complete + Phase 11 polish — Concert Hall palette (black + crimson), lava lamp gradient, typography, shadows, composable cat SVG, Salsa NPC, rarity borders, combo escalation, 3D Ghibli-style cats, sound design, ElevenLabs neural TTS
 
 ---
 
@@ -237,24 +237,80 @@ Moods: happy, neutral, sleepy, excited, sad, teaching, encouraging, curious
 #### Evolution Stages
 baby → teen → adult → master, with XP thresholds. Each stage unlocks accessories and abilities.
 
-### Current: 3D Cat System (Phase 10 — react-three-fiber)
+### Current: 3D Cat System — Ghibli Style (Phase 10 + Phase 11 polish)
 
-The 3D cat system uses react-three-fiber v8 + @react-three/drei for native 3D rendering:
+The 3D cat system uses react-three-fiber v8 + @react-three/drei for native 3D rendering with **Studio Ghibli-inspired cel-shaded aesthetics**.
 
 #### Architecture
-- **`CatAvatar3D.tsx`** — Wraps R3F Canvas with SVG CatAvatar fallback when expo-gl unavailable
+- **`Cat3DCanvas.tsx`** — Wraps R3F Canvas with SVG CatAvatar fallback when expo-gl unavailable. Warm Ghibli-style lighting: hemisphere light (sky #FFE4C4, ground #8B7355) + directional sun + rim light.
+- **`CatModel3D.tsx`** — GLB scene loader with material color overrides. Handles 3 mesh naming conventions: `Mat_` prefix (salsa-cat), no-prefix (chonky-cat), no-materials (slim/round-cat with bone-weight fallback).
+- **`ghibliMaterials.ts`** — Applies `MeshToonMaterial` (cel-shaded) with custom 3-step gradient ramp (`DataTexture` with 4 pixels: 80/140/210/255). Warm pastel palette shift for Ghibli aesthetic. Eye glossiness via separate `MeshStandardMaterial`.
+- **`splitMeshByBones.ts`** — For models without named materials: splits single mesh by bone weights into body/head/ears/eyes/tail/belly submeshes, enabling per-part toon material coloring.
+- **`cat3DConfig.ts`** — Per-cat color mapping (body, belly, earInner, eyeIris, nose, blush colors) for 13 cats + Salsa NPC.
 - **4 GLB body types**: `salsa-cat.glb` (standard), `slim-cat.glb`, `round-cat.glb`, `chonky-cat.glb`
-- **Material color overrides**: Per-cat body/ear/eye/nose colors applied at runtime
 - **`CatAccessories3D.tsx`** — Programmatic Three.js geometry for 30+ evolution accessories
 - **Evolution glow**: pointLight + aura sphere for adult/master stages
-- **Performance**: ONE 3D canvas per screen max, 30fps target
+- **Performance**: ONE 3D canvas per screen max, 30fps target. All reusable components (SalsaCoach, MascotBubble, ExerciseBuddy) always use `forceSVG`.
+
+#### Ghibli Material Config
+```typescript
+// 3-step toon gradient ramp (cel-shading bands)
+const gradientPixels = new Uint8Array([80, 140, 210, 255]);
+const gradientMap = new THREE.DataTexture(gradientPixels, 4, 1, THREE.RedFormat);
+gradientMap.minFilter = THREE.NearestFilter;
+gradientMap.magFilter = THREE.NearestFilter;
+
+// Applied to each mesh:
+new THREE.MeshToonMaterial({
+  color: partColor,
+  gradientMap,
+  emissive: warmShift,  // Subtle warm pastel shift
+  emissiveIntensity: 0.05,
+});
+```
 
 #### Fallback
 SVG composable system (`KeysieSvg.tsx`) used when `forceSVG=true` or WebGL unavailable.
 
 ---
 
-## 5. Known Patterns & Gotchas
+## 5. Voice System (Per-Cat Neural TTS)
+
+### Architecture
+Two-tier TTS pipeline: **ElevenLabs** (primary, neural quality) → **expo-speech** (fallback, device Siri voices).
+
+- **`ElevenLabsProvider.ts`** — REST API client using `eleven_turbo_v2_5` model (~150ms TTFB). Fetches mp3, converts to base64, writes to `FileSystem.cacheDirectory`, plays via expo-av `Audio.Sound`.
+- **`catVoiceConfig.ts`** — Maps each cat to an ElevenLabs voice ID + expo-speech fallback settings (pitch, rate, language, iOS voice identifier).
+- **`TTSService.ts`** — Singleton orchestrator. Tries ElevenLabs first; on failure, seamlessly falls back to expo-speech.
+
+### Voice Personality Mapping
+
+| Cat | ElevenLabs Voice | Personality Match | Stability | Style |
+|-----|-----------------|-------------------|-----------|-------|
+| Mini Meowww | Laura | Sunny, quirky enthusiasm | 0.40 | 0.40 |
+| Jazzy | Will | Conversational, laid-back | 0.55 | 0.30 |
+| Luna | Lily | British, velvety warmth | 0.50 | 0.45 |
+| Biscuit | Sarah | Warm, reassuring | 0.45 | 0.35 |
+| Ballymakawww | Charlie | Australian, energetic | 0.38 | 0.45 |
+| Aria | Matilda | Professional alto | 0.42 | 0.50 |
+| Tempo | Liam | Energetic, warm | 0.35 | 0.40 |
+| Shibu | River | Relaxed, neutral | 0.60 | 0.20 |
+| Bella | Alice | British, clear educator | 0.50 | 0.35 |
+| Sable | Callum | Gravelly, mischievous | 0.48 | 0.40 |
+| Coda | Daniel | British, professional | 0.55 | 0.25 |
+| Chonky Monke | Harry | Animated, energetic | 0.30 | 0.55 |
+| **Salsa (NPC)** | Jessica | Playful, trendy | 0.40 | 0.45 |
+
+**Parameter guidelines:** Lower stability (0.30-0.40) = more expressive character. Higher stability (0.55-0.60) = calmer, measured delivery. Style controls exaggeration of voice characteristics.
+
+### Caching Strategy
+- Cache key: `hash(voiceId + text)` → `elevenlabs-tts/{hash}.mp3`
+- Cache location: `FileSystem.cacheDirectory` (auto-cleaned by OS)
+- Repeat phrases serve instantly from cache (no API call)
+
+---
+
+## 6. Known Patterns & Gotchas
 
 ### textShadowColor + Reanimated
 **Do NOT animate `textShadowColor`, `textShadowOffset`, or `textShadowRadius` inside `useAnimatedStyle`.** Reanimated does not support text shadow animation properties. This was discovered on the AuthScreen where animated text shadows caused a runtime error.

@@ -19,7 +19,7 @@ import Animated, {
 // (e.g. in Jest tests). Default to "focused" when navigation is unavailable.
 let _useIsFocused: () => boolean;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+   
   _useIsFocused = require('@react-navigation/native').useIsFocused;
 } catch {
   _useIsFocused = () => true;

@@ -1,8 +1,8 @@
 # Purrrfect Keys -- System Design, DevOps, AIOps & Scalability Analysis
 
-**Date:** February 28, 2026 (updated)
+**Date:** March 2, 2026 (updated)
 **Scope:** Production readiness assessment for App Store / Play Store launch
-**Codebase snapshot:** 121 test suites, 2,620 tests, 0 TypeScript errors, Expo SDK 52, Firebase 12.9, Gemini 2.0 Flash
+**Codebase snapshot:** 121 test suites, 2,591 tests, 0 TypeScript errors, Expo SDK 52, Firebase 12.9, Gemini 2.0 Flash
 **Companion doc:** See `docs/MANUAL-VERIFICATION-CHECKLIST.md` for the hands-on runbook
 
 ---
@@ -22,7 +22,7 @@
 
 The decision to never process audio buffers in JavaScript is sound. The `ExpoAudioEngine` uses `replayAsync()` for atomic stop+play and pre-loads 50 sound objects (25 notes x 2 voices).
 
-**Graceful degradation is baked in.** The `createAudioEngine()` factory tries WebAudioEngine (JSI) first, falls back to ExpoAudioEngine. `InputManager` auto-detects MIDI > Mic > Touch. `GeminiCoach.getFeedback()` falls back to 50+ offline coaching templates. Auth falls back to a local guest user.
+**Graceful degradation is baked in.** The `createAudioEngine()` factory tries WebAudioEngine (JSI) first, falls back to ExpoAudioEngine. `InputManager` auto-detects MIDI > Mic > Touch. `GeminiCoach.getFeedback()` falls back to 50+ offline coaching templates. Auth falls back to a local guest user. TTS uses ElevenLabs neural voices (primary), falling back to expo-speech when API key is missing or network fails.
 
 **AI integration is well-bounded.** Gemini calls happen only for coaching feedback (post-exercise) and exercise generation (pre-session), never in the real-time audio loop. The AI is an enhancement layer, not a dependency.
 
@@ -38,7 +38,7 @@ The decision to never process audio buffers in JavaScript is sound. The `ExpoAud
 
 **AsyncStorage as persistence layer.** The persistence layer uses AsyncStorage, which is JSON-serialized and async. At launch scale, startup hydration of 10+ stores from AsyncStorage will add measurable time to cold start. Switch to MMKV for 30x faster reads.
 
-**`deleteUserData` does not delete subcollections.** The function only deletes the `users/{uid}` document. Progress, gamification, syncLog, xpLog, songMastery, and songRequests subcollections will be orphaned on account deletion — a GDPR compliance gap.
+**~~`deleteUserData` does not delete subcollections.~~** **RESOLVED (Feb 28).** Cloud Function `deleteUserData` now handles GDPR-compliant deletion: 9 subcollections, friend codes, league membership, challenges (bidirectional), friend list cleanup, root user document. Client-side fallback `deleteUserDataClientSide()` mirrors the Cloud Function logic. 10 unit tests cover both paths.
 
 **Single Firebase region.** Config is hardcoded to `us-central1`. Users in Europe or Asia will experience 100-300ms additional latency.
 
@@ -88,6 +88,7 @@ The current design is already strong. Gaps to address:
 | Firestore | Sync silently fails, retries | Add offline banner; increase queue limit |
 | Gemini (coaching) | Falls back to offline templates | Already solid |
 | Gemini (generation) | Returns null, static exercises used | Add monitoring |
+| ElevenLabs TTS | Falls back to expo-speech | Already solid |
 | PostHog | `initialized` check prevents crashes | Already solid |
 | ONNX Runtime | Falls back to YIN monophonic | Already solid |
 | Network (complete) | Full app works offline | Add UI indicator |
@@ -125,7 +126,7 @@ The current design is already strong. Gaps to address:
 | `firebase` (v12.9) | ~400KB gzipped | Use modular imports (already done) |
 | `onnxruntime-react-native` | ~5MB native | Lazy-load when polyphonic mode selected |
 | `abcjs` | ~200KB | Lazy-load in SongPlayerScreen |
-| `react-three-fiber` (planned) | ~1.3MB | Lazy-load; download models from CDN |
+| `@react-three/fiber` (v8, installed) | ~1.3MB | Lazy-load; download models from CDN |
 
 ---
 
@@ -149,7 +150,20 @@ The current design is already strong. Gaps to address:
 
 With optimizations (pre-generation, global cache, batching): 50-60% reduction.
 
-### 4.3 Cost Control Guardrails
+### 4.3 ElevenLabs TTS Costs
+
+**Status: Integrated (Mar 2).** Two-tier pipeline: ElevenLabs `eleven_turbo_v2_5` (primary) → expo-speech (fallback). 13 unique per-cat voices with file-based caching.
+
+| Plan | Characters/Month | Monthly Cost | Approx. TTS Calls |
+|------|----------------|--------------|--------------------|
+| Free | 10,000 | $0 | ~100 coaching messages |
+| Starter | 30,000 | $5 | ~300 coaching messages |
+| Creator | 100,000 | $22 | ~1,000 coaching messages |
+| Pro | 500,000 | $99 | ~5,000 coaching messages |
+
+**Cost optimization:** File-based caching eliminates repeat calls for identical text+voice. Coaching feedback (2-3 sentences, ~100 chars) × 10 daily sessions = ~1,000 chars/day per active user. At 3K DAU: ~3M chars/month → Creator plan ($22/month) covers it. The expo-speech fallback is free and provides graceful degradation if quota is exceeded.
+
+### 4.4 Cost Control Guardrails
 
 1. Set Firebase budget alerts at $50, $100, $500/month
 2. Set Gemini API quota to 1,000 RPM
@@ -210,8 +224,9 @@ Separate Firebase projects for dev/staging/prod.
 | `ai_coaching_enabled` | Kill switch for Gemini coaching | ON |
 | `ai_generation_enabled` | Kill switch for Gemini generation | ON |
 | `polyphonic_detection` | ONNX model for chord detection | OFF |
-| `social_features` | Friends, leagues, challenges | OFF |
-| `3d_cat_avatars` | Three.js cat rendering | OFF |
+| `social_features` | Friends, leagues, challenges | ON (implemented) |
+| `3d_cat_avatars` | Three.js cat rendering | ON (implemented) |
+| `elevenlabs_tts` | Neural TTS voices (vs expo-speech) | ON |
 
 ### 6.4 Monitoring Stack
 
@@ -312,18 +327,18 @@ Cost: ~$0.02/month at 100K users.
 
 ### P0: Must-Do Before Launch (7-10 days)
 
-| # | Item | Effort |
-|---|------|--------|
-| 1 | Move Gemini API calls to Cloud Functions | 2-3 days |
-| 2 | Add missing Firestore security rules (songs, songMastery) | 1 hour |
-| 3 | Add composite Firestore indexes | 30 min |
-| 4 | Implement full account deletion (recursive subcollection delete) | 1 day |
-| 5 | Create privacy policy | 1 day |
-| 6 | Integrate Crashlytics | 2 hours |
-| 7 | Set up CI/CD (GitHub Actions + EAS Build) | 1 day |
-| 8 | Enable Firebase App Check | 2 hours |
-| 9 | Set Firebase budget alerts | 15 min |
-| 10 | Fix gamification security rules (wildcard too broad) | 30 min |
+| # | Item | Effort | Status |
+|---|------|--------|--------|
+| 1 | Move Gemini API calls to Cloud Functions | 2-3 days | **CODE DONE** (4 functions written, needs deployment) |
+| 2 | Add missing Firestore security rules (songs, songMastery) | 1 hour | TODO |
+| 3 | Add composite Firestore indexes | 30 min | TODO |
+| 4 | Implement full account deletion (recursive subcollection delete) | 1 day | **DONE** (Cloud Function + client fallback + 10 tests) |
+| 5 | Create privacy policy | 1 day | TODO |
+| 6 | Integrate Crashlytics | 2 hours | TODO |
+| 7 | Set up CI/CD (GitHub Actions + EAS Build) | 1 day | **DONE** (ci.yml + build.yml) |
+| 8 | Enable Firebase App Check | 2 hours | TODO |
+| 9 | Set Firebase budget alerts | 15 min | TODO |
+| 10 | Fix gamification security rules (wildcard too broad) | 30 min | TODO |
 
 ### P1: Do Within First Month After Launch
 
@@ -359,10 +374,15 @@ Cost: ~$0.02/month at 100K users.
 
 ## Summary
 
-The Purrrfect Keys codebase is architecturally sound for a pre-launch app. The offline-first design, clean separation between core logic and UI, well-specified audio latency budgets, and comprehensive test coverage (2,620 tests) are significant strengths.
+The Purrrfect Keys codebase is architecturally sound for a pre-launch app. The offline-first design, clean separation between core logic and UI, well-specified audio latency budgets, and comprehensive test coverage (2,591 tests) are significant strengths.
 
-The most critical issue is the **client-side Gemini API key exposure** — must be resolved before public release. The **missing Firestore security rules** and **missing composite indexes** are hard blockers for production.
+**Completed since initial assessment (Feb 28 → Mar 2):**
+- Account deletion: GDPR-compliant Cloud Function + client-side fallback (P0 #4 → DONE)
+- CI/CD: GitHub Actions workflows for typecheck+lint+test and EAS Build (P0 #7 → DONE)
+- Cloud Functions: 4 functions written for Gemini API security (P0 #1 → CODE DONE, needs deployment)
+- ElevenLabs TTS: Neural per-cat voices with expo-speech fallback (new capability)
+- 3D Ghibli rendering: Toon materials, bone-weight mesh splitting, warm lighting (new capability)
 
-Firebase costs are projected to be very manageable: ~$25/month at 10K MAU, ~$250/month at 100K MAU, ~$2,500/month at 1M MAU. AI optimizations can reduce Gemini costs by 50-60%.
+**Remaining critical items:** The **client-side Gemini API key** (Cloud Functions are written but need deployment), **missing Firestore security rules**, and **missing composite indexes** are the top blockers.
 
-Addressing the 10 P0 items (7-10 engineering days) should be the immediate focus before the QA sprint in Phase 11.
+Firebase costs are projected to be very manageable: ~$25/month at 10K MAU, ~$250/month at 100K MAU, ~$2,500/month at 1M MAU. ElevenLabs TTS adds ~$22/month at scale (Creator plan). AI optimizations can reduce Gemini costs by 50-60%.

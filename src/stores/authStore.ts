@@ -27,7 +27,7 @@ import {
   OAuthProvider,
 } from 'firebase/auth';
 import type { User, AuthCredential } from 'firebase/auth';
-import { auth } from '../services/firebase/config';
+import { auth, firebaseAvailable } from '../services/firebase/config';
 import { createUserProfile, getUserProfile, updateUserProfile, deleteUserData } from '../services/firebase/firestore';
 import { PersistenceManager, cancelAllPendingSaves } from './persistence';
 import { useProgressStore } from './progressStore';
@@ -265,6 +265,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initAuth: async () => {
     set({ isLoading: true, isInitializing: true, error: null });
 
+    // If Firebase API keys are missing (standalone build without EAS secrets),
+    // skip Firebase auth and enter offline guest mode.
+    if (!firebaseAvailable) {
+      console.warn('[Auth] Firebase API keys missing — entering offline guest mode');
+      set({
+        user: null,
+        isAuthenticated: false,
+        isAnonymous: false,
+        isLoading: false,
+        isInitializing: false,
+        error: null,
+      });
+      return;
+    }
+
     // Unsubscribe previous listener to prevent duplicates
     if (authUnsubscribe) {
       authUnsubscribe();
@@ -289,6 +304,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signInAnonymously: async () => {
     console.log('[Auth] signInAnonymously started');
     set({ isLoading: true, error: null });
+
+    if (!firebaseAvailable) {
+      console.warn('[Auth] Firebase not available — using local guest mode');
+      const guestUser = createLocalGuestUser();
+      set({ user: guestUser as any, isAuthenticated: true, isAnonymous: true, isLoading: false, error: null });
+      return;
+    }
 
     try {
       const result = await firebaseSignInAnonymously(auth);
@@ -593,11 +615,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await deleteUser(user);
       authUserDeleted = true;
 
-      // 3. Local cleanup
-      cancelAllPendingSaves();
-      await PersistenceManager.clearAll();
-      resetAllStores();
-
+      // 3. Local cleanup — set auth state FIRST so navigation switches
+      //    away from deep screens before stores are reset (prevents
+      //    components from re-rendering with empty store data).
       set({
         user: null,
         isAuthenticated: false,
@@ -605,6 +625,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isLoading: false,
         error: null,
       });
+
+      cancelAllPendingSaves();
+      await PersistenceManager.clearAll();
+      resetAllStores();
     } catch (error) {
       const firebaseError = error as { code?: string };
       if (firebaseError.code === 'auth/requires-recent-login') {
@@ -613,11 +637,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       if (authUserDeleted) {
-        // Auth user is gone but cleanup threw — force-clear state
-        console.warn('[Auth] Post-delete cleanup failed, forcing state clear:', error);
-        cancelAllPendingSaves();
-        await PersistenceManager.clearAll().catch(() => {});
-        resetAllStores();
+        // Auth user is gone but cleanup threw — force-clear state.
+        // Set auth state FIRST so navigation switches away from deep screens.
         set({
           user: null,
           isAuthenticated: false,
@@ -625,6 +646,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isLoading: false,
           error: null,
         });
+        console.warn('[Auth] Post-delete cleanup failed, forcing state clear:', error);
+        cancelAllPendingSaves();
+        await PersistenceManager.clearAll().catch(() => {});
+        resetAllStores();
         return;
       }
 
@@ -658,10 +683,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await deleteUser(user);
       authUserDeleted = true;
 
-      cancelAllPendingSaves();
-      await PersistenceManager.clearAll();
-      resetAllStores();
-
+      // Set auth state FIRST so navigation switches away from deep screens
+      // before stores are reset (prevents stale component renders).
       set({
         user: null,
         isAuthenticated: false,
@@ -669,12 +692,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isLoading: false,
         error: null,
       });
+
+      cancelAllPendingSaves();
+      await PersistenceManager.clearAll();
+      resetAllStores();
     } catch (error) {
       if (authUserDeleted) {
-        console.warn('[Auth] Post-delete cleanup failed, forcing state clear:', error);
-        cancelAllPendingSaves();
-        await PersistenceManager.clearAll().catch(() => {});
-        resetAllStores();
+        // Set auth state FIRST so navigation switches away from deep screens.
         set({
           user: null,
           isAuthenticated: false,
@@ -682,6 +706,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isLoading: false,
           error: null,
         });
+        console.warn('[Auth] Post-delete cleanup failed, forcing state clear:', error);
+        cancelAllPendingSaves();
+        await PersistenceManager.clearAll().catch(() => {});
+        resetAllStores();
         return;
       }
 

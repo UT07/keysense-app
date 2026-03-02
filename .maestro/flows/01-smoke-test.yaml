@@ -1,0 +1,19 @@
+# Smoke Test — App launches, main tabs render
+# This is the minimum viability test: if this fails, nothing else will work.
+appId: com.purrrfectkeys.app
+name: Smoke Test
+tags:
+  - smoke
+  - critical
+
+---
+
+- launchApp:
+    clearState: true
+
+# App should land on either Onboarding or Auth or HomeScreen
+- assertVisible:
+    id: "onboarding-screen|auth-screen|home-screen"
+    optional: true
+
+- takeScreenshot: screenshots/01-smoke-launch

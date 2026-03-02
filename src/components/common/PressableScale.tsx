@@ -16,7 +16,7 @@ import { soundManager } from '../../audio/SoundManager';
 
 let Haptics: typeof import('expo-haptics') | null = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+   
   Haptics = require('expo-haptics');
 } catch {
   Haptics = null;

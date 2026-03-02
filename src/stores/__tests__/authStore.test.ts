@@ -36,6 +36,7 @@ jest.mock('firebase/auth', () => ({
 jest.mock('../../services/firebase/config', () => ({
   auth: { currentUser: null },
   db: {},
+  firebaseAvailable: true,
 }));
 
 jest.mock('../../services/firebase/firestore', () => ({

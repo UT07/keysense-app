@@ -330,7 +330,7 @@ function BuyModal({ visible, cat, gems, onConfirm, onCancel }: {
 // Cat Card — full gallery card
 // ───────────────────────────────────────────────────────
 
-function CatCard({ cat, isSelected, isOwned, evolutionXp, stage, unlockedAbilities, onSelect, onBuy, index }: {
+function CatCard({ cat, isSelected, isOwned, evolutionXp, stage, unlockedAbilities, onSelect, onBuy, index, isFocused }: {
   cat: CatCharacter;
   isSelected: boolean;
   isOwned: boolean;
@@ -340,6 +340,8 @@ function CatCard({ cat, isSelected, isOwned, evolutionXp, stage, unlockedAbiliti
   onSelect: (id: string) => void;
   onBuy: (cat: CatCharacter) => void;
   index: number;
+  /** Whether this card is the currently centered/visible one — only the focused card renders 3D */
+  isFocused: boolean;
 }): React.ReactElement {
   const [showBurst, setShowBurst] = useState(false);
   const [expandedAbility, setExpandedAbility] = useState<CatAbility | null>(null);
@@ -404,7 +406,7 @@ function CatCard({ cat, isSelected, isOwned, evolutionXp, stage, unlockedAbiliti
         style={StyleSheet.absoluteFill}
       />
 
-      {/* Character showcase area — 3D for owned, dimmed SVG for locked */}
+      {/* Character showcase area — 3D for the focused owned cat, SVG for all others */}
       <View style={styles.showcaseArea}>
         {isOwned ? (
           <View style={styles.characterDisplay}>
@@ -414,7 +416,7 @@ function CatCard({ cat, isSelected, isOwned, evolutionXp, stage, unlockedAbiliti
               size={140}
               pose={isSelected ? 'celebrate' : 'idle'}
               evolutionStage={stage}
-              forceSVG
+              forceSVG={!isFocused}
             />
           </View>
         ) : (
@@ -654,9 +656,10 @@ export function CatSwitchScreen(): React.ReactElement {
         onSelect={handleSelect}
         onBuy={handleBuy}
         index={index}
+        isFocused={index === currentIndex}
       />
     );
-  }, [selectedCatId, ownedCats, evolutionData, handleSelect, handleBuy]);
+  }, [selectedCatId, ownedCats, evolutionData, handleSelect, handleBuy, currentIndex]);
 
   const keyExtractor = useCallback((item: CatCharacter) => item.id, []);
 

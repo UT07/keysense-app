@@ -256,9 +256,25 @@ const CAT_3D_CONFIGS: Record<string, Cat3DConfig> = {
   },
 };
 
-/** Get 3D config for a cat by ID, falling back to Salsa's config */
+/** Get 3D config for a cat by ID, falling back to Salsa's config.
+ *  Validates that the resolved body type has a corresponding MODEL_PATHS entry
+ *  to prevent error loops if a GLB model is missing. Falls through body types
+ *  until a valid one is found, ultimately defaulting to 'standard' (salsa-cat.glb).
+ */
 export function getCat3DConfig(catId: string): Cat3DConfig {
-  return CAT_3D_CONFIGS[catId] ?? CAT_3D_CONFIGS['salsa'];
+  const config = CAT_3D_CONFIGS[catId] ?? CAT_3D_CONFIGS['salsa'];
+
+  // BUG-7: Validate the body type has a loadable model path.
+  // If the resolved body type's GLB failed to require() (would be undefined/0),
+  // fall back to 'standard' which maps to salsa-cat.glb.
+  if (!MODEL_PATHS[config.bodyType]) {
+    console.warn(
+      `[cat3DConfig] No model for bodyType '${config.bodyType}' (cat: ${catId}), falling back to 'standard'`
+    );
+    return { ...config, bodyType: 'standard' };
+  }
+
+  return config;
 }
 
 /** Get all cat IDs that have 3D configs */

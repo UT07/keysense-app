@@ -178,17 +178,18 @@ export function useExercisePlayback({
     const initInput = async () => {
       try {
         // Initialize InputManager which handles MIDI + Mic detection.
-        // Wrap in a 3s safety timeout so that if mic permission dialog or
-        // native module hangs, the exercise still loads with touch fallback.
+        // Timeout must be long enough for the iOS mic permission dialog (user
+        // interaction) + native AudioRecorder creation. 15s is generous but
+        // prevents permanent hang if a native module is broken.
         const manager = new InputManager({ preferred: resolvedInputMethod });
         const initPromise = manager.initialize();
         const timeoutPromise = new Promise<'timeout'>((resolve) =>
-          setTimeout(() => resolve('timeout'), 3000),
+          setTimeout(() => resolve('timeout'), 15000),
         );
         const result = await Promise.race([initPromise, timeoutPromise]);
 
         if (result === 'timeout') {
-          console.warn('[useExercisePlayback] Input init timed out (3s) — falling back to touch');
+          console.warn('[useExercisePlayback] Input init timed out (15s) — falling back to touch');
         }
 
         if (mounted) {
@@ -283,7 +284,8 @@ export function useExercisePlayback({
         audioEngine.releaseAllNotes();
       }
     };
-  }, [enableAudio, audioEngine]);
+     
+  }, [enableAudio, audioEngine, resolvedInputMethod]);
 
   /**
    * Subscribe to input events (MIDI + Mic via InputManager)
@@ -377,7 +379,11 @@ export function useExercisePlayback({
     // at 60 BPM after the last note ended. Half a beat is enough for the user to
     // register the last note's completion visually before the modal appears.
     const exerciseDuration = lastNoteBeat + 0.5;
-    const totalExpectedNotes = exercise.notes.filter((n) => !n.optional).length;
+    const requiredNotes = exercise.notes.filter((n) => !n.optional);
+    const totalExpectedNotes = requiredNotes.length;
+    // Set of expected MIDI pitches — used to filter wrong-pitch notes from the
+    // early-completion count so random key mashing doesn't end the exercise early.
+    const expectedPitchSet = new Set(requiredNotes.map((n) => n.note));
     const loopEnabled = exercise.settings.loopEnabled ?? false;
 
     playbackIntervalRef.current = setInterval(() => {
@@ -414,12 +420,16 @@ export function useExercisePlayback({
         useExerciseStore.getState().setCurrentBeat(beat);
       }
 
-      // Early completion: if the user has played at least as many notes as the
-      // exercise requires AND we've passed the last note's start beat, complete
-      // immediately instead of waiting for the full duration timeout.
-      const playedCount = playedNotesRef.current.length;
+      // Early completion: if the user has played at least as many pitch-matched
+      // notes as the exercise requires AND we've passed the last note's start
+      // beat, complete immediately instead of waiting for the duration timeout.
+      // Only count notes whose MIDI pitch matches an expected note — wrong-pitch
+      // notes should NOT inflate the count and trigger premature completion.
+      const playedMatchCount = playedNotesRef.current.filter(
+        (n) => expectedPitchSet.has(n.note),
+      ).length;
       const earlyComplete =
-        playedCount >= totalExpectedNotes && beat >= lastNoteBeat;
+        playedMatchCount >= totalExpectedNotes && beat >= lastNoteBeat;
 
       // Check for completion (use ref to avoid stale closure)
       if (earlyComplete || beat > exerciseDuration) {
@@ -449,7 +459,7 @@ export function useExercisePlayback({
     // Including exerciseStore would cause the interval to be torn down and
     // recreated on every store update (e.g. addPlayedNote from mic input),
     // effectively freezing the beat counter.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [isPlaying, exercise]);
 
   /**
@@ -681,7 +691,7 @@ export function useExercisePlayback({
       exerciseStore.addPlayedNote(midiEvent);
     },
     // isPlaying omitted — we use isPlayingRef.current inside the callback
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     [enableAudio, isAudioReady, audioEngine, exerciseStore, trackNoteOnIndex]
   );
 
@@ -703,7 +713,7 @@ export function useExercisePlayback({
       }
     },
     // isPlaying omitted — we use isPlayingRef.current inside the callback
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     [enableAudio, isAudioReady, audioEngine, closeLatestNoteDuration]
   );
 

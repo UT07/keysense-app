@@ -154,7 +154,7 @@ export class InputManager {
               latencyCompensationMs: this.config.micLatencyCompensationMs ?? 0,
               mode: detectionMode,
             }),
-            4000,
+            10000,
             null,
             'createMicrophoneInput',
           );
@@ -300,7 +300,7 @@ export class InputManager {
               latencyCompensationMs: this.config.micLatencyCompensationMs ?? 0,
               mode: detectionMode,
             }),
-            4000,
+            10000,
             null,
             'switchMethod:createMicrophoneInput',
           );
@@ -321,7 +321,7 @@ export class InputManager {
     } else if (method === 'touch') {
       this._activeMethod = 'touch';
     } else {
-      // 'auto' — re-run detection
+      // 'auto' — re-run detection (MIDI > Mic > Touch)
       const midiAvailable = this.midiInput.isReady() &&
         (await this.midiInput.getConnectedDevices()).length > 0;
       if (midiAvailable) {
@@ -329,7 +329,35 @@ export class InputManager {
       } else if (this.micInput) {
         this._activeMethod = 'mic';
       } else {
-        this._activeMethod = 'touch';
+        // Try to init mic if permission is already granted
+        const micPermitted = await withTimeout(
+          checkMicrophonePermission(), 2000, false, 'switchMethod:checkMicPermission',
+        );
+        if (micPermitted) {
+          try {
+            configureAudioSessionForRecording();
+            const detectionMode = useSettingsStore.getState().micDetectionMode ?? 'monophonic';
+            this.micInput = await withTimeout(
+              createMicrophoneInput({
+                defaultVelocity: this.config.micDefaultVelocity ?? 80,
+                latencyCompensationMs: this.config.micLatencyCompensationMs ?? 0,
+                mode: detectionMode,
+              }),
+              10000,
+              null,
+              'switchMethod:auto:createMicrophoneInput',
+            );
+            if (this.micInput) {
+              this._activeMethod = 'mic';
+            } else {
+              this._activeMethod = 'touch';
+            }
+          } catch {
+            this._activeMethod = 'touch';
+          }
+        } else {
+          this._activeMethod = 'touch';
+        }
       }
     }
 

@@ -27,11 +27,22 @@ import { PersistenceManager } from '../persistence';
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Get current week's Monday as ISO date (matches leagueStore.getCurrentWeekMonday) */
+function getCurrentWeekMonday(): string {
+  const now = new Date();
+  const utcDay = now.getUTCDay();
+  const daysFromMonday = utcDay === 0 ? 6 : utcDay - 1;
+  const monday = new Date(now);
+  monday.setUTCDate(now.getUTCDate() - daysFromMonday);
+  monday.setUTCHours(0, 0, 0, 0);
+  return monday.toISOString().split('T')[0];
+}
+
 function makeMembership(overrides: Partial<LeagueMembership> = {}): LeagueMembership {
   return {
     leagueId: 'league-abc',
     tier: 'bronze',
-    weekStart: '2026-02-23',
+    weekStart: getCurrentWeekMonday(),
     weeklyXp: 0,
     rank: 1,
     totalMembers: 10,

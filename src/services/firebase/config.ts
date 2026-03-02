@@ -4,6 +4,11 @@
  *
  * Auth uses initializeAuth with getReactNativePersistence(AsyncStorage) so that
  * the user session persists across app restarts (remember device).
+ *
+ * If Firebase API keys are missing (e.g. standalone build without EAS secrets),
+ * Firebase is initialized with placeholder values. It won't crash at startup,
+ * but all auth/Firestore operations will fail — caught by existing try/catch
+ * handlers in authStore (which falls back to local guest mode).
  */
 
 import { initializeApp } from 'firebase/app';
@@ -16,11 +21,26 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Firebase Config
 // ============================================================================
 
+/** True when real API keys are present (Metro dev server or EAS secrets). */
+export const firebaseAvailable = Boolean(
+  process.env.EXPO_PUBLIC_FIREBASE_API_KEY && process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+);
+
+if (!firebaseAvailable) {
+  console.warn(
+    '[Firebase] API keys missing — auth and cloud features unavailable. ' +
+    'Set EXPO_PUBLIC_FIREBASE_* env vars or EAS secrets.',
+  );
+}
+
+// Use real values when available, otherwise placeholders that let initializeApp()
+// succeed without a module-load crash. Operations will fail at call time with
+// errors caught by existing try/catch handlers.
 export const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? 'placeholder-api-key',
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ?? 'placeholder-project',
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID ?? '1:000:ios:placeholder',
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ?? 'placeholder.firebaseapp.com',
   databaseURL: process.env.EXPO_PUBLIC_FIREBASE_DATABASE_URL,
   storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,

@@ -18,6 +18,13 @@ import { getCat3DConfig, getAnimationName, MODEL_PATHS } from './cat3DConfig';
 import { getAccessoryProps } from './cat3DConfig';
 import type { Cat3DMaterials, Cat3DConfig } from './cat3DConfig';
 import { CatAccessories3D } from './CatAccessories3D';
+import {
+  createToonMaterial,
+  createBlushMaterial,
+  createHiddenMaterial,
+  createOutlineMaterial,
+} from './ghibliMaterials';
+import { splitMeshByBones } from './splitMeshByBones';
 
 // ────────────────────────────────────────────────
 // Asset resolution cache: Metro asset ID → file:// URI
@@ -46,11 +53,6 @@ interface CatModel3DProps {
   evolutionStage?: EvolutionStage;
   /** User-equipped accessory render names (from settingsStore via getEquippedRenderNames) */
   equippedRenderNames?: string[];
-}
-
-/** Convert hex color string to Three.js Color */
-function hexToColor(hex: string): THREE.Color {
-  return new THREE.Color(hex);
 }
 
 /**
@@ -84,7 +86,15 @@ const BLUSH_MATERIAL_NAMES = new Set([
   'Mat_Blush', 'Blush_L', 'Blush_R',
 ]);
 
-/** Apply per-cat colors to the loaded GLTF scene */
+/**
+ * Apply per-cat Ghibli toon materials to a GLTF scene clone.
+ *
+ * Material matching strategy (tries in order):
+ *   1. Match by material.name using MATERIAL_NAME_MAP → toon materials (salsa-cat, chonky-cat)
+ *   2. Split by bone weights → toon materials (slim-cat, round-cat with no named materials)
+ *
+ * Also adds outline meshes for the anime ink-line look.
+ */
 function applyMaterials(scene: THREE.Group, materials: Cat3DMaterials, hasBlush: boolean): void {
   let anyMaterialMatched = false;
 
@@ -103,15 +113,11 @@ function applyMaterials(scene: THREE.Group, materials: Cat3DMaterials, hasBlush:
 
       // Hide blush materials if cat doesn't have blush
       if (BLUSH_MATERIAL_NAMES.has(mat.name) && !hasBlush) {
-        if (mat instanceof THREE.MeshStandardMaterial) {
-          const cloned = mat.clone();
-          cloned.transparent = true;
-          cloned.opacity = 0;
-          if (Array.isArray(node.material)) {
-            node.material[i] = cloned;
-          } else {
-            node.material = cloned;
-          }
+        const hidden = createHiddenMaterial();
+        if (Array.isArray(node.material)) {
+          node.material[i] = hidden;
+        } else {
+          node.material = hidden;
         }
         anyMaterialMatched = true;
         continue;
@@ -120,91 +126,60 @@ function applyMaterials(scene: THREE.Group, materials: Cat3DMaterials, hasBlush:
       const colorHex = materials[materialKey];
       if (!colorHex) continue;
 
-      // Clone material to avoid affecting other instances
-      if (mat instanceof THREE.MeshStandardMaterial) {
-        const cloned = mat.clone();
-        const color = hexToColor(colorHex);
-        cloned.color = color;
+      // Replace with Ghibli toon material
+      const toonMat = materialKey === 'blush'
+        ? createBlushMaterial(colorHex)
+        : createToonMaterial(colorHex, materialKey);
 
-        // Per-part material properties for expressive anime look
-        if (materialKey === 'eye') {
-          // Eyes: bright, wet, glossy with strong catchlight
-          cloned.roughness = 0.05;
-          cloned.metalness = 0.15;
-          cloned.emissive = color;
-          cloned.emissiveIntensity = 0.25;
-        } else if (materialKey === 'nose') {
-          // Nose: wet, shiny
-          cloned.roughness = 0.1;
-          cloned.metalness = 0.25;
-          cloned.emissive = color;
-          cloned.emissiveIntensity = 0.1;
-        } else if (materialKey === 'blush') {
-          // Blush: soft, warm glow
-          cloned.roughness = 0.4;
-          cloned.metalness = 0.0;
-          cloned.emissive = color;
-          cloned.emissiveIntensity = 0.2;
-          cloned.transparent = true;
-          cloned.opacity = 0.7;
-        } else {
-          // Body/belly/earInner: glossy vinyl toy look
-          cloned.roughness = 0.2;
-          cloned.metalness = 0.08;
-          cloned.emissive = color;
-          cloned.emissiveIntensity = 0.08;
-        }
-
-        if (Array.isArray(node.material)) {
-          node.material[i] = cloned;
-        } else {
-          node.material = cloned;
-        }
-        anyMaterialMatched = true;
+      if (Array.isArray(node.material)) {
+        node.material[i] = toonMat;
+      } else {
+        node.material = toonMat;
       }
+      anyMaterialMatched = true;
     }
   });
 
-  // Fallback for models with no named materials (slim-cat, round-cat):
-  // Apply per-part colors based on mesh node names
+  // Fallback for single-mesh models with no named materials (slim-cat, round-cat).
+  // Split geometry into material groups using bone weights, then apply toon materials.
   if (!anyMaterialMatched) {
-    const bodyColor = hexToColor(materials.body);
-    const bellyColor = hexToColor(materials.belly);
-    const eyeColor = hexToColor(materials.eye);
-    const noseColor = materials.nose ? hexToColor(materials.nose) : bodyColor;
-
     scene.traverse((node) => {
       if (!(node instanceof THREE.Mesh)) return;
 
-      const name = node.name.toLowerCase();
-      let color = bodyColor;
-      let roughness = 0.2;
-      let metalness = 0.08;
-      let emissiveIntensity = 0.08;
-
-      if (name.includes('eye') || name.includes('iris')) {
-        color = eyeColor;
-        roughness = 0.05;
-        metalness = 0.15;
-        emissiveIntensity = 0.25;
-      } else if (name.includes('nose')) {
-        color = noseColor;
-        roughness = 0.1;
-        metalness = 0.25;
-        emissiveIntensity = 0.1;
-      } else if (name.includes('belly') || name.includes('chest')) {
-        color = bellyColor;
+      const toonMaterials = splitMeshByBones(node, materials, hasBlush);
+      if (toonMaterials) {
+        node.material = toonMaterials;
+      } else {
+        // Ultimate fallback: single toon material
+        node.material = createToonMaterial(materials.body, 'body');
       }
-
-      const newMat = new THREE.MeshStandardMaterial({
-        color,
-        roughness,
-        metalness,
-        emissive: color,
-        emissiveIntensity,
-      });
-      node.material = newMat;
     });
+  }
+}
+
+/**
+ * Add outline meshes (inverted hull method) for Ghibli ink-line look.
+ * Creates a duplicate mesh rendered with BackSide in dark color, slightly scaled up.
+ */
+function addOutlineMeshes(scene: THREE.Group, accentColor: string): void {
+  const outlineMat = createOutlineMaterial(accentColor);
+  const meshesToOutline: THREE.Mesh[] = [];
+
+  scene.traverse((node) => {
+    if (node instanceof THREE.Mesh) {
+      meshesToOutline.push(node);
+    }
+  });
+
+  for (const mesh of meshesToOutline) {
+    const outlineMesh = mesh.clone();
+    outlineMesh.material = outlineMat;
+    // Scale up slightly for outline thickness
+    outlineMesh.scale.multiplyScalar(1.03);
+    outlineMesh.name = `${mesh.name}_outline`;
+    // Render outline behind the main mesh
+    outlineMesh.renderOrder = -1;
+    mesh.parent?.add(outlineMesh);
   }
 }
 
@@ -284,41 +259,90 @@ function CatModel3DInner({
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const gltf = useGLTF(modelUri);
-  const { scene, animations } = gltf;
+  const { scene: originalScene, animations } = gltf;
 
-  // Apply materials to the original scene (clone caused bounding box issues on device).
+  // Clone the scene for this instance so each cat has independent materials.
+  // useGLTF caches by URL — without cloning, all cats with the same bodyType
+  // would share one scene and the last cat's colors would "win".
+  const scene = useMemo(() => {
+    const cloned = originalScene.clone(true);
+    applyMaterials(cloned, config.materials, config.hasBlush);
+    addOutlineMeshes(cloned, config.materials.accent);
+    return cloned;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [originalScene, config.materials.body, config.materials.eye, config.materials.accent, config.hasBlush]);
+
+  // BUG-3 & BUG-4: Dispose cloned scene's geometry AND materials on unmount
+  // or when the scene is re-created. Without this, cloned materials leak GPU memory.
+  useEffect(() => {
+    return () => {
+      scene.traverse((node) => {
+        if (node instanceof THREE.Mesh) {
+          node.geometry?.dispose();
+          const mats = Array.isArray(node.material) ? node.material : [node.material];
+          for (const mat of mats) {
+            mat?.dispose();
+          }
+        }
+      });
+    };
+  }, [scene]);
+
   // Use hardcoded scale — all 4 GLB models are ~5.4 Blender units tall.
   // Camera at z=3.5, FOV 50° sees ~3.26 units. Scale 0.5 → model ~2.7 units → fills view nicely.
-  const MODEL_HEIGHT = 5.4;        // All GLBs are ~5.4 Blender units tall
-  const HARDCODED_SCALE = 0.50;    // Large, prominent cat
-  const HARDCODED_Y_OFFSET = -1.35; // -MODEL_HEIGHT/2 * 0.50 = -1.35 (centers model vertically)
+  const MODEL_HEIGHT = 5.4;
+  const HARDCODED_SCALE = 0.50;
+  const HARDCODED_Y_OFFSET = -1.35;
 
-  useMemo(() => {
-    applyMaterials(scene, config.materials, config.hasBlush);
-    console.log(`[CatModel3D] Rendering with hardcoded scale=${HARDCODED_SCALE}, yOffset=${HARDCODED_Y_OFFSET}`);
-  }, [scene, config.materials, config.hasBlush]);
+  // Set up animation mixer — works on cloned scene because bone names are preserved
+  const { actions, mixer } = useAnimations(animations, groupRef);
 
-  // Set up animation mixer
-  const { actions } = useAnimations(animations, groupRef);
+  // BUG-5: drei's useAnimations calls stopAllAction + uncacheAction on clip change,
+  // but never uncacheRoot on unmount. This retains internal references to the
+  // Three.js group tree. Explicitly uncache the root to allow full GC.
+  useEffect(() => {
+    return () => {
+      mixer.stopAllAction();
+      if (groupRef.current) {
+        mixer.uncacheRoot(groupRef.current);
+      }
+    };
+     
+  }, [mixer]);
 
-  // Play the correct animation for the current pose
+  // Play the correct animation for the current pose.
+  // Animation naming varies across GLB exports:
+  //   salsa-cat:  "Idle", "Celebrate" (no prefix)
+  //   slim-cat:   "Slim_Idle" + "Idle" (both)
+  //   round-cat:  "Round_Idle"
+  //   chonky-cat: "Chonk_Idle"
+  // We try multiple patterns to find a match.
   useEffect(() => {
     const animName = getAnimationName(config.bodyType, pose);
+    const poseCapitalized = pose.charAt(0).toUpperCase() + pose.slice(1);
 
-    // Try exact name first, then fall back to any matching animation
+    // Try in order: Prefix_Pose_Track → Prefix_Pose → Pose (unprefixed)
     let action = actions[animName] ?? null;
 
     if (!action) {
-      // Try without the _Track suffix
       const altName = animName.replace('_Track', '');
       action = actions[altName] ?? null;
     }
 
     if (!action) {
-      // Fall back to idle
+      // Unprefixed name (e.g. "Idle", "Celebrate") — used by salsa-cat
+      action = actions[poseCapitalized] ?? null;
+    }
+
+    if (!action) {
+      // Fall back to idle with the same fallback chain
       const idleName = getAnimationName(config.bodyType, 'idle');
       const keys = Object.keys(actions);
-      action = actions[idleName] ?? (keys.length > 0 ? actions[keys[0]] : null) ?? null;
+      action = actions[idleName]
+        ?? actions[idleName.replace('_Track', '')]
+        ?? actions['Idle']
+        ?? (keys.length > 0 ? actions[keys[0]] : null)
+        ?? null;
     }
 
     if (action) {

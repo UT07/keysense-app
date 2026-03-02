@@ -29,7 +29,7 @@ jest.mock('expo-haptics', () => ({
 }));
 
 // Exercise store state — mutable object that tests can modify via resetStore()
-// eslint-disable-next-line prefer-const
+ 
 let mockExerciseState: Record<string, any> = {};
 
 jest.mock('../../../stores/exerciseStore', () => {

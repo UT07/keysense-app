@@ -23,7 +23,7 @@ import { CatAvatar } from '../CatAvatar';
 // (e.g. in Jest tests or standalone overlays). Default to "focused".
 let _useIsFocused: () => boolean;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+   
   _useIsFocused = require('@react-navigation/native').useIsFocused;
 } catch {
   _useIsFocused = () => true;
@@ -49,11 +49,11 @@ let CatModel3DComponent: any = null;
 let gl3DAvailable = false;
 
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+   
   require('expo-gl');
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+   
   R3FCanvas = require('@react-three/fiber/native').Canvas;
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+   
   CatModel3DComponent = require('./CatModel3D').CatModel3D;
   gl3DAvailable = true;
   console.log('[Cat3DCanvas] 3D rendering available (expo-gl loaded)');
@@ -132,10 +132,10 @@ function LoadingFallback({ size }: { size: number }) {
 const POSE_TO_MOOD: Record<CatPose, MascotMood> = {
   idle: 'happy',
   celebrate: 'celebrating',
-  teach: 'encouraging',
-  sleep: 'teaching',
+  teach: 'teaching',
+  sleep: 'happy',
   play: 'excited',
-  sad: 'teaching',
+  sad: 'encouraging',
   curious: 'encouraging',
 };
 
@@ -263,18 +263,22 @@ export const Cat3DCanvas = React.memo(function Cat3DCanvas({
             }}
             style={styles.canvas}
           >
-            {/* Strong ambient fill so dark models are always visible */}
-            <ambientLight intensity={2.0} />
-            {/* Key light — bright warm front-top */}
-            <directionalLight position={[2, 3, 4]} intensity={1.5} />
-            {/* Hemisphere light — sky/ground color gradient for natural fill */}
-            <hemisphereLight args={['#B8C8FF', '#FFE8D0', 1.2]} />
-            {/* Rim light — backlight for silhouette edge definition */}
-            <directionalLight position={[-2, 1, -3]} intensity={0.8} color="#B0C4FF" />
-            {/* Fill light from below for anime-style uplighting */}
-            <directionalLight position={[0, -2, 2]} intensity={0.4} color="#FFE0FF" />
-            {/* Front point light for extra specular highlights */}
-            <pointLight position={[0, 0.5, 3]} intensity={1.0} distance={8} />
+            {/* ── Ghibli-style lighting ──
+                Soft, warm, and diffuse. Key light from upper-right,
+                fill from lower-left, rim from behind. Gentle ambient
+                prevents harsh shadows while toon shading creates the
+                anime light bands. */}
+            <ambientLight intensity={1.6} color="#FFF5E8" />
+            {/* Key light — warm sunlight from upper right */}
+            <directionalLight position={[2, 3, 4]} intensity={1.8} color="#FFF0D0" />
+            {/* Hemisphere light — warm sky/cool ground for Ghibli color shift */}
+            <hemisphereLight args={['#E8D0FF', '#FFE8D0', 1.0]} />
+            {/* Rim light — cool backlight for anime silhouette glow */}
+            <directionalLight position={[-2, 1, -3]} intensity={0.6} color="#C0D8FF" />
+            {/* Fill light — soft pink-warm uplighting for cute factor */}
+            <directionalLight position={[0, -2, 2]} intensity={0.3} color="#FFD0E8" />
+            {/* Front catch light — creates specular sparkle in eyes */}
+            <pointLight position={[0.3, 0.8, 3]} intensity={0.8} distance={6} color="#FFFFFF" />
 
             <ModelComponent
               catId={catId}

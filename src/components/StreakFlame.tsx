@@ -43,13 +43,12 @@ function getFlameConfig(streak: number, sizeOverride?: 'small' | 'medium' | 'lar
 }
 
 export function StreakFlame({ streak, showCount = true, size }: StreakFlameProps): React.ReactElement | null {
-  if (streak <= 0) return null;
-
   const config = getFlameConfig(streak, size);
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0.8);
 
   useEffect(() => {
+    if (streak <= 0) return;
     scale.value = withRepeat(
       withSequence(
         withTiming(config.intensity, { duration: 400, easing: Easing.inOut(Easing.ease) }),
@@ -66,12 +65,14 @@ export function StreakFlame({ streak, showCount = true, size }: StreakFlameProps
       -1, // Infinite loop
       true,
     );
-  }, [scale, opacity, config.intensity]);
+  }, [streak, scale, opacity, config.intensity]);
 
   const flameStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
     opacity: opacity.value,
   }));
+
+  if (streak <= 0) return null;
 
   return (
     <View style={styles.container}>

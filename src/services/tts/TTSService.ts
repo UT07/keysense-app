@@ -1,14 +1,23 @@
 /**
  * Text-to-Speech Service
  *
- * Wraps expo-speech to provide voice coaching with per-cat voice settings.
- * Interface abstraction allows future upgrade to ElevenLabs or other providers.
+ * Two-tier TTS pipeline:
+ *   1. ElevenLabs (primary) — Neural voices with per-cat personality
+ *   2. expo-speech (fallback) — Device TTS when ElevenLabs unavailable
+ *
+ * The service tries ElevenLabs first. If the API key is missing, the network
+ * fails, or the API returns an error, it falls back to expo-speech seamlessly.
+ * Cached ElevenLabs audio is served instantly on repeat phrases.
  */
 
 import { getCatVoiceSettings, type CatVoiceSettings } from './catVoiceConfig';
+import {
+  speakWithElevenLabs,
+  stopElevenLabs,
+  isElevenLabsAvailable,
+} from './ElevenLabsProvider';
 
 // Lazy-load expo-speech to avoid crashing on dev builds without the native module.
-// The module is optional — TTS gracefully degrades to no-op when unavailable.
 let Speech: typeof import('expo-speech') | null = null;
 try {
   Speech = require('expo-speech');
@@ -22,6 +31,8 @@ export interface TTSOptions {
   rate?: number;
   language?: string;
   voice?: string;
+  /** Force expo-speech even if ElevenLabs is available */
+  forceLocal?: boolean;
   onDone?: () => void;
   onStopped?: () => void;
   onError?: (error: Error) => void;
@@ -29,11 +40,11 @@ export interface TTSOptions {
 
 class TTSServiceImpl {
   private _isSpeaking = false;
+  private _usingElevenLabs = false;
   private _availableVoiceIds: Set<string> | null = null;
 
   /**
-   * Pre-cache available voice identifiers so we can validate before speaking.
-   * iOS may not have "enhanced" voices downloaded — fall back to compact voices.
+   * Pre-cache available expo-speech voice identifiers.
    */
   private async _ensureVoiceCache(): Promise<void> {
     if (this._availableVoiceIds || !Speech) return;
@@ -45,26 +56,21 @@ class TTSServiceImpl {
     }
   }
 
-  /** Check if a specific voice ID is available on this device */
   private _isVoiceAvailable(voiceId: string | undefined): boolean {
     if (!voiceId || !this._availableVoiceIds) return false;
     return this._availableVoiceIds.has(voiceId);
   }
 
   /**
-   * Speak text aloud using the device TTS engine.
-   * Voice characteristics are determined by catId.
+   * Speak text aloud. Tries ElevenLabs first, falls back to expo-speech.
    */
   async speak(text: string, options: TTSOptions = {}): Promise<void> {
-    if (!text.trim() || !Speech) return;
+    if (!text.trim()) return;
 
     // Stop any current speech
     if (this._isSpeaking) {
       this.stop();
     }
-
-    // Cache available voices on first speak
-    await this._ensureVoiceCache();
 
     const catVoice: CatVoiceSettings = options.catId
       ? getCatVoiceSettings(options.catId)
@@ -72,19 +78,54 @@ class TTSServiceImpl {
 
     this._isSpeaking = true;
 
+    // Try ElevenLabs first (unless forced local)
+    if (!options.forceLocal && isElevenLabsAvailable() && catVoice.elevenLabsVoiceId) {
+      const success = await speakWithElevenLabs(
+        text,
+        catVoice.elevenLabsVoiceId,
+        {
+          voiceSettings: catVoice.elevenLabsSettings,
+          onDone: () => {
+            this._isSpeaking = false;
+            this._usingElevenLabs = false;
+            options.onDone?.();
+          },
+          onError: (error) => {
+            this._isSpeaking = false;
+            this._usingElevenLabs = false;
+            options.onError?.(error);
+          },
+        },
+      );
+
+      if (success) {
+        this._usingElevenLabs = true;
+        return;
+      }
+      // ElevenLabs failed — fall through to expo-speech
+      console.log('[TTSService] ElevenLabs unavailable, falling back to expo-speech');
+    }
+
+    // Fallback: expo-speech
+    if (!Speech) {
+      this._isSpeaking = false;
+      return;
+    }
+
+    await this._ensureVoiceCache();
+
     // Validate the requested voice exists on this device.
-    // Enhanced Siri voices must be downloaded by the user — fall back to compact.
     let voiceId = options.voice ?? catVoice.voice;
     if (voiceId && !this._isVoiceAvailable(voiceId)) {
-      // Try compact version (drop ".enhanced" from the identifier)
       const compact = voiceId.replace('.enhanced.', '.compact.');
       if (this._isVoiceAvailable(compact)) {
         voiceId = compact;
       } else {
-        // Let the system pick the best voice for the language
         voiceId = undefined;
       }
     }
+
+    this._usingElevenLabs = false;
 
     return new Promise<void>((resolve) => {
       Speech!.speak(text, {
@@ -111,12 +152,16 @@ class TTSServiceImpl {
     });
   }
 
-  /** Stop any currently playing speech. */
+  /** Stop any currently playing speech (ElevenLabs or expo-speech). */
   stop(): void {
-    if (this._isSpeaking && Speech) {
-      Speech.stop();
-      this._isSpeaking = false;
+    if (this._usingElevenLabs) {
+      stopElevenLabs();
+      this._usingElevenLabs = false;
     }
+    if (Speech) {
+      Speech.stop();
+    }
+    this._isSpeaking = false;
   }
 
   /** Check if TTS is currently speaking. */
@@ -126,6 +171,7 @@ class TTSServiceImpl {
 
   /** Check if TTS is available on this device. */
   async isAvailable(): Promise<boolean> {
+    if (isElevenLabsAvailable()) return true;
     if (!Speech) return false;
     try {
       const voices = await Speech.getAvailableVoicesAsync();

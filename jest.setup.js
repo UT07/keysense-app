@@ -191,8 +191,10 @@ jest.mock('@react-three/drei/native', () => ({
 jest.mock('three', () => {
   const MockGeometry = jest.fn();
   const MockColor = jest.fn(() => ({
-    multiplyScalar: jest.fn(() => ({ getHexString: jest.fn(() => '000000') })),
-    offsetHSL: jest.fn(() => ({ getHexString: jest.fn(() => 'ffffff') })),
+    multiplyScalar: jest.fn().mockReturnThis(),
+    offsetHSL: jest.fn().mockReturnThis(),
+    lerp: jest.fn().mockReturnThis(),
+    clone: jest.fn(() => MockColor()),
     getHexString: jest.fn(() => '000000'),
   }));
   return {
@@ -200,6 +202,12 @@ jest.mock('three', () => {
     Mesh: jest.fn(),
     Group: jest.fn(),
     MeshStandardMaterial: jest.fn(),
+    MeshToonMaterial: jest.fn(),
+    MeshBasicMaterial: jest.fn(),
+    DataTexture: jest.fn(),
+    BufferAttribute: jest.fn(),
+    RedFormat: 1028,
+    NearestFilter: 1003,
     SphereGeometry: MockGeometry,
     BoxGeometry: MockGeometry,
     TorusGeometry: MockGeometry,
@@ -208,6 +216,7 @@ jest.mock('three', () => {
     CylinderGeometry: MockGeometry,
     DoubleSide: 2,
     BackSide: 1,
+    SkinnedMesh: jest.fn(),
   };
 });
 

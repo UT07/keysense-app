@@ -37,7 +37,7 @@ import Animated, {
   FadeInUp,
   FadeInDown,
 } from 'react-native-reanimated';
-import { SalsaCoach } from '../components/Mascot/SalsaCoach';
+import { Cat3DCanvas } from '../components/Mascot/3d';
 import { PressableScale } from '../components/common/PressableScale';
 import { GradientMeshBackground } from '../components/effects';
 import { useAuthStore } from '../stores/authStore';
@@ -282,7 +282,7 @@ export function AuthScreen(): React.ReactElement {
       {/* Hero section: Salsa + App name + Tagline */}
       <Animated.View entering={FadeInUp.duration(600).delay(200)} style={styles.hero}>
         <View style={styles.salsaContainer}>
-          <SalsaCoach mood="excited" size="large" />
+          <Cat3DCanvas catId="salsa" size={180} pose="play" mood="excited" />
         </View>
         <ShimmerTitle />
         <Text style={styles.tagline}>Learn piano. Grow cats.</Text>
@@ -384,8 +384,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xxl,
   },
   salsaContainer: {
-    transform: [{ scale: 2 }],
-    marginBottom: SPACING.xl + SPACING.lg,
+    marginBottom: SPACING.lg,
     marginTop: SPACING.lg,
   },
   appName: {

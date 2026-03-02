@@ -1,0 +1,28 @@
+# Helper: Complete onboarding if it appears
+# Skip silently if already completed (home/auth screen shown instead)
+
+- assertVisible:
+    id: "onboarding-screen"
+    optional: true
+
+- runFlow:
+    when:
+      visible:
+        id: "onboarding-step-1"
+    commands:
+      - tapOn:
+          id: "onboarding-get-started"
+      - tapOn:
+          id: "onboarding-experience-beginner"
+      - tapOn:
+          id: "onboarding-experience-next"
+      - tapOn:
+          id: "onboarding-input-touch"
+      - tapOn:
+          id: "onboarding-input-next"
+      - tapOn:
+          id: "onboarding-goal-songs"
+      - tapOn:
+          id: "onboarding-goal-next"
+      - tapOn:
+          id: "onboarding-finish"

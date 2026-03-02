@@ -43,9 +43,12 @@ export class AudioCapture {
   private isInitialized = false;
   private bufferCount = 0;
   private bufferWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Pre-allocated copy buffer to avoid GC pressure in the audio callback hot path */
+  private copyBuffer: Float32Array;
 
   constructor(config?: Partial<AudioCaptureConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.copyBuffer = new Float32Array(this.config.bufferSize);
   }
 
   /**
@@ -74,10 +77,13 @@ export class AudioCapture {
     this.recorder.onAudioReady((event) => {
       if (!this.isCapturing) return;
 
-      // Defensive copy: getChannelData() may return a reference to a reusable
-      // native buffer. Copy ensures YIN/ONNX processes stable data.
+      // Defensive copy into pre-allocated buffer: getChannelData() may return
+      // a reference to a reusable native buffer. Avoids `new Float32Array()` on
+      // every callback (~21x/sec) which would cause GC pressure and audio glitches.
       const rawSamples = event.buffer.getChannelData(0);
-      const samples = new Float32Array(rawSamples);
+      const len = Math.min(rawSamples.length, this.copyBuffer.length);
+      this.copyBuffer.set(rawSamples.subarray(0, len));
+      const samples = this.copyBuffer.subarray(0, len);
       // event.when may be undefined in some react-native-audio-api versions;
       // fall back to Date.now() for a reasonable timestamp
       const timestamp = typeof event.when === 'number' ? event.when * 1000 : Date.now();

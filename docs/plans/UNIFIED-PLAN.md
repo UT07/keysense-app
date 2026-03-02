@@ -1,9 +1,9 @@
 # Purrrfect Keys — Unified Plan
 
-**Last Updated:** March 1, 2026
+**Last Updated:** March 2, 2026
 **Goal:** Production-quality piano learning app on App Store & Play Store
 **Target Launch:** June 8, 2026 (16-week roadmap from Feb 17)
-**Codebase Health:** 0 TypeScript errors, 2,630 tests passing, 122 suites
+**Codebase Health:** 0 TypeScript errors, 2,591 tests passing, 121 suites
 
 > **This is the single source of truth.** All historical plan files have been moved to `docs/plans/archive/`. The only other active plan file is `docs/plans/2026-02-27-arcade-concert-hall-implementation.md` (the task-by-task execution plan for Phase 10).
 
@@ -382,7 +382,7 @@ Tab order: Home, Learn, Songs, Social, Profile.
 - Categories: crash risks, security, performance, UX, code quality
 
 #### Test Health
-- **122 test suites, 2,630 tests passing, 0 TypeScript errors**
+- **121 test suites, 2,591 tests passing, 0 TypeScript errors**
 
 ### In Progress / Remaining
 
@@ -401,9 +401,19 @@ Tab order: Home, Learn, Songs, Social, Profile.
 - Memory leak detection (30-minute session profiling)
 - Network resilience (offline mode, intermittent connectivity)
 
-#### Cat Voice TTS Upgrade (Planned)
-- Evaluate ElevenLabs and OpenAI TTS for per-cat unique voices
-- Currently using expo-speech with pitch/rate tuning per cat
+#### ElevenLabs TTS Integration — COMPLETE
+- **Two-tier pipeline:** ElevenLabs neural TTS (primary) → expo-speech (fallback)
+- **Provider:** `src/services/tts/ElevenLabsProvider.ts` — REST API (`eleven_turbo_v2_5` model, ~150ms TTFB) → mp3 → base64 file cache → expo-av playback
+- **13 unique voices:** Each cat mapped to a personality-matched ElevenLabs voice (Laura, Will, Lily, Sarah, Charlie, Matilda, Liam, River, Alice, Callum, Daniel, Harry, Jessica)
+- **Per-cat voice settings:** stability (0.30-0.60), style (0.20-0.55), similarity_boost, speaker_boost tuned per personality
+- **Caching:** Content-based hash (text + voiceId) → `FileSystem.cacheDirectory/elevenlabs-tts/{hash}.mp3`
+- **Lazy module loading:** expo-file-system and expo-av loaded via `require()` inside functions to avoid Jest global mock interference
+- **Fallback:** If API key missing, network fails, or API errors → seamless fallback to expo-speech with per-cat pitch/rate/language settings
+
+#### 3D Ghibli-Style Rendering — COMPLETE
+- **`ghibliMaterials.ts`:** Applies MeshToonMaterial (cel-shaded) with custom 3-step gradient ramp (DataTexture) to all meshes. Warm pastel palette shift for Studio Ghibli aesthetic.
+- **`splitMeshByBones.ts`:** For models without named materials — splits single mesh by bone weights (body/head/ears/eyes/tail/belly) to enable per-part coloring
+- **Cat3DCanvas lighting:** Warm hemisphere light (skyColor #FFE4C4, groundColor #8B7355) + directional sun + gentle rim light
 
 #### Cloud Functions Deployment
 - 4 functions written (deleteUserData, generateExercise, generateSong, generateCoachFeedback) — need Firebase project deployment and testing
@@ -450,7 +460,11 @@ Every item below must be verified on a physical device (not just simulator) wher
 - [ ] Verify no "As an AI" or technical jargon in responses
 - [ ] Verify offline coaching templates are contextually appropriate
 - [ ] Verify cat personality is reflected in VoiceCoachingService responses
-- [ ] Test TTS playback of coaching (TTSService via expo-speech)
+- [ ] Test ElevenLabs TTS playback: verify neural voice quality on device
+- [ ] Test ElevenLabs → expo-speech fallback: disable API key → verify graceful degradation
+- [ ] Verify ElevenLabs audio caching: repeat same phrase → should play from cache (instant)
+- [ ] Verify per-cat voice personality matches character (e.g., Salsa=playful Jessica, Shibu=calm River)
+- [ ] Verify ElevenLabs audio doesn't overlap with piano audio engine
 
 #### 4. Microphone Input (Device Required)
 - [ ] Grant microphone permission flow (MicSetupScreen)
@@ -661,9 +675,10 @@ Every item below must be verified on a physical device (not just simulator) wher
 ```
 [DONE]     Phases 1-10.5 + 3D cats   All complete
 [ACTIVE]   Phase 11: QA + Launch     Account deletion, Cloud Functions, CI/CD, MIDI,
-                                      audio session fix, 3D material rewrite, Maestro scaffolding done
+                                      audio session fix, 3D Ghibli materials, ElevenLabs TTS,
+                                      Maestro scaffolding done
                                       Remaining: Maestro testID wiring, CF deployment,
-                                      deep testing, MIDI hardware, TTS upgrade
+                                      deep testing, MIDI hardware, real-device verification
 ```
 
 ---
@@ -680,7 +695,7 @@ PH10.5-SOC                                ████  DONE
 PH11-QA                                    ████████  ← ACTIVE
 ```
 
-Currently in **Week 2** (Mar 1). All implementation phases complete. Phase 11 QA in progress — account deletion, Cloud Functions, CI/CD, environment audit, MIDI integration, audio session race condition fix, 3D material override rewrite, and Maestro scaffolding done. Remaining: Maestro testID wiring, Cloud Functions deployment, deep testing strategy, MIDI hardware testing, TTS upgrade.
+Currently in **Week 2** (Mar 2). All implementation phases complete. Phase 11 QA in progress — account deletion, Cloud Functions, CI/CD, environment audit, MIDI integration, audio session race condition fix, 3D material override rewrite, Ghibli-style toon materials, ElevenLabs TTS, and Maestro scaffolding done. Remaining: Maestro testID wiring, Cloud Functions deployment, deep testing strategy, MIDI hardware testing, real-device verification.
 
 ---
 
@@ -696,7 +711,7 @@ Currently in **Week 2** (Mar 1). All implementation phases complete. Phase 11 QA
 8. **ONNX Basic Pitch model**: Downloaded (`assets/models/basic-pitch.onnx`, 230KB), needs real-device testing
 9. **3D cat models**: 4 body types only (not 13 unique per-cat meshes). Material-name-based color overrides differentiate cats (3 naming conventions handled + fallback for models without materials)
 10. **Cloud Functions**: 4 functions written (deleteUserData, generateExercise, generateSong, generateCoachFeedback) — need Firebase project deployment
-11. **Cat voice TTS**: Currently expo-speech; ElevenLabs/OpenAI evaluation planned for higher-quality per-cat voices
+11. **Cat voice TTS**: ElevenLabs neural TTS integrated as primary (13 unique voices), expo-speech as fallback. Needs real-device testing to verify audio quality and caching.
 
 ---
 

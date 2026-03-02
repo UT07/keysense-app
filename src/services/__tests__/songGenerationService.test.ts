@@ -23,6 +23,7 @@ jest.mock('firebase/firestore', () => ({
 
 jest.mock('../firebase/config', () => ({
   db: {},
+  firebaseAvailable: true,
 }));
 
 // ---------------------------------------------------------------------------

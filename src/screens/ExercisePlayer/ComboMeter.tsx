@@ -29,12 +29,19 @@ export function ComboMeter({ combo }: ComboMeterProps) {
   const tier = getComboTier(combo);
   const icon = TIER_ICONS[tier.name] || '';
 
-  // Animate + play sound on tier change
+  // Animate on combo change: tier change gets a big pop (1.4x), regular
+  // increments get a small pulse (1.12x). Combined into one effect so only
+  // ONE animation drives the shared `scale` value at a time.
   useEffect(() => {
-    if (tier.name !== prevTierRef.current && tier.name !== 'NORMAL') {
+    const tierChanged = tier.name !== prevTierRef.current;
+    prevTierRef.current = tier.name;
+
+    if (tierChanged && tier.name !== 'NORMAL') {
+      // Big pop on tier upgrade — also play the tier sound
       const sound = COMBO_SOUNDS[tier.name];
       if (sound) soundManager.play(sound);
 
+      scale.stopAnimation();
       Animated.sequence([
         Animated.spring(scale, {
           toValue: 1.4,
@@ -49,13 +56,9 @@ export function ComboMeter({ combo }: ComboMeterProps) {
           bounciness: 8,
         }),
       ]).start();
-    }
-    prevTierRef.current = tier.name;
-  }, [tier.name, scale]);
-
-  // Small pulse on every combo increment
-  useEffect(() => {
-    if (combo >= 3) {
+    } else if (combo >= 3) {
+      // Small pulse on regular combo increment (no tier change)
+      scale.stopAnimation();
       Animated.sequence([
         Animated.spring(scale, {
           toValue: 1.12,
@@ -71,7 +74,7 @@ export function ComboMeter({ combo }: ComboMeterProps) {
         }),
       ]).start();
     }
-  }, [combo, scale]);
+  }, [combo, tier.name, scale]);
 
   if (combo < 3) return null;
 

@@ -1,0 +1,16 @@
+# Maestro Configuration — Purrrfect Keys
+appId: com.purrrfectkeys.app
+
+env:
+  TIMEOUT: 15000
+  # Test user credentials (set via .maestro/.env or CLI --env)
+  TEST_EMAIL: ""
+  TEST_PASSWORD: ""
+
+tags:
+  - e2e
+  - purrrfect-keys
+
+platforms:
+  - iOS
+  - Android

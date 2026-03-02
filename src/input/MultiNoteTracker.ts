@@ -22,6 +22,8 @@ const DEFAULT_CONFIG: MultiNoteTrackerConfig = {
 export class MultiNoteTracker {
   private readonly config: MultiNoteTrackerConfig;
   private activeNotes = new Map<number, { startTime: number; lastSeen: number }>();
+  /** Notes awaiting onset hold confirmation — must persist for onsetHoldMs before emitting */
+  private pendingOnsets = new Map<number, { firstSeen: number; lastSeen: number; confidence: number }>();
   private callbacks = new Set<NoteEventCallback>();
 
   constructor(config?: Partial<MultiNoteTrackerConfig>) {
@@ -48,21 +50,55 @@ export class MultiNoteTracker {
       }
     }
 
+    // Expire pending onsets that disappeared before reaching the hold threshold
+    for (const [midiNote] of this.pendingOnsets) {
+      if (!currentMidiNotes.has(midiNote)) {
+        this.pendingOnsets.delete(midiNote);
+      }
+    }
+
     // Check for new note onsets
     for (const note of frame.notes) {
       const existing = this.activeNotes.get(note.midiNote);
       if (existing) {
         // Update lastSeen for sustained notes
         existing.lastSeen = now;
-      } else if (note.isOnset) {
-        // New note onset
-        this.activeNotes.set(note.midiNote, { startTime: now, lastSeen: now });
-        this.emit({
-          type: 'noteOn',
-          midiNote: note.midiNote,
-          confidence: note.confidence,
-          timestamp: now,
-        });
+      } else if (note.isOnset || this.pendingOnsets.has(note.midiNote)) {
+        // Onset hold: require note to persist for onsetHoldMs before emitting
+        const pending = this.pendingOnsets.get(note.midiNote);
+        if (pending) {
+          pending.lastSeen = now;
+          if (note.confidence > pending.confidence) pending.confidence = note.confidence;
+          if (now - pending.firstSeen >= this.config.onsetHoldMs) {
+            // Held long enough — promote to active
+            this.pendingOnsets.delete(note.midiNote);
+            this.activeNotes.set(note.midiNote, { startTime: pending.firstSeen, lastSeen: now });
+            this.emit({
+              type: 'noteOn',
+              midiNote: note.midiNote,
+              confidence: pending.confidence,
+              timestamp: pending.firstSeen,
+            });
+          }
+        } else if (note.isOnset) {
+          if (this.config.onsetHoldMs <= 0) {
+            // No hold — emit immediately (backwards compatible)
+            this.activeNotes.set(note.midiNote, { startTime: now, lastSeen: now });
+            this.emit({
+              type: 'noteOn',
+              midiNote: note.midiNote,
+              confidence: note.confidence,
+              timestamp: now,
+            });
+          } else {
+            // Start tracking pending onset
+            this.pendingOnsets.set(note.midiNote, {
+              firstSeen: now,
+              lastSeen: now,
+              confidence: note.confidence,
+            });
+          }
+        }
       }
     }
   }
@@ -73,6 +109,7 @@ export class MultiNoteTracker {
       this.emit({ type: 'noteOff', midiNote, confidence: 0, timestamp: now });
     }
     this.activeNotes.clear();
+    this.pendingOnsets.clear();
   }
 
   getActiveNotes(): number[] {
