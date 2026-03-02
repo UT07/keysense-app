@@ -120,6 +120,11 @@ jest.mock('../../screens/CatSwitchScreen', () => {
   return { CatSwitchScreen: () => <View testID="cat-switch-screen"><Text>CatSwitchScreen</Text></View> };
 });
 
+jest.mock('../../screens/CatStudioScreen', () => {
+  const { View, Text } = require('react-native');
+  return { CatStudioScreen: () => <View testID="cat-studio-screen"><Text>CatStudioScreen</Text></View> };
+});
+
 jest.mock('../../screens/SkillAssessmentScreen', () => {
   const { View, Text } = require('react-native');
   return { SkillAssessmentScreen: () => <View testID="skill-assessment-screen"><Text>SkillAssessmentScreen</Text></View> };

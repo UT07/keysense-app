@@ -31,6 +31,7 @@ import { SocialScreen } from '../screens/SocialScreen';
 import { LeaderboardScreen } from '../screens/LeaderboardScreen';
 import { FriendsScreen } from '../screens/FriendsScreen';
 import { AddFriendScreen } from '../screens/AddFriendScreen';
+import { CatStudioScreen } from '../screens/CatStudioScreen';
 // Navigation
 import { CustomTabBar } from './CustomTabBar';
 
@@ -67,6 +68,7 @@ export type RootStackParamList = {
   Leaderboard: undefined;
   Friends: undefined;
   AddFriend: undefined;
+  CatStudio: undefined;
 };
 
 export type MainTabParamList = {
@@ -233,6 +235,11 @@ export function AppNavigator() {
               name="CatSwitch"
               component={CatSwitchScreen}
               options={{ animation: 'slide_from_right' }}
+            />
+            <RootStack.Screen
+              name="CatStudio"
+              component={CatStudioScreen}
+              options={{ animation: 'slide_from_bottom' }}
             />
           </>
         )}
