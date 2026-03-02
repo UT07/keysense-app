@@ -58,6 +58,7 @@ jest.mock('@react-navigation/native', () => {
     useRoute: () => ({
       params: {},
     }),
+    useIsFocused: () => true,
     NavigationContainer: ({ children }) => children,
   };
 });

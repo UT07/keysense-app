@@ -115,7 +115,7 @@ export class SoundManager {
     if (this.preloaded) return;
 
     await Audio.setAudioModeAsync({
-      playsInSilentModeIOS: false,
+      playsInSilentModeIOS: true,
       staysActiveInBackground: false,
     });
 

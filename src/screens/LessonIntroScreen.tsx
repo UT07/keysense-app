@@ -408,7 +408,7 @@ export function LessonIntroScreen(): React.ReactElement {
 
         {/* Keysie mascot */}
         <View style={styles.mascotSection}>
-          <Cat3DCanvas catId={selectedCatId ?? 'mini-meowww'} size={140} pose="teach" />
+          <Cat3DCanvas catId={selectedCatId ?? 'mini-meowww'} size={140} pose="teach" forceSVG />
           <View style={styles.mascotBubbleWrapper}>
             <MascotBubble
               mood="teaching"

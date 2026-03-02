@@ -11,8 +11,27 @@ import Animated, {
   withRepeat,
   withTiming,
   withSequence,
+  cancelAnimation,
   Easing,
 } from 'react-native-reanimated';
+
+// Safe wrapper: useIsFocused throws if not inside a NavigationContainer
+// (e.g. in Jest tests). Default to "focused" when navigation is unavailable.
+let _useIsFocused: () => boolean;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  _useIsFocused = require('@react-navigation/native').useIsFocused;
+} catch {
+  _useIsFocused = () => true;
+}
+
+function useSafeIsFocused(): boolean {
+  try {
+    return _useIsFocused();
+  } catch {
+    return true;
+  }
+}
 
 export type ScreenAccent = 'home' | 'social' | 'learn' | 'songs' | 'catStudio' | 'exercise' | 'profile' | 'leaderboard';
 
@@ -37,6 +56,7 @@ export function GradientMeshBackground({
   accent = 'home',
   speed = 1,
 }: GradientMeshBackgroundProps) {
+  const isFocused = useSafeIsFocused();
   const opacity1 = useSharedValue(1);
   const opacity2 = useSharedValue(0);
 
@@ -52,6 +72,15 @@ export function GradientMeshBackground({
   }) as [string, string, string];
 
   useEffect(() => {
+    if (!isFocused) {
+      // Pause animations when screen is not visible (React Navigation keeps
+      // background screens mounted — without this, every screen's gradient
+      // crossfade runs continuously, wasting CPU/GPU).
+      cancelAnimation(opacity1);
+      cancelAnimation(opacity2);
+      return;
+    }
+
     const duration = 8000 / speed;
     opacity1.value = withRepeat(
       withSequence(
@@ -69,7 +98,7 @@ export function GradientMeshBackground({
       -1,
       true,
     );
-  }, [speed, opacity1, opacity2]);
+  }, [isFocused, speed, opacity1, opacity2]);
 
   const style1 = useAnimatedStyle(() => ({ opacity: opacity1.value }));
   const style2 = useAnimatedStyle(() => ({ opacity: opacity2.value }));

@@ -18,6 +18,19 @@ import type { ReactElement, ReactNode, ErrorInfo } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 
 import { CatAvatar } from '../CatAvatar';
+
+// Safe wrapper: useIsFocused throws if not inside a NavigationContainer
+// (e.g. in Jest tests or standalone overlays). Default to "focused".
+let _useIsFocused: () => boolean;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  _useIsFocused = require('@react-navigation/native').useIsFocused;
+} catch {
+  _useIsFocused = () => true;
+}
+function useSafeIsFocused(): boolean {
+  try { return _useIsFocused(); } catch { return true; }
+}
 import type { CatPose } from '../animations/catAnimations';
 import type { MascotMood } from '../types';
 import type { EvolutionStage } from '@/stores/types';
@@ -120,9 +133,9 @@ const POSE_TO_MOOD: Record<CatPose, MascotMood> = {
   idle: 'happy',
   celebrate: 'celebrating',
   teach: 'encouraging',
-  sleep: 'happy',
+  sleep: 'teaching',
   play: 'excited',
-  sad: 'encouraging',
+  sad: 'teaching',
   curious: 'encouraging',
 };
 
@@ -169,6 +182,11 @@ export const Cat3DCanvas = React.memo(function Cat3DCanvas({
   evolutionStage = 'baby',
   forceSVG = false,
 }: Cat3DCanvasProps): ReactElement {
+  // When screen loses focus (hidden behind another screen in the nav stack),
+  // fall back to SVG to free the GL context. This prevents multiple GL contexts
+  // from accumulating across stacked screens (each eats GPU memory).
+  const isFocused = useSafeIsFocused();
+
   const [hasError, setHasError] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
   const [canvasReady, setCanvasReady] = useState(false);
@@ -203,8 +221,10 @@ export const Cat3DCanvas = React.memo(function Cat3DCanvas({
     setHasError(true);
   }, []);
 
-  // Fall back to SVG if 3D unavailable, fails, times out, or is forced off
-  if (!gl3DAvailable || !R3FCanvas || !CatModel3DComponent || forceSVG || hasError || timedOut) {
+  // Fall back to SVG if 3D unavailable, fails, times out, forced off, or screen not focused.
+  // The !isFocused check is critical: React Navigation keeps background screens mounted,
+  // so without this every stacked screen keeps its GL context alive (GPU exhaustion).
+  if (!gl3DAvailable || !R3FCanvas || !CatModel3DComponent || forceSVG || hasError || timedOut || !isFocused) {
     return (
       <SVGFallback
         catId={catId}

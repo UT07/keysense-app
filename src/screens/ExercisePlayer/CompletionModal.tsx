@@ -443,6 +443,7 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
                 pose={score.overall >= 95 ? 'celebrate' : score.overall >= 80 ? 'play' : 'curious'}
                 mood={mascotMood}
                 evolutionStage={evolutionStage}
+                forceSVG
               />
               <Text style={styles.title}>{exercise.metadata.title}</Text>
               <Text style={styles.subtitle}>

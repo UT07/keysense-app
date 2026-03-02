@@ -616,13 +616,38 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
    */
   const handleExerciseCompletion = useCallback((initialScore: ExerciseScore) => {
     if (!mountedRef.current) return;
-    // BUG-001 fix: Work with a mutable copy so we never mutate the original score object
     let score = { ...initialScore };
-    setFinalScore(score);
 
     // Read exercise from ref to avoid stale closure in AI mode
     // (exercise loads async, but ref is always current)
     const ex = exerciseRef.current;
+
+    // Apply ability boosts BEFORE setting finalScore so CompletionModal shows
+    // the correct (boosted) values. Previously setFinalScore ran before the boost,
+    // causing the modal to display the raw score.
+    const currentAbilityConfig = abilityConfig;
+    if (currentAbilityConfig) {
+      // Score boost (cap at 100)
+      if (currentAbilityConfig.scoreBoostPercent > 0) {
+        const boostedOverall = Math.min(100, score.overall + currentAbilityConfig.scoreBoostPercent);
+        score = {
+          ...score,
+          overall: boostedOverall,
+          // Use exerciseRef (not closure exercise) for threshold checks
+          isPassed: boostedOverall >= ex.scoring.passingScore,
+          stars: (boostedOverall >= ex.scoring.starThresholds[2] ? 3
+            : boostedOverall >= ex.scoring.starThresholds[1] ? 2
+            : boostedOverall >= ex.scoring.starThresholds[0] ? 1 : 0) as 0 | 1 | 2 | 3,
+        };
+      }
+      // XP multiplier
+      if (currentAbilityConfig.xpMultiplier > 1) {
+        score = { ...score, xpEarned: Math.round(score.xpEarned * currentAbilityConfig.xpMultiplier) };
+      }
+    }
+
+    // Set finalScore AFTER ability boosts so CompletionModal shows the correct values
+    setFinalScore(score);
 
     // Track consecutive fails for demo prompt
     // Read ghostNotesEnabled from store directly (not from closure) to avoid stale state
@@ -643,34 +668,9 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     // Capture level BEFORE any XP mutations so we can detect level-ups
     const previousLevel = useProgressStore.getState().level;
 
-    // BUG-001 fix: Clone score before mutation to avoid mutating React state
-    const currentAbilityConfig = abilityConfig;
-    if (currentAbilityConfig) {
-      // Score boost (cap at 100)
-      if (currentAbilityConfig.scoreBoostPercent > 0) {
-        const boostedOverall = Math.min(100, score.overall + currentAbilityConfig.scoreBoostPercent);
-        score = {
-          ...score,
-          overall: boostedOverall,
-          // Recompute isPassed after boost — otherwise a boosted-above-threshold
-          // score still shows as "failed", blocking player progression.
-          isPassed: boostedOverall >= exercise.scoring.passingScore,
-          // Recompute stars after boost
-          stars: (boostedOverall >= exercise.scoring.starThresholds[2] ? 3
-            : boostedOverall >= exercise.scoring.starThresholds[1] ? 2
-            : boostedOverall >= exercise.scoring.starThresholds[0] ? 1 : 0) as 0 | 1 | 2 | 3,
-        };
-      }
-      // XP multiplier
-      if (currentAbilityConfig.xpMultiplier > 1) {
-        score = { ...score, xpEarned: Math.round(score.xpEarned * currentAbilityConfig.xpMultiplier) };
-      }
-    }
-
     // Persist XP and daily goal progress with challenge context
     const progressStore = useProgressStore.getState();
     const todayISO = new Date().toISOString().split('T')[0];
-    const todayGoalData = progressStore.dailyGoalData[todayISO];
 
     // Compute max combo from score details (longest consecutive correct-pitch streak)
     let maxCombo = 0;
@@ -703,7 +703,10 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       progressStore.recordPracticeSession(elapsedMinutes);
     }
 
-    const minutesSoFar = (todayGoalData?.minutesPracticed ?? 0) + elapsedMinutes;
+    // Read fresh minutesPracticed AFTER recordPracticeSession mutated the store
+    // (the todayGoalData snapshot was taken before the mutation and is stale)
+    const freshGoalData = useProgressStore.getState().dailyGoalData[todayISO];
+    const minutesSoFar = freshGoalData?.minutesPracticed ?? elapsedMinutes;
 
     progressStore.recordExerciseCompletion(ex.id, score.overall, score.xpEarned, {
       score: score.overall,
@@ -1370,6 +1373,10 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       pausePlayback();
       setIsPaused(true);
     }
+
+    // Clear consumed note indices so retry after demo starts fresh
+    consumedNoteIndicesRef.current.clear();
+    setComboCount(0);
 
     setIsDemoPlaying(true);
     useExerciseStore.getState().setDemoWatched(true);

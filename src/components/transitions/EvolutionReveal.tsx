@@ -150,6 +150,7 @@ export function EvolutionReveal({
           catId={catId}
           size={120}
           pose={phase === 'reveal' || phase === 'ability' ? 'celebrate' : 'idle'}
+          forceSVG
         />
       </Animated.View>
 

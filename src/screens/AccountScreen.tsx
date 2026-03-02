@@ -249,7 +249,7 @@ export function AccountScreen(): React.ReactElement {
         </TouchableOpacity>
 
         <View style={styles.anonHero}>
-          <Cat3DCanvas catId={selectedCatId ?? 'mini-meowww'} size={120} pose="idle" />
+          <Cat3DCanvas catId={selectedCatId ?? 'mini-meowww'} size={120} pose="idle" forceSVG />
           <Text style={styles.anonTitle}>Create an account to save your progress across devices!</Text>
         </View>
 
