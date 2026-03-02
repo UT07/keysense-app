@@ -23,12 +23,15 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import Animated, { FadeInUp } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLeagueStore } from '../stores/leagueStore';
 import type { LeagueStandingEntry } from '../stores/leagueStore';
 import { useAuthStore } from '../stores/authStore';
 import { getLeagueStandings } from '../services/firebase/leagueService';
-import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../theme/tokens';
+import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../theme/tokens';
 import { PressableScale } from '../components/common/PressableScale';
+import { Cat3DCanvas } from '../components/Mascot/3d';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -51,6 +54,96 @@ const MEDAL_COLORS: Record<number, string> = {
 // Promotion: top 10 get green zone; demotion: bottom 5 get red zone
 const PROMOTION_CUTOFF = 10;
 const DEMOTION_FROM_BOTTOM = 5;
+
+// ---------------------------------------------------------------------------
+// Podium — Top 3 hero section with cat avatars
+// ---------------------------------------------------------------------------
+
+const PODIUM_HEIGHTS = [80, 100, 60]; // 2nd, 1st, 3rd pedestal heights
+const PODIUM_MEDAL_SIZES = { 1: 22, 2: 18, 3: 16 };
+const PODIUM_CAT_SIZES = { 1: 72, 2: 56, 3: 56 };
+
+function PodiumPedestal({
+  entry,
+  place,
+  isCurrentUser,
+}: {
+  entry: LeagueStandingEntry | undefined;
+  place: 1 | 2 | 3;
+  isCurrentUser: boolean;
+}) {
+  if (!entry) return <View style={styles.podiumSlot} />;
+
+  const height = PODIUM_HEIGHTS[place === 2 ? 0 : place === 1 ? 1 : 2];
+  const catSize = PODIUM_CAT_SIZES[place];
+  const medalColor = MEDAL_COLORS[place];
+
+  return (
+    <Animated.View
+      entering={FadeInUp.delay(place === 1 ? 200 : place === 2 ? 100 : 300).duration(400)}
+      style={styles.podiumSlot}
+    >
+      {/* Cat avatar */}
+      <View style={[styles.podiumAvatar, isCurrentUser && styles.podiumAvatarCurrent]}>
+        <Cat3DCanvas
+          catId={entry.selectedCatId ?? 'mini-meowww'}
+          size={catSize}
+          pose={place === 1 ? 'celebrate' : 'idle'}
+          forceSVG
+        />
+      </View>
+
+      {/* Medal */}
+      <MaterialCommunityIcons
+        name="medal"
+        size={PODIUM_MEDAL_SIZES[place]}
+        color={medalColor}
+        style={styles.podiumMedal}
+      />
+
+      {/* Name */}
+      <Text
+        style={[styles.podiumName, isCurrentUser && styles.podiumNameCurrent]}
+        numberOfLines={1}
+      >
+        {entry.displayName}
+      </Text>
+
+      {/* XP */}
+      <Text style={styles.podiumXp}>{entry.weeklyXp.toLocaleString()} XP</Text>
+
+      {/* Pedestal block */}
+      <LinearGradient
+        colors={[medalColor + '40', medalColor + '15']}
+        style={[styles.podiumBlock, { height }]}
+      >
+        <Text style={[styles.podiumRank, { color: medalColor }]}>{place}</Text>
+      </LinearGradient>
+    </Animated.View>
+  );
+}
+
+function Podium({
+  standings,
+  currentUserUid,
+}: {
+  standings: LeagueStandingEntry[];
+  currentUserUid: string;
+}) {
+  if (standings.length < 1) return null;
+
+  const first = standings.find((s) => s.rank === 1);
+  const second = standings.find((s) => s.rank === 2);
+  const third = standings.find((s) => s.rank === 3);
+
+  return (
+    <View style={styles.podiumContainer}>
+      <PodiumPedestal entry={second} place={2} isCurrentUser={second?.uid === currentUserUid} />
+      <PodiumPedestal entry={first} place={1} isCurrentUser={first?.uid === currentUserUid} />
+      <PodiumPedestal entry={third} place={3} isCurrentUser={third?.uid === currentUserUid} />
+    </View>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Standings Row
@@ -278,6 +371,11 @@ export function LeaderboardScreen(): React.JSX.Element {
         <View style={styles.headerSpacer} />
       </View>
 
+      {/* Podium hero section for top 3 */}
+      {standings.length > 0 && (
+        <Podium standings={standings} currentUserUid={currentUserUid} />
+      )}
+
       {/* Zone legend */}
       <View style={styles.legendRow}>
         <View style={styles.legendItem}>
@@ -290,14 +388,14 @@ export function LeaderboardScreen(): React.JSX.Element {
         </View>
       </View>
 
-      {/* Standings list */}
+      {/* Standings list (4th place onwards — top 3 are in the podium) */}
       {isLoadingStandings && standings.length === 0 ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
       ) : (
         <FlatList
-          data={standings}
+          data={standings.filter((s) => s.rank > 3)}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           contentContainerStyle={styles.listContent}
@@ -320,17 +418,31 @@ export function LeaderboardScreen(): React.JSX.Element {
         />
       )}
 
-      {/* Footer: current user rank */}
-      {currentUserRank !== null && (
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Your rank:{' '}
-            <Text style={styles.footerRank}>
-              {currentUserRank} of {totalMembers}
+      {/* Pinned current user row */}
+      {currentUserRank !== null && currentUserRank > 3 && (() => {
+        const me = standings.find((s) => s.uid === currentUserUid);
+        if (!me) return null;
+        return (
+          <View style={styles.pinnedFooter}>
+            <View style={styles.pinnedRank}>
+              <Text style={styles.pinnedRankText}>{currentUserRank}</Text>
+            </View>
+            <Cat3DCanvas
+              catId={me.selectedCatId ?? 'mini-meowww'}
+              size={36}
+              pose="idle"
+              forceSVG
+            />
+            <Text style={styles.pinnedName} numberOfLines={1}>
+              {me.displayName} (You)
             </Text>
-          </Text>
-        </View>
-      )}
+            <View style={styles.pinnedXp}>
+              <Text style={styles.pinnedXpValue}>{me.weeklyXp.toLocaleString()}</Text>
+              <Text style={styles.pinnedXpLabel}>XP</Text>
+            </View>
+          </View>
+        );
+      })()}
     </SafeAreaView>
   );
 }
@@ -499,20 +611,102 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
 
-  // Footer
-  footer: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.cardBorder,
-    paddingVertical: SPACING.md,
+  // Podium
+  podiumContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.cardBorder,
+  },
+  podiumSlot: {
+    flex: 1,
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
+    maxWidth: 120,
   },
-  footerText: {
-    ...TYPOGRAPHY.body.md,
-    color: COLORS.textSecondary,
+  podiumAvatar: {
+    borderRadius: 999,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: COLORS.cardBorder,
+    marginBottom: SPACING.xs,
   },
-  footerRank: {
-    ...TYPOGRAPHY.heading.md,
+  podiumAvatarCurrent: {
+    borderColor: COLORS.primary,
+    ...SHADOWS.md,
+  },
+  podiumMedal: {
+    marginBottom: 2,
+  },
+  podiumName: {
+    ...TYPOGRAPHY.caption.lg,
     color: COLORS.textPrimary,
+    fontWeight: '600',
+    textAlign: 'center',
+    maxWidth: 100,
+  },
+  podiumNameCurrent: {
+    color: COLORS.primary,
+  },
+  podiumXp: {
+    ...TYPOGRAPHY.caption.md,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.xs,
+  },
+  podiumBlock: {
+    width: '85%',
+    borderTopLeftRadius: BORDER_RADIUS.sm,
+    borderTopRightRadius: BORDER_RADIUS.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  podiumRank: {
+    ...TYPOGRAPHY.heading.lg,
+    fontWeight: '800',
+  },
+
+  // Pinned current-user footer
+  pinnedFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.primary + '40',
+    backgroundColor: COLORS.primary + '10',
+    gap: SPACING.sm,
+  },
+  pinnedRank: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.primary + '30',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pinnedRankText: {
+    ...TYPOGRAPHY.body.md,
+    color: COLORS.primary,
+    fontWeight: '800',
+  },
+  pinnedName: {
+    flex: 1,
+    ...TYPOGRAPHY.body.md,
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+  pinnedXp: {
+    alignItems: 'flex-end',
+  },
+  pinnedXpValue: {
+    ...TYPOGRAPHY.heading.sm,
+    color: COLORS.primary,
+  },
+  pinnedXpLabel: {
+    ...TYPOGRAPHY.caption.sm,
+    color: COLORS.textSecondary,
   },
 });
