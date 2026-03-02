@@ -1,3 +1,6 @@
+appId: com.purrrfectkeys.app
+name: Complete Onboarding
+---
 # Helper: Complete onboarding if it appears
 # Skip silently if already completed (home/auth screen shown instead)
 

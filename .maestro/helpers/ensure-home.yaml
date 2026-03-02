@@ -1,3 +1,6 @@
+appId: com.purrrfectkeys.app
+name: Ensure Home Screen
+---
 # Helper: Ensure we're on the HomeScreen
 # Handles dev launcher, onboarding, and auth skip if needed
 
