@@ -15,6 +15,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.purrrfectkeys.app",
       "buildNumber": "1",
+      "usesAppleSignIn": true,
       "googleServicesFile": "./firebase/GoogleService-Info.plist",
       "config": {
         "usesNonExemptEncryption": false
@@ -49,6 +50,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "expo-apple-authentication",
       "expo-dev-client",
       [
         "expo-screen-orientation",

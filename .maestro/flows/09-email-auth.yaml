@@ -11,6 +11,9 @@ tags:
 - launchApp:
     clearState: true
 
+# Handle dev client launcher if present (dev builds only)
+- runFlow: ../helpers/dismiss-dev-launcher.yaml
+
 # Complete onboarding
 - runFlow: ../helpers/complete-onboarding.yaml
 

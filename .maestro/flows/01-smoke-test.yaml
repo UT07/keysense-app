@@ -11,6 +11,9 @@ tags:
 - launchApp:
     clearState: true
 
+# Handle dev client launcher if present (dev builds only)
+- runFlow: ../helpers/dismiss-dev-launcher.yaml
+
 # App should land on either Onboarding or Auth or HomeScreen
 - assertVisible:
     id: "onboarding-screen|auth-screen|home-screen"

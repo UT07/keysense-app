@@ -1,5 +1,8 @@
 # Helper: Ensure we're on the HomeScreen
-# Handles onboarding and auth skip if needed
+# Handles dev launcher, onboarding, and auth skip if needed
+
+# Handle dev client launcher if present
+- runFlow: dismiss-dev-launcher.yaml
 
 # Complete onboarding if shown
 - runFlow:

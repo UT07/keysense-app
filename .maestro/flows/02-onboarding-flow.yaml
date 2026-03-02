@@ -10,6 +10,9 @@ tags:
 - launchApp:
     clearState: true
 
+# Handle dev client launcher if present (dev builds only)
+- runFlow: ../helpers/dismiss-dev-launcher.yaml
+
 # Step 1: Welcome
 - assertVisible:
     id: "onboarding-step-1"
