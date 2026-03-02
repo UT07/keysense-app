@@ -687,6 +687,15 @@ export function CatSwitchScreen(): React.ReactElement {
               {CAT_CHARACTERS.filter((c) => isCatOwned(c.id, ownedCats)).length} of {CAT_CHARACTERS.length} unlocked
             </Text>
           </View>
+          {/* Customize button */}
+          <TouchableOpacity
+            style={styles.customizeButton}
+            onPress={() => (navigation as any).navigate('CatStudio')}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons name="palette" size={16} color={COLORS.primary} />
+            <Text style={styles.customizeText}>Studio</Text>
+          </TouchableOpacity>
           {/* Gem balance pill */}
           <View style={styles.gemPill}>
             <MaterialCommunityIcons name="diamond-stone" size={16} color={COLORS.gemGold} />
@@ -777,6 +786,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textSecondary,
     marginTop: 1,
+  },
+  customizeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary + '20',
+    borderRadius: BORDER_RADIUS.full,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 6,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: COLORS.primary + '40',
+  },
+  customizeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primary,
   },
   gemPill: {
     flexDirection: 'row',
