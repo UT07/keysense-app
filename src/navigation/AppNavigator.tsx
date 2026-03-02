@@ -31,7 +31,6 @@ import { SocialScreen } from '../screens/SocialScreen';
 import { LeaderboardScreen } from '../screens/LeaderboardScreen';
 import { FriendsScreen } from '../screens/FriendsScreen';
 import { AddFriendScreen } from '../screens/AddFriendScreen';
-
 // Navigation
 import { CustomTabBar } from './CustomTabBar';
 

@@ -165,6 +165,8 @@ export interface ProfileSettings {
   displayName: string;
   avatarEmoji: string; // Emoji used as avatar
   selectedCatId: string; // Cat character avatar ID
+  equippedAccessories: Record<string, string>; // category → accessory ID
+  ownedAccessories: string[]; // purchased accessory IDs
 }
 
 export interface SettingsStoreState extends AudioSettings, DisplaySettings, NotificationSettings, MidiSettings, OnboardingSettings, ProfileSettings {
@@ -195,6 +197,9 @@ export interface SettingsStoreState extends AudioSettings, DisplaySettings, Noti
   setDisplayName: (name: string) => void;
   setAvatarEmoji: (emoji: string) => void;
   setSelectedCatId: (id: string) => void;
+  equipAccessory: (category: string, accessoryId: string) => void;
+  unequipAccessory: (category: string) => void;
+  addOwnedAccessory: (accessoryId: string) => void;
   reset: () => void;
 }
 

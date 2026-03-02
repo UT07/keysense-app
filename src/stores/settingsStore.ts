@@ -61,6 +61,8 @@ const defaultSettings: SettingsData = {
   displayName: 'Piano Student',
   avatarEmoji: '\uD83C\uDFB9', // piano emoji
   selectedCatId: 'mini-meowww', // default cat character
+  equippedAccessories: {} as Record<string, string>,
+  ownedAccessories: [] as string[],
 };
 
 // Create debounced save function
@@ -229,6 +231,27 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
   setSelectedCatId: (id: string) => {
     set({ selectedCatId: id });
     debouncedSave({ ...get(), selectedCatId: id });
+  },
+
+  equipAccessory: (category: string, accessoryId: string) => {
+    const equippedAccessories = { ...get().equippedAccessories, [category]: accessoryId };
+    set({ equippedAccessories });
+    debouncedSave({ ...get(), equippedAccessories });
+  },
+
+  unequipAccessory: (category: string) => {
+    const equippedAccessories = { ...get().equippedAccessories };
+    delete equippedAccessories[category];
+    set({ equippedAccessories });
+    debouncedSave({ ...get(), equippedAccessories });
+  },
+
+  addOwnedAccessory: (accessoryId: string) => {
+    const current = get().ownedAccessories;
+    if (current.includes(accessoryId)) return;
+    const ownedAccessories = [...current, accessoryId];
+    set({ ownedAccessories });
+    debouncedSave({ ...get(), ownedAccessories });
   },
 
   reset: () => {

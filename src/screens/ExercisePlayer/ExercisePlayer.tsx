@@ -68,6 +68,7 @@ import { ExerciseIntroOverlay } from './ExerciseIntroOverlay';
 import { ExerciseLoadingScreen } from './ExerciseLoadingScreen';
 import { ComboMeter } from './ComboMeter';
 import { ComboGlow } from './ComboGlow';
+import { FeedbackText } from './FeedbackText';
 import { HitParticles } from './HitParticles';
 import { ScreenShake, type ScreenShakeRef } from '../../components/effects';
 import { GlassmorphismCard } from '../../components/effects';
@@ -110,18 +111,6 @@ function getFeedbackColor(type: string | null): string {
     case 'late': return COLORS.feedbackLate;
     case 'miss': return COLORS.feedbackMiss;
     default: return COLORS.feedbackDefault;
-  }
-}
-
-function getFeedbackLabel(type: string | null): string {
-  switch (type) {
-    case 'perfect': return 'PERFECT!';
-    case 'good': return 'GOOD!';
-    case 'ok': return 'OK';
-    case 'early': return 'EARLY';
-    case 'late': return 'LATE';
-    case 'miss': return 'MISS';
-    default: return '';
   }
 }
 
@@ -2084,21 +2073,11 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         {/* Timing feedback overlay between piano roll and keyboard */}
         {feedback.type && (
           <View style={styles.feedbackOverlay}>
-            <ReAnimated.Text
-              key={feedback.timestamp}
-              entering={FadeIn.duration(100).springify().damping(12).stiffness(200)}
-              style={[
-                styles.feedbackText,
-                {
-                  color: getFeedbackColor(feedback.type),
-                  textShadowColor: getFeedbackColor(feedback.type),
-                  textShadowOffset: { width: 0, height: 0 },
-                  textShadowRadius: feedback.type === 'perfect' ? 12 : 6,
-                },
-              ]}
-            >
-              {getFeedbackLabel(feedback.type)}
-            </ReAnimated.Text>
+            <FeedbackText
+              type={feedback.type}
+              trigger={feedback.timestamp}
+              timingOffsetMs={feedback.timingOffsetMs}
+            />
             <ComboMeter combo={comboCount} />
           </View>
         )}
@@ -2319,11 +2298,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     backgroundColor: 'rgba(0, 0, 0, 0.9)',
-  },
-  feedbackText: {
-    fontSize: 24,
-    fontWeight: '900',
-    letterSpacing: 2,
   },
   missFlash: {
     ...StyleSheet.absoluteFillObject,
