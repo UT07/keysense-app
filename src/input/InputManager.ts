@@ -154,7 +154,7 @@ export class InputManager {
               latencyCompensationMs: this.config.micLatencyCompensationMs ?? 0,
               mode: detectionMode,
             }),
-            8000,
+            4000,
             null,
             'createMicrophoneInput',
           );
@@ -300,7 +300,7 @@ export class InputManager {
               latencyCompensationMs: this.config.micLatencyCompensationMs ?? 0,
               mode: detectionMode,
             }),
-            8000,
+            4000,
             null,
             'switchMethod:createMicrophoneInput',
           );

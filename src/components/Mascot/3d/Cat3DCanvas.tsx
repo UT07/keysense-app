@@ -13,7 +13,7 @@
  * - Canvas runs at 30fps to save battery
  */
 
-import React, { Suspense, useState, useEffect, useCallback, Component } from 'react';
+import React, { Suspense, useState, useEffect, useCallback, useMemo, Component } from 'react';
 import type { ReactElement, ReactNode, ErrorInfo } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 
@@ -21,6 +21,8 @@ import { CatAvatar } from '../CatAvatar';
 import type { CatPose } from '../animations/catAnimations';
 import type { MascotMood } from '../types';
 import type { EvolutionStage } from '@/stores/types';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { getEquippedRenderNames } from '@/data/accessories';
 
 // ────────────────────────────────────────────────
 // Dynamic imports for 3D (expo-gl may not be available)
@@ -171,6 +173,13 @@ export const Cat3DCanvas = React.memo(function Cat3DCanvas({
   const [timedOut, setTimedOut] = useState(false);
   const [canvasReady, setCanvasReady] = useState(false);
 
+  // Read user-equipped accessories from settingsStore
+  const equippedAccessories = useSettingsStore((s) => s.equippedAccessories);
+  const equippedRenderNames = useMemo(
+    () => getEquippedRenderNames(equippedAccessories),
+    [equippedAccessories],
+  );
+
   // Loading timeout: if 3D doesn't render within LOAD_TIMEOUT_MS, fall back to SVG
   useEffect(() => {
     if (canvasReady || hasError || forceSVG) return;
@@ -227,25 +236,32 @@ export const Cat3DCanvas = React.memo(function Cat3DCanvas({
           <CanvasComponent
             frameloop="always"
             gl={{ antialias: true, alpha: true }}
-            camera={{ position: [0, 0, 5], fov: 50 }}
+            camera={{ position: [0, 0, 3.5], fov: 50 }}
             onCreated={(state: any) => {
               state.gl.setClearColor(0x000000, 0);
               handleCanvasCreated();
             }}
             style={styles.canvas}
           >
-            <ambientLight intensity={1.2} />
-            <directionalLight position={[2, 3, 4]} intensity={0.8} />
-            {/* Rim light — backlight for silhouette definition */}
-            <directionalLight position={[-2, 1, -3]} intensity={0.5} color="#B0C4FF" />
+            {/* Strong ambient fill so dark models are always visible */}
+            <ambientLight intensity={2.0} />
+            {/* Key light — bright warm front-top */}
+            <directionalLight position={[2, 3, 4]} intensity={1.5} />
+            {/* Hemisphere light — sky/ground color gradient for natural fill */}
+            <hemisphereLight args={['#B8C8FF', '#FFE8D0', 1.2]} />
+            {/* Rim light — backlight for silhouette edge definition */}
+            <directionalLight position={[-2, 1, -3]} intensity={0.8} color="#B0C4FF" />
             {/* Fill light from below for anime-style uplighting */}
-            <directionalLight position={[0, -2, 2]} intensity={0.2} color="#FFE0FF" />
+            <directionalLight position={[0, -2, 2]} intensity={0.4} color="#FFE0FF" />
+            {/* Front point light for extra specular highlights */}
+            <pointLight position={[0, 0.5, 3]} intensity={1.0} distance={8} />
 
             <ModelComponent
               catId={catId}
               pose={pose}
               scale={1}
               evolutionStage={evolutionStage}
+              equippedRenderNames={equippedRenderNames}
             />
           </CanvasComponent>
         </Suspense>

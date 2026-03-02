@@ -89,37 +89,37 @@ const CAT_3D_CONFIGS: Record<string, Cat3DConfig> = {
     bodyType: 'slim',
     hasBlush: true,
     materials: {
-      body: '#2D2D2D',  // Brightened from #1A1A1A (+30%)
+      body: '#555555',   // Charcoal grey (visible on dark BG)
       belly: '#F5F5F5',
-      earInner: '#DC143C',
-      eye: '#2ECC71',
-      nose: '#DC143C',
+      earInner: '#FF3355',
+      eye: '#3DFF88',    // Brighter green for pop
+      nose: '#FF3355',
       blush: '#FF9999',
-      accent: '#DC143C',
+      accent: '#FF3355',
     },
   },
   'jazzy': {
     bodyType: 'slim',
     hasBlush: false,
     materials: {
-      body: '#4A4A6A',
-      belly: '#6B6B8A',
-      earInner: '#9B59B6',
-      eye: '#D4A5FF',
-      nose: '#9B59B6',
-      accent: '#9B59B6',
+      body: '#5D5D80',   // Brighter purple-grey
+      belly: '#8888A8',
+      earInner: '#B06EDE',
+      eye: '#E0B8FF',
+      nose: '#B06EDE',
+      accent: '#B06EDE',
     },
   },
   'luna': {
     bodyType: 'standard',
     hasBlush: false,
     materials: {
-      body: '#2A2A50',  // Brightened from #1C1C3A (+25%)
-      belly: '#3A3A62',  // Brightened from #2A2A52
-      earInner: '#5B6EAE',
-      eye: '#7EB8FF',
-      nose: '#3D4F8A',
-      accent: '#5B6EAE',
+      body: '#454580',   // Brighter midnight blue
+      belly: '#5E5EA0',
+      earInner: '#7088CC',
+      eye: '#99CCFF',
+      nose: '#5568AA',
+      accent: '#7088CC',
     },
   },
 
@@ -204,12 +204,12 @@ const CAT_3D_CONFIGS: Record<string, Cat3DConfig> = {
     bodyType: 'slim',
     hasBlush: false,
     materials: {
-      body: '#333333',  // Brightened from #212121 (+30%)
-      belly: '#555555',  // Brightened from #424242
-      earInner: '#AB47BC',
-      eye: '#CE93D8',
-      nose: '#7B1FA2',
-      accent: '#AB47BC',
+      body: '#5A5A5A',   // Medium grey (visible on dark BG)
+      belly: '#787878',
+      earInner: '#C060D8',
+      eye: '#E0A8F0',
+      nose: '#9540B0',
+      accent: '#C060D8',
     },
   },
   'coda': {

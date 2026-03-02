@@ -65,6 +65,6 @@ export const ScreenShake = forwardRef<ScreenShakeRef, ScreenShakeProps>(
       ],
     }));
 
-    return <Animated.View style={animatedStyle}>{children}</Animated.View>;
+    return <Animated.View style={[{ flex: 1 }, animatedStyle]}>{children}</Animated.View>;
   },
 );

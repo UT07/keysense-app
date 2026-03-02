@@ -44,6 +44,8 @@ interface CatModel3DProps {
   enableIdle?: boolean;
   /** Evolution stage for accessory rendering */
   evolutionStage?: EvolutionStage;
+  /** User-equipped accessory render names (from settingsStore via getEquippedRenderNames) */
+  equippedRenderNames?: string[];
 }
 
 /** Convert hex color string to Three.js Color */
@@ -121,9 +123,13 @@ function applyMaterials(scene: THREE.Group, materials: Cat3DMaterials, hasBlush:
       // Clone material to avoid affecting other instances
       if (mat instanceof THREE.MeshStandardMaterial) {
         const cloned = mat.clone();
-        cloned.color = hexToColor(colorHex);
-        cloned.roughness = 0.35;   // Shinier anime look (was ~0.7 default)
-        cloned.metalness = 0.05;   // Slight specular sheen
+        const color = hexToColor(colorHex);
+        cloned.color = color;
+        cloned.roughness = 0.2;    // Glossy anime/vinyl toy look
+        cloned.metalness = 0.08;   // Subtle specular sheen
+        // Add slight emissive so dark cats self-illuminate
+        cloned.emissive = color;
+        cloned.emissiveIntensity = 0.08;
         if (Array.isArray(node.material)) {
           node.material[i] = cloned;
         } else {
@@ -155,8 +161,10 @@ function applyMaterials(scene: THREE.Group, materials: Cat3DMaterials, hasBlush:
 
       const newMat = new THREE.MeshStandardMaterial({
         color,
-        roughness: 0.35,   // Shinier anime look
-        metalness: 0.05,   // Slight specular sheen
+        roughness: 0.2,    // Glossy anime/vinyl toy look
+        metalness: 0.08,   // Subtle specular sheen
+        emissive: color,
+        emissiveIntensity: 0.08,  // Subtle self-illumination
       });
       node.material = newMat;
     });
@@ -181,10 +189,24 @@ export function CatModel3D({
   scale = 1,
   enableIdle = true,
   evolutionStage = 'baby',
+  equippedRenderNames = [],
 }: CatModel3DProps) {
   const config = getCat3DConfig(catId);
-  const accessoryProps = getAccessoryProps(catId, evolutionStage);
+  const evolutionAccessoryProps = getAccessoryProps(catId, evolutionStage);
   const modelAssetId = MODEL_PATHS[config.bodyType];
+
+  // Merge evolution-stage accessories with user-equipped accessories
+  const mergedAccessoryProps = useMemo(() => {
+    const evolutionNames = evolutionAccessoryProps?.accessories ?? [];
+    const allNames = [...new Set([...evolutionNames, ...equippedRenderNames])];
+    if (allNames.length === 0) return null;
+    return {
+      accessories: allNames,
+      accentColor: evolutionAccessoryProps?.accentColor ?? config.materials.accent,
+      hasGlow: evolutionAccessoryProps?.hasGlow ?? false,
+      auraIntensity: evolutionAccessoryProps?.auraIntensity ?? 0,
+    };
+  }, [evolutionAccessoryProps, equippedRenderNames, config.materials.accent]);
 
   // Resolve Metro asset ID → file:// URI before passing to useGLTF
   const [modelUri, setModelUri] = useState<string | null>(null);
@@ -203,7 +225,7 @@ export function CatModel3D({
     pose={pose}
     scale={scale}
     enableIdle={enableIdle}
-    accessoryProps={accessoryProps}
+    accessoryProps={mergedAccessoryProps}
   />;
 }
 
@@ -229,9 +251,9 @@ function CatModel3DInner({
 
   // Apply materials to the original scene (clone caused bounding box issues on device).
   // Use hardcoded scale — all 4 GLB models are ~5.4 Blender units tall.
-  // Camera at z=5, FOV 50° sees ~4.66 units. Scale 0.35 → model ~1.89 units → fits with margin.
-  const HARDCODED_SCALE = 0.385;  // +10% from 0.35 for more presence
-  const HARDCODED_Y_OFFSET = -1.04; // -5.4/2 * 0.385 ≈ -1.04 (centers model vertically)
+  // Camera at z=3.5, FOV 50° sees ~3.26 units. Scale 0.5 → model ~2.7 units → fills view nicely.
+  const HARDCODED_SCALE = 0.50;   // Large, prominent cat
+  const HARDCODED_Y_OFFSET = -1.35; // -5.4/2 * 0.50 = -1.35 (centers model vertically)
 
   useMemo(() => {
     applyMaterials(scene, config.materials, config.hasBlush);

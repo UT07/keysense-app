@@ -76,6 +76,56 @@ export const ACCESSORIES: Accessory[] = [
   { id: 'effect-lightning', name: 'Lightning', category: 'effects', rarity: 'legendary', gemCost: 120, minStage: 'master', icon: 'lightning-bolt' },
 ];
 
+/**
+ * Map shop accessory IDs → CatAccessories3D render names.
+ * null = no 3D geometry (effects, some outfits).
+ */
+export const ACCESSORY_RENDER_NAMES: Record<string, string | null> = {
+  // Hats
+  'hat-beret': 'beanie',
+  'hat-tophat': 'fedora',
+  'hat-santa': 'beanie',
+  'hat-wizard': 'fedora',
+  'hat-pirate': 'fedora',
+  'hat-crown': 'crown',
+  // Glasses
+  'glass-round': 'round-glasses',
+  'glass-sunglasses': 'sunglasses',
+  'glass-monocle': 'monocle',
+  'glass-star': 'pixel-glasses',
+  'glass-heart': 'round-glasses',
+  // Outfits
+  'outfit-tuxedo': 'bow-tie',
+  'outfit-hawaiian': null,
+  'outfit-hoodie': null,
+  'outfit-superhero': 'cape',
+  'outfit-robe': 'royal-robe',
+  // Capes
+  'cape-red': 'cape',
+  'cape-wings': 'cape',
+  'cape-guitar': null,
+  'cape-notes': null,
+  'cape-rainbow': 'golden-cape',
+  // Collars
+  'collar-bowtie': 'bow-tie',
+  'collar-scarf': 'scarf',
+  'collar-bandana': 'scarf',
+  'collar-necklace': 'pearl-necklace',
+  'collar-medal': 'gem-pendant',
+  // Effects (auras — no 3D geometry)
+  'effect-sparkle': null,
+  'effect-fire': null,
+  'effect-rainbow': null,
+  'effect-lightning': null,
+};
+
+/** Convert equipped accessory IDs to 3D render names (filtering out nulls) */
+export function getEquippedRenderNames(equippedAccessories: Record<string, string>): string[] {
+  return Object.values(equippedAccessories)
+    .map((id) => ACCESSORY_RENDER_NAMES[id])
+    .filter((name): name is string => name != null);
+}
+
 /** Get accessories by category */
 export function getAccessoriesByCategory(category: AccessoryCategory): Accessory[] {
   return ACCESSORIES.filter((a) => a.category === category);
