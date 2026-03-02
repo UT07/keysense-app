@@ -64,7 +64,8 @@ export function PressableScale({
   }));
 
   const handlePressIn = useCallback(() => {
-    scale.value = withSpring(scaleDown, { damping: 15, stiffness: 200 });
+    // Snap in fast: high stiffness + damping for immediate response
+    scale.value = withSpring(scaleDown, { damping: 20, stiffness: 350, mass: 0.8 });
     if (glowOnPress) {
       glowOpacity.value = withSpring(1, { damping: 20, stiffness: 300 });
     }
@@ -78,9 +79,10 @@ export function PressableScale({
   }, [scale, scaleDown, glowOnPress, glowOpacity, soundOnPress, haptic]);
 
   const handlePressOut = useCallback(() => {
-    scale.value = withSpring(1, { damping: 12, stiffness: 180 });
+    // Bounce back: lower damping for satisfying overshoot on release
+    scale.value = withSpring(1, { damping: 10, stiffness: 250, mass: 0.8 });
     if (glowOnPress) {
-      glowOpacity.value = withSpring(0, { damping: 20, stiffness: 300 });
+      glowOpacity.value = withSpring(0, { damping: 15, stiffness: 200 });
     }
   }, [scale, glowOnPress, glowOpacity]);
 

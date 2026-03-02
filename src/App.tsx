@@ -17,6 +17,7 @@ import { useAuthStore } from './stores/authStore';
 import { useAchievementStore } from './stores/achievementStore';
 import { useLearnerProfileStore } from './stores/learnerProfileStore';
 import { levelFromXp } from './core/progression/XpSystem';
+import type { PlaybackSpeed, PreferredInputMethod, MicDetectionMode } from './stores/types';
 import { syncManager } from './services/firebase/syncService';
 import { migrateLocalToCloud } from './services/firebase/dataMigration';
 import { hydrateGemStore } from './stores/gemStore';
@@ -94,6 +95,11 @@ export default function App(): React.ReactElement {
             soundEnabled, hapticEnabled, metronomeVolume, keyboardVolume,
             showFingerNumbers, showNoteNames, preferredHand, darkMode, showTutorials,
             lastMidiDeviceId, lastMidiDeviceName, autoConnectMidi,
+            // Phase 8-11 fields (must be hydrated or they revert to defaults on restart)
+            equippedAccessories, ownedAccessories, playbackSpeed,
+            uiSoundEnabled, uiSoundVolume, preferredInputMethod, micDetectionMode,
+            showPianoRoll, showStaffNotation, audioBufferSize,
+            reminderEnabled, completionNotifications,
           } = savedSettings as Record<string, unknown>;
           useSettingsStore.setState({
             ...(hasCompletedOnboarding != null ? { hasCompletedOnboarding: hasCompletedOnboarding as boolean } : {}),
@@ -116,6 +122,19 @@ export default function App(): React.ReactElement {
             ...(lastMidiDeviceId !== undefined ? { lastMidiDeviceId: lastMidiDeviceId as string | null } : {}),
             ...(lastMidiDeviceName !== undefined ? { lastMidiDeviceName: lastMidiDeviceName as string | null } : {}),
             ...(autoConnectMidi != null ? { autoConnectMidi: autoConnectMidi as boolean } : {}),
+            // Phase 8-11 fields
+            ...(equippedAccessories != null ? { equippedAccessories: equippedAccessories as Record<string, string> } : {}),
+            ...(ownedAccessories != null ? { ownedAccessories: ownedAccessories as string[] } : {}),
+            ...(playbackSpeed != null ? { playbackSpeed: playbackSpeed as PlaybackSpeed } : {}),
+            ...(uiSoundEnabled != null ? { uiSoundEnabled: uiSoundEnabled as boolean } : {}),
+            ...(uiSoundVolume != null ? { uiSoundVolume: uiSoundVolume as number } : {}),
+            ...(preferredInputMethod ? { preferredInputMethod: preferredInputMethod as PreferredInputMethod } : {}),
+            ...(micDetectionMode ? { micDetectionMode: micDetectionMode as MicDetectionMode } : {}),
+            ...(showPianoRoll != null ? { showPianoRoll: showPianoRoll as boolean } : {}),
+            ...(showStaffNotation != null ? { showStaffNotation: showStaffNotation as boolean } : {}),
+            ...(audioBufferSize != null ? { audioBufferSize: audioBufferSize as number } : {}),
+            ...(reminderEnabled != null ? { reminderEnabled: reminderEnabled as boolean } : {}),
+            ...(completionNotifications != null ? { completionNotifications: completionNotifications as boolean } : {}),
           });
           console.log('[App] Settings state hydrated from storage (onboarding:', hasCompletedOnboarding, ')');
         }

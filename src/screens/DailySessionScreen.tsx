@@ -474,10 +474,10 @@ const styles = StyleSheet.create({
     ...SHADOWS.sm,
     marginHorizontal: SPACING.md,
     padding: SPACING.md,
-    backgroundColor: COLORS.surface,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: 'rgba(255,255,255,0.10)',
     marginBottom: SPACING.lg,
   },
   skillProgressRow: {
@@ -615,10 +615,10 @@ const styles = StyleSheet.create({
   reasoningCard: {
     marginHorizontal: SPACING.md,
     padding: SPACING.md,
-    backgroundColor: COLORS.surface,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: 'rgba(255,255,255,0.10)',
     marginBottom: SPACING.md,
   },
   reasoningHeader: {

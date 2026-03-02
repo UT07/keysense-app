@@ -648,7 +648,18 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     if (currentAbilityConfig) {
       // Score boost (cap at 100)
       if (currentAbilityConfig.scoreBoostPercent > 0) {
-        score = { ...score, overall: Math.min(100, score.overall + currentAbilityConfig.scoreBoostPercent) };
+        const boostedOverall = Math.min(100, score.overall + currentAbilityConfig.scoreBoostPercent);
+        score = {
+          ...score,
+          overall: boostedOverall,
+          // Recompute isPassed after boost — otherwise a boosted-above-threshold
+          // score still shows as "failed", blocking player progression.
+          isPassed: boostedOverall >= exercise.scoring.passingScore,
+          // Recompute stars after boost
+          stars: (boostedOverall >= exercise.scoring.starThresholds[2] ? 3
+            : boostedOverall >= exercise.scoring.starThresholds[1] ? 2
+            : boostedOverall >= exercise.scoring.starThresholds[0] ? 1 : 0) as 0 | 1 | 2 | 3,
+        };
       }
       // XP multiplier
       if (currentAbilityConfig.xpMultiplier > 1) {
@@ -1157,6 +1168,15 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
   const consumedNoteIndicesRef = useRef<Set<number>>(new Set());
   const shakeRef = useRef<ScreenShakeRef>(null);
 
+  // Refs for values read inside the external-note effect to avoid stale closures.
+  // These sync on every render so the effect always reads current values.
+  const isPlayingRef = useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
+  const isPausedRef = useRef(isPaused);
+  isPausedRef.current = isPaused;
+  const activeInputMethodRef = useRef(activeInputMethod);
+  activeInputMethodRef.current = activeInputMethod;
+
   // Hit particle state
   const [hitParticle, setHitParticle] = useState({ x: 0, y: 0, color: '#fff', trigger: 0 });
   // Red flash on miss
@@ -1607,19 +1627,26 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       });
     }, 300);
 
-    // Trigger feedback scoring (same path as touch, but skip audio since hook handles it)
-    if (isPlaying && !isPaused && countInComplete) {
+    // Trigger feedback scoring (same path as touch, but skip audio since hook handles it).
+    // Read from refs to avoid stale closures — this effect only re-runs on externalNoteCount.
+    const curIsPlaying = isPlayingRef.current;
+    const curIsPaused = isPausedRef.current;
+    const curCountInComplete = realtimeBeatRef.current >= 0;
+    const curExercise = exerciseRef.current;
+    const curInputMethod = activeInputMethodRef.current;
+
+    if (curIsPlaying && !curIsPaused && curCountInComplete) {
       // Feed into the same nearest-note matching for visual feedback
       const realtimeBeat = realtimeBeatRef.current;
-      const msPerBeat = 60000 / exercise.settings.tempo;
-      const graceWindowBeats = exercise.scoring.timingGracePeriodMs / msPerBeat;
-      const toleranceWindowBeats = exercise.scoring.timingToleranceMs / msPerBeat;
+      const msPerBeat = 60000 / curExercise.settings.tempo;
+      const graceWindowBeats = curExercise.scoring.timingGracePeriodMs / msPerBeat;
+      const toleranceWindowBeats = curExercise.scoring.timingToleranceMs / msPerBeat;
       const matchWindowBeats = Math.max(graceWindowBeats, toleranceWindowBeats) + 0.35;
 
       let bestMatch: { index: number; beatDiffSigned: number; startBeat: number; matchScore: number } | null = null;
 
-      for (let i = 0; i < exercise.notes.length; i++) {
-        const note = exercise.notes[i];
+      for (let i = 0; i < curExercise.notes.length; i++) {
+        const note = curExercise.notes[i];
         if (consumedNoteIndicesRef.current.has(i)) continue;
         if (note.note !== externalNote.note) continue;
         const beatDiffSigned = realtimeBeat - note.startBeat;
@@ -1635,15 +1662,15 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         consumedNoteIndicesRef.current.add(bestMatch.index);
         const beatDiffMs = Math.abs(bestMatch.beatDiffSigned) * msPerBeat;
         let feedbackType: FeedbackState['type'];
-        if (beatDiffMs <= exercise.scoring.timingToleranceMs * 0.5) feedbackType = 'perfect';
-        else if (beatDiffMs <= exercise.scoring.timingToleranceMs) feedbackType = 'good';
-        else if (beatDiffMs <= exercise.scoring.timingGracePeriodMs) feedbackType = bestMatch.beatDiffSigned < 0 ? 'early' : 'late';
+        if (beatDiffMs <= curExercise.scoring.timingToleranceMs * 0.5) feedbackType = 'perfect';
+        else if (beatDiffMs <= curExercise.scoring.timingToleranceMs) feedbackType = 'good';
+        else if (beatDiffMs <= curExercise.scoring.timingGracePeriodMs) feedbackType = bestMatch.beatDiffSigned < 0 ? 'early' : 'late';
         else feedbackType = 'ok';
 
         setComboCount((prev) => prev + 1);
         setFeedback({ type: feedbackType, noteIndex: bestMatch.index, timestamp: Date.now(), timingOffsetMs: bestMatch.beatDiffSigned * msPerBeat });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      } else if (activeInputMethod !== 'mic') {
+      } else if (curInputMethod !== 'mic') {
         // Only show "miss" for non-mic inputs. When mic is active, unmatched
         // external notes are often speaker echoes of touch events that were
         // already consumed by handleKeyDown. Showing "miss" would incorrectly

@@ -30,6 +30,7 @@ import type { LeagueStandingEntry } from '../stores/leagueStore';
 import { useAuthStore } from '../stores/authStore';
 import { getLeagueStandings } from '../services/firebase/leagueService';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../theme/tokens';
+import { GradientMeshBackground } from '../components/effects';
 import { PressableScale } from '../components/common/PressableScale';
 import { Cat3DCanvas } from '../components/Mascot/3d';
 import type { RootStackParamList } from '../navigation/AppNavigator';
@@ -346,6 +347,7 @@ export function LeaderboardScreen(): React.JSX.Element {
 
   return (
     <SafeAreaView style={styles.container} testID="leaderboard-screen">
+      <GradientMeshBackground accent="leaderboard" />
       {/* Header */}
       <View style={styles.header}>
         <PressableScale onPress={handleGoBack} style={styles.backButton} testID="leaderboard-back">

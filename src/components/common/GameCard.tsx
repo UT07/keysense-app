@@ -12,7 +12,6 @@ import { PressableScale } from './PressableScale';
 import {
   RARITY,
   type RarityLevel,
-  COLORS,
   BORDER_RADIUS,
   SHADOWS,
   SPACING,
@@ -39,7 +38,7 @@ export function GameCard({
     borderWidth: 1.5,
     borderColor: rarityConfig.borderColor,
     borderRadius: BORDER_RADIUS.lg,
-    backgroundColor: COLORS.cardSurface,
+    backgroundColor: 'rgba(26, 22, 40, 0.85)',
     padding: SPACING.md,
     ...SHADOWS.md,
   };

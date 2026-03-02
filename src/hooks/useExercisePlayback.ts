@@ -653,8 +653,10 @@ export function useExercisePlayback({
         console.warn(`[useExercisePlayback] Audio not ready — note ${note} skipped. Engine state: ${audioEngine.getState()}`);
       }
 
-      // Only record notes for scoring when exercise is playing
-      if (!isPlaying) return;
+      // Only record notes for scoring when exercise is playing.
+      // Use ref (not state) to avoid stale closure — the first few touch notes
+      // after startPlayback() could be dropped if React hasn't re-rendered yet.
+      if (!isPlayingRef.current) return;
 
       // When mic is the active input, do NOT record touch events for scoring.
       // The mic pipeline will pick up the speaker output and record its own noteOn
@@ -678,7 +680,9 @@ export function useExercisePlayback({
       setPlayedNotes([...playedNotesRef.current]);
       exerciseStore.addPlayedNote(midiEvent);
     },
-    [isPlaying, enableAudio, isAudioReady, audioEngine, exerciseStore, trackNoteOnIndex]
+    // isPlaying omitted — we use isPlayingRef.current inside the callback
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [enableAudio, isAudioReady, audioEngine, exerciseStore, trackNoteOnIndex]
   );
 
   /**
@@ -686,7 +690,7 @@ export function useExercisePlayback({
    */
   const releaseNote = useCallback(
     (note: number) => {
-      if (isPlaying) {
+      if (isPlayingRef.current) {
         closeLatestNoteDuration(note, Date.now());
       }
 
@@ -698,7 +702,9 @@ export function useExercisePlayback({
         activeNotesRef.current.delete(note);
       }
     },
-    [isPlaying, enableAudio, isAudioReady, audioEngine, closeLatestNoteDuration]
+    // isPlaying omitted — we use isPlayingRef.current inside the callback
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [enableAudio, isAudioReady, audioEngine, closeLatestNoteDuration]
   );
 
   return {

@@ -292,7 +292,7 @@ function BuyModal({ visible, cat, gems, onConfirm, onCancel }: {
             colors={[cat.color + '20', 'transparent']}
             style={StyleSheet.absoluteFill}
           />
-          <Cat3DCanvas catId={cat.id} size={100} mood="happy" pose="idle" />
+          <Cat3DCanvas catId={cat.id} size={100} mood="happy" pose="idle" forceSVG />
           <Text style={styles.modalTitle}>Unlock {cat.name}?</Text>
           <View style={styles.modalCostRow}>
             <MaterialCommunityIcons name="diamond-stone" size={18} color={COLORS.gemGold} />
@@ -414,6 +414,7 @@ function CatCard({ cat, isSelected, isOwned, evolutionXp, stage, unlockedAbiliti
               size={140}
               pose={isSelected ? 'celebrate' : 'idle'}
               evolutionStage={stage}
+              forceSVG
             />
           </View>
         ) : (
@@ -424,6 +425,7 @@ function CatCard({ cat, isSelected, isOwned, evolutionXp, stage, unlockedAbiliti
                 size={140}
                 mood="happy"
                 pose="idle"
+                forceSVG
               />
             </View>
             <View style={styles.lockedBadge}>

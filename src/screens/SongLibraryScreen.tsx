@@ -630,11 +630,11 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.lg,
     marginTop: SPACING.sm,
     marginBottom: SPACING.xs,
-    backgroundColor: COLORS.surface,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: BORDER_RADIUS.md,
     paddingHorizontal: SPACING.sm,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: 'rgba(255,255,255,0.10)',
   },
   searchInput: {
     flex: 1,
@@ -681,11 +681,11 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   songCard: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: BORDER_RADIUS.md,
     marginBottom: SPACING.sm,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: 'rgba(255,255,255,0.10)',
   },
   songCardContent: {
     flexDirection: 'row',

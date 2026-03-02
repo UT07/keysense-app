@@ -45,6 +45,7 @@ import { CAT_CHARACTERS, getCatById } from '../components/Mascot/catCharacters';
 import { StreakFlame } from '../components/StreakFlame';
 import { getLevelProgress } from '../core/progression/XpSystem';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, GRADIENTS, glowColor, shadowGlow } from '../theme/tokens';
+import { GradientMeshBackground } from '../components/effects';
 import { useAuthStore } from '../stores/authStore';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
@@ -464,6 +465,7 @@ export function ProfileScreen(): React.ReactElement {
 
   return (
     <SafeAreaView style={styles.container} testID="profile-screen">
+      <GradientMeshBackground accent="profile" />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -471,7 +473,7 @@ export function ProfileScreen(): React.ReactElement {
       >
         {/* Gradient Header with cat avatar centerpiece and level progress ring */}
         <LinearGradient
-          colors={[catColor + '22', COLORS.surface, COLORS.background]}
+          colors={[catColor + '22', 'transparent', 'transparent']}
           style={styles.header}
         >
           <TouchableOpacity
@@ -1054,12 +1056,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.surface,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     padding: SPACING.md,
     borderRadius: BORDER_RADIUS.md,
     marginBottom: SPACING.sm,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: 'rgba(255,255,255,0.10)',
   },
   settingLeft: {
     flexDirection: 'row',
@@ -1125,12 +1127,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    backgroundColor: COLORS.surface,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: BORDER_RADIUS.md,
     padding: SPACING.md,
     paddingBottom: SPACING.md - 4,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: 'rgba(255,255,255,0.10)',
     height: 140,
     position: 'relative',
   },
@@ -1228,9 +1230,9 @@ const styles = StyleSheet.create({
     } : { elevation: 4 }),
   },
   achievementBadgeLocked: {
-    backgroundColor: COLORS.background,
+    backgroundColor: 'rgba(255,255,255,0.04)',
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: 'rgba(255,255,255,0.10)',
   },
   achievementBadgeRecent: {
     shadowColor: COLORS.starGold,
@@ -1313,7 +1315,7 @@ const styles = StyleSheet.create({
   // Evolution progress
   evolutionCard: {
     ...SHADOWS.sm,
-    backgroundColor: COLORS.surface,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.md,
     borderWidth: 1,
