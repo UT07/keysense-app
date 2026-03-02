@@ -43,6 +43,7 @@ import { GradientMeshBackground } from '../components/effects';
 import { useAuthStore } from '../stores/authStore';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS } from '../theme/tokens';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+import { logger } from '../utils/logger';
 
 type AuthNavProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -219,7 +220,7 @@ export function AuthScreen(): React.ReactElement {
     } catch (err: unknown) {
       const errObj = err as { code?: string; message?: string };
       if (errObj.code === 'ERR_REQUEST_CANCELED') return;
-      console.warn('[AuthScreen] Apple sign-in error:', err);
+      logger.warn('[AuthScreen] Apple sign-in error:', err);
       Alert.alert('Sign-In Failed', errObj.message ?? 'Apple Sign-In failed. Please try again.');
     }
   }, []);
@@ -248,7 +249,7 @@ export function AuthScreen(): React.ReactElement {
     } catch (err: unknown) {
       const errObj = err as { code?: string; message?: string };
       if (errObj.code === 'SIGN_IN_CANCELLED') return;
-      console.warn('[AuthScreen] Google sign-in error:', err);
+      logger.warn('[AuthScreen] Google sign-in error:', err);
       Alert.alert('Sign-In Failed', errObj.message ?? 'Google Sign-In failed. Please try again.');
     }
   }, []);

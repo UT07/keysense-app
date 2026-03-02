@@ -40,6 +40,7 @@ import { useAchievementStore } from './achievementStore';
 import { useLearnerProfileStore } from './learnerProfileStore';
 import { useSocialStore } from './socialStore';
 import { useLeagueStore } from './leagueStore';
+import { logger } from '../utils/logger';
 
 // ============================================================================
 // Types
@@ -96,7 +97,7 @@ function resetAllStores(): void {
     try {
       reset();
     } catch (err) {
-      console.warn(`[Auth] Failed to reset ${name} store:`, err);
+      logger.warn(`[Auth] Failed to reset ${name} store:`, err);
     }
   }
 }
@@ -198,7 +199,7 @@ async function ensureSocialSetup(uid: string, displayName: string): Promise<void
     }
     useLeagueStore.getState().setMembership(membership);
   } catch (err) {
-    console.warn('[Social] League membership check failed:', err);
+    logger.warn('[Social] League membership check failed:', err);
   }
 
   // Friend code
@@ -209,7 +210,7 @@ async function ensureSocialSetup(uid: string, displayName: string): Promise<void
       useSocialStore.getState().setFriendCode(code);
     }
   } catch (err) {
-    console.warn('[Social] Friend code registration failed:', err);
+    logger.warn('[Social] Friend code registration failed:', err);
   }
 }
 
@@ -223,14 +224,14 @@ async function triggerPostSignInSync(): Promise<void> {
     const { migrateLocalToCloud } = require('../services/firebase/dataMigration');
     await migrateLocalToCloud();
   } catch (err) {
-    console.warn('[Auth] Post-sign-in migration failed:', err);
+    logger.warn('[Auth] Post-sign-in migration failed:', err);
   }
   try {
     const { syncManager } = require('../services/firebase/syncService');
     await syncManager.pullRemoteProgress();
     syncManager.startPeriodicSync();
   } catch (err) {
-    console.warn('[Auth] Post-sign-in pull failed:', err);
+    logger.warn('[Auth] Post-sign-in pull failed:', err);
   }
 
   // Set up social features (league membership + friend code)
@@ -243,7 +244,7 @@ async function triggerPostSignInSync(): Promise<void> {
       );
     }
   } catch (err) {
-    console.warn('[Auth] Post-sign-in social setup failed:', err);
+    logger.warn('[Auth] Post-sign-in social setup failed:', err);
   }
 }
 
@@ -268,7 +269,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // If Firebase API keys are missing (standalone build without EAS secrets),
     // skip Firebase auth and enter offline guest mode.
     if (!firebaseAvailable) {
-      console.warn('[Auth] Firebase API keys missing — entering offline guest mode');
+      logger.warn('[Auth] Firebase API keys missing — entering offline guest mode');
       set({
         user: null,
         isAuthenticated: false,
@@ -302,11 +303,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   signInAnonymously: async () => {
-    console.log('[Auth] signInAnonymously started');
+    logger.log('[Auth] signInAnonymously started');
     set({ isLoading: true, error: null });
 
     if (!firebaseAvailable) {
-      console.warn('[Auth] Firebase not available — using local guest mode');
+      logger.warn('[Auth] Firebase not available — using local guest mode');
       const guestUser = createLocalGuestUser();
       set({ user: guestUser as any, isAuthenticated: true, isAnonymous: true, isLoading: false, error: null });
       return;
@@ -314,7 +315,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     try {
       const result = await firebaseSignInAnonymously(auth);
-      console.log('[Auth] signInAnonymously success, uid:', result.user.uid);
+      logger.log('[Auth] signInAnonymously success, uid:', result.user.uid);
       set({
         user: result.user,
         isAuthenticated: true,
@@ -325,7 +326,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       if (shouldEnableLocalGuestMode(error)) {
         const guestUser = createLocalGuestUser();
-        console.warn('[Auth] Anonymous auth unavailable, entering local guest mode.');
+        logger.warn('[Auth] Anonymous auth unavailable, entering local guest mode.');
         set({
           user: guestUser,
           isAuthenticated: true,
@@ -570,7 +571,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (signOutSucceeded) {
         // Firebase sign-out worked but cleanup threw — force-clear state.
         // Leaving a stale user reference after sign-out is worse than the cleanup error.
-        console.warn('[Auth] Post-signout cleanup failed, forcing state clear:', error);
+        logger.warn('[Auth] Post-signout cleanup failed, forcing state clear:', error);
         cancelAllPendingSaves();
         await PersistenceManager.clearAll().catch(() => {});
         resetAllStores();
@@ -607,7 +608,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       try {
         await deleteUserData(user.uid);
       } catch (err) {
-        console.warn('[Auth] Firestore cleanup failed (non-blocking):', err);
+        logger.warn('[Auth] Firestore cleanup failed (non-blocking):', err);
       }
 
       // 2. Delete the Firebase Auth user.
@@ -646,7 +647,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isLoading: false,
           error: null,
         });
-        console.warn('[Auth] Post-delete cleanup failed, forcing state clear:', error);
+        logger.warn('[Auth] Post-delete cleanup failed, forcing state clear:', error);
         cancelAllPendingSaves();
         await PersistenceManager.clearAll().catch(() => {});
         resetAllStores();
@@ -677,7 +678,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       try {
         await deleteUserData(user.uid);
       } catch (err) {
-        console.warn('[Auth] Firestore cleanup failed (non-blocking):', err);
+        logger.warn('[Auth] Firestore cleanup failed (non-blocking):', err);
       }
 
       await deleteUser(user);
@@ -706,7 +707,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isLoading: false,
           error: null,
         });
-        console.warn('[Auth] Post-delete cleanup failed, forcing state clear:', error);
+        logger.warn('[Auth] Post-delete cleanup failed, forcing state clear:', error);
         cancelAllPendingSaves();
         await PersistenceManager.clearAll().catch(() => {});
         resetAllStores();

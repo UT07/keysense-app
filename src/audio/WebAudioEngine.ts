@@ -21,6 +21,7 @@ import {
   GainNode as RNGainNode,
 } from 'react-native-audio-api';
 import type { IAudioEngine, NoteHandle, AudioContextState } from './types';
+import { logger } from '../utils/logger';
 
 const DEFAULT_VOLUME = 0.5;
 const MAX_POLYPHONY = 10;
@@ -85,7 +86,7 @@ export class WebAudioEngine implements IAudioEngine {
    */
   async initialize(): Promise<void> {
     if (this.context) {
-      console.warn('[WebAudioEngine] Already initialized');
+      logger.warn('[WebAudioEngine] Already initialized');
       return;
     }
 
@@ -107,7 +108,7 @@ export class WebAudioEngine implements IAudioEngine {
       this.masterGain.connect(this.limiterGain);
 
       const initMs = Date.now() - initStart;
-      console.log(`[WebAudioEngine] Context created in ${initMs}ms (sampleRate=${this.context.sampleRate})`);
+      logger.log(`[WebAudioEngine] Context created in ${initMs}ms (sampleRate=${this.context.sampleRate})`);
 
       // Attempt to resume the context (may succeed on Android, will be deferred on iOS
       // until first user gesture triggers playNote which has its own resume check)
@@ -120,7 +121,7 @@ export class WebAudioEngine implements IAudioEngine {
       // Pre-warm the audio pipeline to avoid cold-start latency on first real note
       this.warmUpAudio();
 
-      console.log('[WebAudioEngine] Initialized successfully (react-native-audio-api, 3-harmonic oscillator synthesis)');
+      logger.log('[WebAudioEngine] Initialized successfully (react-native-audio-api, 3-harmonic oscillator synthesis)');
     } catch (error) {
       console.error('[WebAudioEngine] Initialization failed:', error);
       this.context = null;
@@ -161,10 +162,10 @@ export class WebAudioEngine implements IAudioEngine {
       osc.stop(now + 0.03); // Stop after 30ms
 
       const warmMs = Date.now() - warmStart;
-      console.log(`[WebAudioEngine] Audio pipeline pre-warmed in ${warmMs}ms`);
+      logger.log(`[WebAudioEngine] Audio pipeline pre-warmed in ${warmMs}ms`);
     } catch (error) {
       // Non-critical — first real note will just have slightly higher latency
-      console.warn('[WebAudioEngine] Warm-up failed (non-critical):', error);
+      logger.warn('[WebAudioEngine] Warm-up failed (non-critical):', error);
     }
   }
 
@@ -214,7 +215,7 @@ export class WebAudioEngine implements IAudioEngine {
     this.limiterGain = null;
     this.activeNotes.clear();
     this.oldestNoteKey = -1;
-    console.log('[WebAudioEngine] Disposed');
+    logger.log('[WebAudioEngine] Disposed');
   }
 
   /**

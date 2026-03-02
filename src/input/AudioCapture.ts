@@ -12,6 +12,7 @@
  */
 
 import { AudioRecorder, AudioManager } from 'react-native-audio-api';
+import { logger } from '../utils/logger';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,7 +64,7 @@ export class AudioCapture {
         sampleRate: this.config.sampleRate,
         bufferLengthInSamples: this.config.bufferSize,
       });
-      console.log(
+      logger.log(
         `[AudioCapture] AudioRecorder created (sampleRate=${this.config.sampleRate}, bufferSize=${this.config.bufferSize})`
       );
     } catch (error) {
@@ -92,7 +93,7 @@ export class AudioCapture {
       // Log first 5 buffers and then every 200th for ongoing diagnostics
       if (this.bufferCount <= 5 || this.bufferCount % 200 === 0) {
         const maxAmp = samples.reduce((max, s) => Math.max(max, Math.abs(s)), 0);
-        console.log(
+        logger.log(
           `[AudioCapture] Buffer #${this.bufferCount}: ${samples.length} samples, ` +
           `maxAmplitude=${maxAmp.toFixed(4)}, timestamp=${timestamp.toFixed(0)}ms`
         );
@@ -104,7 +105,7 @@ export class AudioCapture {
     });
 
     this.isInitialized = true;
-    console.log('[AudioCapture] Initialized successfully');
+    logger.log('[AudioCapture] Initialized successfully');
   }
 
   /**
@@ -122,7 +123,7 @@ export class AudioCapture {
 
     try {
       this.recorder.start();
-      console.log('[AudioCapture] Recording started');
+      logger.log('[AudioCapture] Recording started');
 
       // Watchdog: warn if no audio buffers arrive within 3 seconds.
       // This typically indicates the iOS audio session is misconfigured
@@ -131,7 +132,7 @@ export class AudioCapture {
         if (this.isCapturing && this.bufferCount === 0) {
           // Use console.warn (not .error) — this is a diagnostic, not a crash.
           // console.error triggers the red error overlay in dev builds.
-          console.warn(
+          logger.warn(
             '[AudioCapture] No audio buffers received after 3s. ' +
             'The iOS audio session may not be configured for recording. ' +
             'Check that ensureAudioModeConfigured(true) was awaited before start().'
@@ -159,7 +160,7 @@ export class AudioCapture {
 
     try {
       this.recorder.stop();
-      console.log(`[AudioCapture] Recording stopped after ${this.bufferCount} buffers`);
+      logger.log(`[AudioCapture] Recording stopped after ${this.bufferCount} buffers`);
     } catch (error) {
       console.error('[AudioCapture] Failed to stop recording:', error);
     }
@@ -249,9 +250,9 @@ export function configureAudioSessionForRecording(): void {
       iosOptions: ['defaultToSpeaker', 'allowBluetooth'],
       iosAllowHaptics: true,
     });
-    console.log('[AudioCapture] Audio session configured for playAndRecord (via AudioManager)');
+    logger.log('[AudioCapture] Audio session configured for playAndRecord (via AudioManager)');
   } catch (error) {
-    console.warn('[AudioCapture] Failed to configure audio session via AudioManager:', error);
+    logger.warn('[AudioCapture] Failed to configure audio session via AudioManager:', error);
   }
 }
 
@@ -280,10 +281,10 @@ export async function requestMicrophonePermission(): Promise<boolean> {
       5000,
       'AudioManager.requestRecordingPermissions',
     );
-    console.log(`[AudioCapture] Mic permission request result (AudioManager): ${status}`);
+    logger.log(`[AudioCapture] Mic permission request result (AudioManager): ${status}`);
     return status === 'Granted';
   } catch (error) {
-    console.warn('[AudioCapture] AudioManager permission request failed, trying expo-av:', error);
+    logger.warn('[AudioCapture] AudioManager permission request failed, trying expo-av:', error);
     // Fallback to expo-av (also with 5s timeout)
     try {
       const { Audio } = require('expo-av');
@@ -292,7 +293,7 @@ export async function requestMicrophonePermission(): Promise<boolean> {
         5000,
         'Audio.requestPermissionsAsync',
       );
-      console.log(`[AudioCapture] Mic permission request result (expo-av): ${status}`);
+      logger.log(`[AudioCapture] Mic permission request result (expo-av): ${status}`);
       return status === 'granted';
     } catch (fallbackError) {
       console.error('[AudioCapture] All mic permission request methods failed:', fallbackError);
@@ -311,10 +312,10 @@ export async function checkMicrophonePermission(): Promise<boolean> {
       3000,
       'AudioManager.checkRecordingPermissions',
     );
-    console.log(`[AudioCapture] Mic permission check (AudioManager): ${status}`);
+    logger.log(`[AudioCapture] Mic permission check (AudioManager): ${status}`);
     return status === 'Granted';
   } catch (error) {
-    console.warn('[AudioCapture] AudioManager permission check failed, trying expo-av:', error);
+    logger.warn('[AudioCapture] AudioManager permission check failed, trying expo-av:', error);
     try {
       const { Audio } = require('expo-av');
       const { status } = await withTimeout<{ status: string }>(
@@ -322,7 +323,7 @@ export async function checkMicrophonePermission(): Promise<boolean> {
         3000,
         'Audio.getPermissionsAsync',
       );
-      console.log(`[AudioCapture] Mic permission check (expo-av): ${status}`);
+      logger.log(`[AudioCapture] Mic permission check (expo-av): ${status}`);
       return status === 'granted';
     } catch (fallbackError) {
       console.error('[AudioCapture] All mic permission check methods failed:', fallbackError);

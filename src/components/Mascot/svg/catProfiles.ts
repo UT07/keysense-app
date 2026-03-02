@@ -7,6 +7,7 @@
  */
 
 import type { BodyType, EarType, EyeShape, TailType } from './CatParts';
+import { getCatColors } from '../catColorPalette';
 
 export interface CatProfile {
   body: BodyType;
@@ -37,7 +38,7 @@ export const CAT_PROFILES: Record<string, CatProfile> = {
     tail: 'curled',
     cheekFluff: false,
     blush: true,
-    blushColor: '#FF9999',
+    blushColor: getCatColors('mini-meowww').blush ?? undefined,
   },
   'jazzy': {
     body: 'slim',
@@ -64,7 +65,7 @@ export const CAT_PROFILES: Record<string, CatProfile> = {
     tail: 'curled',
     cheekFluff: true,
     blush: true,
-    blushColor: '#FFAAAA',
+    blushColor: getCatColors('biscuit').blush ?? undefined,
   },
   'ballymakawww': {
     body: 'round',
@@ -73,7 +74,7 @@ export const CAT_PROFILES: Record<string, CatProfile> = {
     tail: 'straight',
     cheekFluff: true,
     blush: true,
-    blushColor: '#FFB07C',
+    blushColor: getCatColors('ballymakawww').blush ?? undefined,
   },
   'aria': {
     body: 'slim',
@@ -98,7 +99,7 @@ export const CAT_PROFILES: Record<string, CatProfile> = {
     tail: 'curled',
     cheekFluff: false,
     blush: true,
-    blushColor: '#FFCCAA',
+    blushColor: getCatColors('shibu').blush ?? undefined,
   },
   'bella': {
     body: 'round',
@@ -107,7 +108,7 @@ export const CAT_PROFILES: Record<string, CatProfile> = {
     tail: 'fluffy',
     cheekFluff: true,
     blush: true,
-    blushColor: '#FFD1DC',
+    blushColor: getCatColors('bella').blush ?? undefined,
   },
   'sable': {
     body: 'slim',
@@ -134,7 +135,7 @@ export const CAT_PROFILES: Record<string, CatProfile> = {
     tail: 'fluffy',
     cheekFluff: true,
     blush: true,
-    blushColor: '#FFB74D',
+    blushColor: getCatColors('chonky-monke').blush ?? undefined,
   },
 
   // ─── Coach NPC ──────────────────────────────
@@ -145,7 +146,7 @@ export const CAT_PROFILES: Record<string, CatProfile> = {
     tail: 'curled',
     cheekFluff: false,
     blush: true,
-    blushColor: '#FF5252',
+    blushColor: getCatColors('salsa').blush ?? undefined,
   },
 };
 

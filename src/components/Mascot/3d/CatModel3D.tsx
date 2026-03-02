@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import { Asset } from 'expo-asset';
 
 import type { CatPose } from '../animations/catAnimations';
+import { logger } from '../../../utils/logger';
 import type { EvolutionStage } from '@/stores/types';
 import { getCat3DConfig, getAnimationName, MODEL_PATHS } from './cat3DConfig';
 import { getAccessoryProps } from './cat3DConfig';
@@ -57,10 +58,9 @@ interface CatModel3DProps {
 
 /**
  * Material name → config property mapping.
- * GLB models use different naming conventions depending on how they were exported:
- *   - salsa-cat: Mat_Body, Mat_Belly, Mat_EarInner, Mat_Iris, Mat_Nose, Mat_Blush
- *   - chonky-cat: Body, Belly, Ear_Inner_L, Eye_Iris_L, Nose, Blush_L
- *   - slim/round: No materials (single uncolored mesh)
+ * All chibi GLB models use per-mesh named materials:
+ *   Body, Belly, Ear_Inner_L/R, Eye_Iris_L/R, Eye_White_L/R, Nose, Mouth, Blush_L/R, Tail
+ * Legacy Mat_ prefix entries kept for backwards compatibility.
  */
 const MATERIAL_NAME_MAP: Record<string, keyof Cat3DMaterials> = {
   // salsa-cat format (Mat_ prefix, shared per side)
@@ -70,16 +70,20 @@ const MATERIAL_NAME_MAP: Record<string, keyof Cat3DMaterials> = {
   'Mat_Iris': 'eye',
   'Mat_Nose': 'nose',
   'Mat_Blush': 'blush',
-  // chonky-cat format (no prefix, separate per side)
+  // chibi cat format (no prefix, separate per side)
   'Body': 'body',
   'Belly': 'belly',
   'Ear_Inner_L': 'earInner',
   'Ear_Inner_R': 'earInner',
   'Eye_Iris_L': 'eye',
   'Eye_Iris_R': 'eye',
+  'Eye_White_L': 'belly',   // sclera uses belly (light) color
+  'Eye_White_R': 'belly',
   'Nose': 'nose',
+  'Mouth': 'nose',           // mouth uses nose color
   'Blush_L': 'blush',
   'Blush_R': 'blush',
+  'Tail': 'body',            // tail uses body color
 };
 
 const BLUSH_MATERIAL_NAMES = new Set([
@@ -224,7 +228,7 @@ export function CatModel3D({
   const [modelUri, setModelUri] = useState<string | null>(null);
   useEffect(() => {
     resolveAssetUri(modelAssetId).then(setModelUri).catch((err) => {
-      console.warn('[CatModel3D] Failed to resolve asset URI:', err);
+      logger.warn('[CatModel3D] Failed to resolve asset URI:', err);
     });
   }, [modelAssetId]);
 

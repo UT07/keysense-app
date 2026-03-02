@@ -13,6 +13,7 @@ import {
 } from './firestore';
 import type { ProgressChange, LessonProgress as FirestoreLessonProgress } from './firestore';
 import { useProgressStore } from '../../stores/progressStore';
+import { logger } from '../../utils/logger';
 import { useCatEvolutionStore } from '../../stores/catEvolutionStore';
 import { useGemStore } from '../../stores/gemStore';
 import { levelFromXp } from '../../core/progression/XpSystem';
@@ -360,7 +361,7 @@ export class SyncManager {
       ]);
 
       if (!remoteLessons.length && !remoteGamification && !remoteCats && !remoteGems) {
-        console.log('[Sync] No remote data found — nothing to pull');
+        logger.log('[Sync] No remote data found — nothing to pull');
         return { pulled: true, merged: false };
       }
 
@@ -374,7 +375,7 @@ export class SyncManager {
           level: levelFromXp(remoteGamification.xp),
         });
         didMerge = true;
-        console.log(
+        logger.log(
           `[Sync] Merged remote XP: ${remoteGamification.xp} (local was ${localState.totalXp})`,
         );
       }
@@ -520,7 +521,7 @@ export class SyncManager {
           didMerge = true;
         }
 
-        console.log(`[Sync] Cat evolution merged: ${mergedOwned.size} total cats`);
+        logger.log(`[Sync] Cat evolution merged: ${mergedOwned.size} total cats`);
       }
 
       // Merge gems: take higher balance
@@ -530,18 +531,18 @@ export class SyncManager {
           const diff = remoteGems.gems - localGems.gems;
           useGemStore.getState().earnGems(diff, 'cloud-sync');
           didMerge = true;
-          console.log(`[Sync] Merged remote gems: ${remoteGems.gems} (local was ${localGems.gems})`);
+          logger.log(`[Sync] Merged remote gems: ${remoteGems.gems} (local was ${localGems.gems})`);
         }
       }
 
       if (didMerge) {
-        console.log('[Sync] Remote progress merged into local state');
+        logger.log('[Sync] Remote progress merged into local state');
       }
 
       return { pulled: true, merged: didMerge };
     } catch (error) {
       const msg = (error as Error)?.message ?? 'Unknown error';
-      console.warn('[Sync] Failed to pull remote progress:', msg);
+      logger.warn('[Sync] Failed to pull remote progress:', msg);
       return { pulled: false, merged: false, error: msg };
     }
   }

@@ -33,6 +33,18 @@ import { useLeagueStore } from './leagueStore';
 import { addLeagueXp } from '@/services/firebase/leagueService';
 import { postActivity } from '@/services/firebase/socialService';
 import { auth } from '@/services/firebase/config';
+import { logger } from '@/utils/logger';
+
+/** Fire-and-forget with one retry after 2s delay. Logs failures but never throws. */
+function fireAndRetry(fn: () => Promise<unknown>, label: string): void {
+  fn().catch(() => {
+    setTimeout(() => {
+      fn().catch((err) => {
+        logger.warn(`[progressStore] ${label} failed after retry:`, (err as Error)?.message);
+      });
+    }, 2000);
+  });
+}
 
 // BUG-008 fix: Use local date string so streak day boundary matches user's wall clock
 function localToday(): string {
@@ -94,7 +106,7 @@ export const useProgressStore = create<ProgressStoreState>((set, get) => ({
     });
     const newLevel = get().level;
 
-    // Post level-up activity (fire-and-forget)
+    // Post level-up activity (fire-and-forget with logged failure)
     if (newLevel > oldLevel && auth.currentUser && !auth.currentUser.isAnonymous) {
       postActivity(auth.currentUser.uid, {
         id: `level-up-${newLevel}-${Date.now()}`,
@@ -104,7 +116,7 @@ export const useProgressStore = create<ProgressStoreState>((set, get) => ({
         type: 'level_up',
         detail: `Reached level ${newLevel}`,
         timestamp: Date.now(),
-      }).catch(() => {});
+      }).catch((err) => logger.warn('[progressStore] postActivity (addXp) failed:', (err as Error)?.message));
     }
 
     debouncedSave(get());
@@ -343,10 +355,13 @@ export const useProgressStore = create<ProgressStoreState>((set, get) => ({
     if (leagueMembership && auth.currentUser && !auth.currentUser.isAnonymous) {
       const newWeeklyXp = leagueMembership.weeklyXp + effectiveXp;
       useLeagueStore.getState().updateWeeklyXp(newWeeklyXp);
-      addLeagueXp(leagueMembership.leagueId, auth.currentUser.uid, effectiveXp).catch(() => {});
+      fireAndRetry(
+        () => addLeagueXp(leagueMembership.leagueId, auth.currentUser!.uid, effectiveXp),
+        'addLeagueXp',
+      );
     }
 
-    // ── Post level-up activity (fire-and-forget) ──
+    // ── Post level-up activity (fire-and-forget with logged failure) ──
     const newLevel = get().level;
     if (newLevel > oldLevel && auth.currentUser && !auth.currentUser.isAnonymous) {
       postActivity(auth.currentUser.uid, {
@@ -357,7 +372,7 @@ export const useProgressStore = create<ProgressStoreState>((set, get) => ({
         type: 'level_up',
         detail: `Reached level ${newLevel}`,
         timestamp: Date.now(),
-      }).catch(() => {});
+      }).catch((err) => logger.warn('[progressStore] postActivity (record) failed:', (err as Error)?.message));
     }
   },
 

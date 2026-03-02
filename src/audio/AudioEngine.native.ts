@@ -18,6 +18,7 @@
  */
 
 import type { IAudioEngine, NoteHandle, AudioContextState, NoteState, ADSRConfig } from './types';
+import { logger } from '../utils/logger';
 import { SampleLoader } from './samples/SampleLoader';
 
 const DEFAULT_VOLUME = 0.8;
@@ -62,7 +63,7 @@ export class NativeAudioEngine implements IAudioEngine {
    */
   async initialize(): Promise<void> {
     if (this.context) {
-      console.warn('AudioEngine already initialized');
+      logger.warn('AudioEngine already initialized');
       return;
     }
 
@@ -87,7 +88,7 @@ export class NativeAudioEngine implements IAudioEngine {
       // Preload all samples (CRITICAL: must complete before playback)
       await this.sampleLoader.preloadSamples();
 
-      console.log('AudioEngine initialized successfully');
+      logger.log('AudioEngine initialized successfully');
     } catch (error) {
       console.error('AudioEngine initialization failed:', error);
       throw new Error(
@@ -184,7 +185,7 @@ export class NativeAudioEngine implements IAudioEngine {
 
       // Validate pitch shift is within reasonable range (±3 octaves)
       if (playbackRate < 0.125 || playbackRate > 8) {
-        console.warn(
+        logger.warn(
           `Pitch shift ratio ${playbackRate} is out of safe range for note ${note}`
         );
       }

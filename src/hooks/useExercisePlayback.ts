@@ -18,6 +18,7 @@ import type { ActiveInputMethod } from '@/input/InputManager';
 import { createAudioEngine, ensureAudioModeConfigured } from '@/audio/createAudioEngine';
 import { useExerciseStore } from '@/stores/exerciseStore';
 import { useProgressStore } from '@/stores/progressStore';
+import { logger } from '../utils/logger';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { getLessonIdForExercise } from '../content/ContentLoader';
 
@@ -85,7 +86,6 @@ export function useExercisePlayback({
   enableAudio = true,
   inputMethod,
 }: UseExercisePlaybackOptions): UseExercisePlaybackReturn {
-  const exerciseStore = useExerciseStore();
   const audioEngineRef = useRef(createAudioEngine());
   const audioEngine = audioEngineRef.current;
   const preferredInput = useSettingsStore((s) => s.preferredInputMethod);
@@ -189,19 +189,19 @@ export function useExercisePlayback({
         const result = await Promise.race([initPromise, timeoutPromise]);
 
         if (result === 'timeout') {
-          console.warn('[useExercisePlayback] Input init timed out (15s) — falling back to touch');
+          logger.warn('[useExercisePlayback] Input init timed out (15s) — falling back to touch');
         }
 
         if (mounted) {
           inputManagerRef.current = manager;
           setActiveInputMethod(manager.activeMethod);
           setIsMidiReady(true);
-          console.log(`[useExercisePlayback] Input initialized: ${manager.activeMethod}`);
+          logger.log(`[useExercisePlayback] Input initialized: ${manager.activeMethod}`);
 
           // If mic was requested but failed, show the reason to the user
           const micFailure = manager.getMicFailureReason();
           if (micFailure && resolvedInputMethod === 'mic') {
-            console.warn(`[useExercisePlayback] Mic failed: ${micFailure}`);
+            logger.warn(`[useExercisePlayback] Mic failed: ${micFailure}`);
             setHasError(true);
             setErrorMessage(micFailure);
           }
@@ -256,14 +256,14 @@ export function useExercisePlayback({
         if (audioEngine.isReady()) {
           if (mounted) {
             isAudioReadyRef.current = true; setIsAudioReady(true);
-            console.log('[useExercisePlayback] Audio engine already initialized');
+            logger.log('[useExercisePlayback] Audio engine already initialized');
           }
           return;
         }
         await audioEngine.initialize();
         if (mounted) {
           isAudioReadyRef.current = true; setIsAudioReady(true);
-          console.log('[useExercisePlayback] Audio engine initialized');
+          logger.log('[useExercisePlayback] Audio engine initialized');
         }
       } catch (error) {
         console.error('[useExercisePlayback] Audio init failed:', error);
@@ -311,7 +311,7 @@ export function useExercisePlayback({
         playedNotesRef.current.push(normalizedEvent);
         trackNoteOnIndex(normalizedEvent.note, noteIndex);
         setPlayedNotes([...playedNotesRef.current]);
-        exerciseStore.addPlayedNote(normalizedEvent);
+        useExerciseStore.getState().addPlayedNote(normalizedEvent);
 
         // Surface external noteOn for keyboard highlighting in ExercisePlayer.
         // The ref holds the event data; the counter state triggers the effect.
@@ -348,12 +348,15 @@ export function useExercisePlayback({
     return () => {
       unsubscribe();
     };
+  // IMPORTANT: Do NOT include exerciseStore in deps. The callback accesses the
+  // store via useExerciseStore.getState() to avoid tearing down + resubscribing
+  // the InputManager on every note detection (which restarts AudioRecorder and
+  // freezes mic playback). Same pattern as the playback loop below.
   }, [
     enableMidi,
     enableAudio,
     isMidiReady,
     audioEngine,
-    exerciseStore,
     trackNoteOnIndex,
     closeLatestNoteDuration,
   ]);
@@ -476,11 +479,11 @@ export function useExercisePlayback({
     setIsPlaying(true);
     setCurrentBeat(-exercise.settings.countIn);
     setPlayedNotes([]);
-    exerciseStore.setIsPlaying(true);
-    exerciseStore.clearSession();
+    useExerciseStore.getState().setIsPlaying(true);
+    useExerciseStore.getState().clearSession();
 
-    console.log('[useExercisePlayback] Playback started');
-  }, [exercise.settings.countIn, exerciseStore]);
+    logger.log('[useExercisePlayback] Playback started');
+  }, [exercise.settings.countIn]);
 
   /**
    * Resume playback after pause (continues from where it left off)
@@ -491,10 +494,10 @@ export function useExercisePlayback({
     startTimeRef.current = Date.now() - pauseElapsedRef.current;
     isPlayingRef.current = true;
     setIsPlaying(true);
-    exerciseStore.setIsPlaying(true);
+    useExerciseStore.getState().setIsPlaying(true);
 
-    console.log('[useExercisePlayback] Playback resumed');
-  }, [exerciseStore]);
+    logger.log('[useExercisePlayback] Playback resumed');
+  }, []);
 
   /**
    * Pause playback (preserves played notes and position)
@@ -511,7 +514,7 @@ export function useExercisePlayback({
 
     isPlayingRef.current = false;
     setIsPlaying(false);
-    exerciseStore.setIsPlaying(false);
+    useExerciseStore.getState().setIsPlaying(false);
 
     // Close any held notes at pause time so duration scoring remains accurate.
     closeAllOpenNoteDurations(Date.now());
@@ -522,8 +525,8 @@ export function useExercisePlayback({
       activeNotesRef.current.clear();
     }
 
-    console.log('[useExercisePlayback] Playback paused');
-  }, [exerciseStore, enableAudio, isAudioReady, audioEngine, closeAllOpenNoteDurations]);
+    logger.log('[useExercisePlayback] Playback paused');
+  }, [enableAudio, isAudioReady, audioEngine, closeAllOpenNoteDurations]);
 
   /**
    * Stop playback
@@ -539,7 +542,7 @@ export function useExercisePlayback({
     isPlayingRef.current = false;
     setIsPlaying(false);
     setCurrentBeat(-exercise.settings.countIn);
-    exerciseStore.setIsPlaying(false);
+    useExerciseStore.getState().setIsPlaying(false);
 
     // Close any held notes when stopping.
     closeAllOpenNoteDurations(Date.now());
@@ -550,8 +553,8 @@ export function useExercisePlayback({
       activeNotesRef.current.clear();
     }
 
-    console.log('[useExercisePlayback] Playback stopped');
-  }, [exercise.settings.countIn, exerciseStore, enableAudio, isAudioReady, audioEngine, closeAllOpenNoteDurations]);
+    logger.log('[useExercisePlayback] Playback stopped');
+  }, [exercise.settings.countIn, enableAudio, isAudioReady, audioEngine, closeAllOpenNoteDurations]);
 
   /**
    * Reset playback
@@ -560,10 +563,10 @@ export function useExercisePlayback({
     stopPlayback();
     playedNotesRef.current = [];
     setPlayedNotes([]);
-    exerciseStore.clearSession();
+    useExerciseStore.getState().clearSession();
 
-    console.log('[useExercisePlayback] Playback reset');
-  }, [stopPlayback, exerciseStore]);
+    logger.log('[useExercisePlayback] Playback reset');
+  }, [stopPlayback]);
 
   /**
    * Handle exercise completion
@@ -579,7 +582,7 @@ export function useExercisePlayback({
 
     isPlayingRef.current = false;
     setIsPlaying(false);
-    exerciseStore.setIsPlaying(false);
+    useExerciseStore.getState().setIsPlaying(false);
 
     // Any notes still held at completion are closed at completion time.
     closeAllOpenNoteDurations(Date.now());
@@ -634,11 +637,11 @@ export function useExercisePlayback({
       : 0;
 
     const score = scoreExercise(scoringExercise, adjustedNotes, previousHighScore);
-    exerciseStore.setScore(score);
+    useExerciseStore.getState().setScore(score);
 
-    console.log('[useExercisePlayback] Exercise completed:', score);
+    logger.log('[useExercisePlayback] Exercise completed:', score);
     onComplete?.(score);
-  }, [exercise, exerciseStore, onComplete, closeAllOpenNoteDurations, enableAudio, audioEngine]);
+  }, [exercise, onComplete, closeAllOpenNoteDurations, enableAudio, audioEngine]);
 
   // Keep ref in sync so the interval always calls the latest handleCompletion
   useEffect(() => {
@@ -660,7 +663,7 @@ export function useExercisePlayback({
           console.error('[useExercisePlayback] Manual playback error:', error);
         }
       } else if (enableAudio && !isAudioReady) {
-        console.warn(`[useExercisePlayback] Audio not ready — note ${note} skipped. Engine state: ${audioEngine.getState()}`);
+        logger.warn(`[useExercisePlayback] Audio not ready — note ${note} skipped. Engine state: ${audioEngine.getState()}`);
       }
 
       // Only record notes for scoring when exercise is playing.
@@ -688,11 +691,11 @@ export function useExercisePlayback({
       playedNotesRef.current.push(midiEvent);
       trackNoteOnIndex(note, noteIndex);
       setPlayedNotes([...playedNotesRef.current]);
-      exerciseStore.addPlayedNote(midiEvent);
+      useExerciseStore.getState().addPlayedNote(midiEvent);
     },
-    // isPlaying omitted — we use isPlayingRef.current inside the callback
-     
-    [enableAudio, isAudioReady, audioEngine, exerciseStore, trackNoteOnIndex]
+    // isPlaying and exerciseStore omitted — we use refs / getState() inside the callback
+
+    [enableAudio, isAudioReady, audioEngine, trackNoteOnIndex]
   );
 
   /**

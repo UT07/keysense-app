@@ -10,6 +10,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from './firebase/config';
 import type { GenerationHints } from '../core/curriculum/SkillTree';
+import { withTimeout } from '../utils/withTimeout';
+import { logger } from '../utils/logger';
 
 // ============================================================================
 // Type Definitions
@@ -337,7 +339,7 @@ export async function generateExercise(params: GenerationParams): Promise<AIExer
       return exercise;
     }
   } catch (cfError) {
-    console.warn('[GeminiExercise] Cloud Function unavailable, using direct API:', (cfError as Error)?.message ?? cfError);
+    logger.warn('[GeminiExercise] Cloud Function unavailable, using direct API:', (cfError as Error)?.message ?? cfError);
   }
 
   // Fall back to direct Gemini API call
@@ -345,7 +347,7 @@ export async function generateExercise(params: GenerationParams): Promise<AIExer
     // Dynamic access prevents Babel from inlining the env var at build time
     const apiKey = process.env[API_KEY_ENV];
     if (!apiKey) {
-      console.warn('[GeminiExercise] EXPO_PUBLIC_GEMINI_API_KEY is not set');
+      logger.warn('[GeminiExercise] EXPO_PUBLIC_GEMINI_API_KEY is not set');
       return null;
     }
 
@@ -379,10 +381,10 @@ export async function generateExercise(params: GenerationParams): Promise<AIExer
       return retryExercise;
     }
 
-    console.warn('[GeminiExercise] Both generation attempts failed validation');
+    logger.warn('[GeminiExercise] Both generation attempts failed validation');
     return null;
   } catch (error) {
-    console.warn(
+    logger.warn(
       '[GeminiExercise] Generation failed:',
       (error as Error)?.message ?? error
     );
@@ -405,7 +407,11 @@ async function attemptGeneration(
   prompt: string,
   allowedMidi?: number[],
 ): Promise<AIExercise | null> {
-  const result = await model.generateContent(prompt);
+  const result = await withTimeout(
+    model.generateContent(prompt),
+    30000,
+    'GeminiExercise.generateContent',
+  );
   const text = result.response.text();
   const parsed: unknown = JSON.parse(text);
 

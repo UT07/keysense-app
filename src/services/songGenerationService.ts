@@ -19,6 +19,8 @@ import {
 } from '@/core/songs/songAssembler';
 import type { Song, SongRequestParams } from '@/core/songs/songTypes';
 import { saveSongToFirestore, getUserSongRequestCount, incrementSongRequestCount } from './songService';
+import { withTimeout } from '../utils/withTimeout';
+import { logger } from '../utils/logger';
 
 // Re-export pure functions for backward compatibility
 export { buildSongPrompt, validateGeneratedSong, assembleSong, type GeneratedSongABC };
@@ -56,7 +58,7 @@ export async function generateAndSaveSong(
       }
     }
   } catch (cfError) {
-    console.warn('[SongGen] Cloud Function unavailable, using direct API:', (cfError as Error)?.message ?? cfError);
+    logger.warn('[SongGen] Cloud Function unavailable, using direct API:', (cfError as Error)?.message ?? cfError);
   }
 
   // Fall back to direct Gemini API call
@@ -64,13 +66,13 @@ export async function generateAndSaveSong(
   const today = new Date().toISOString().split('T')[0];
   const count = await getUserSongRequestCount(uid, today);
   if (count >= MAX_REQUESTS_PER_DAY) {
-    console.warn('[SongGen] Daily request limit reached');
+    logger.warn('[SongGen] Daily request limit reached');
     return null;
   }
 
   const apiKey = process.env[API_KEY_ENV];
   if (!apiKey) {
-    console.warn('[SongGen] EXPO_PUBLIC_GEMINI_API_KEY is not set');
+    logger.warn('[SongGen] EXPO_PUBLIC_GEMINI_API_KEY is not set');
     return null;
   }
 
@@ -95,7 +97,7 @@ export async function generateAndSaveSong(
     }
 
     if (!song) {
-      console.warn('[SongGen] Both generation attempts failed');
+      logger.warn('[SongGen] Both generation attempts failed');
       return null;
     }
 
@@ -105,7 +107,7 @@ export async function generateAndSaveSong(
 
     return song;
   } catch (error) {
-    console.warn('[SongGen] Generation failed:', (error as Error)?.message ?? error);
+    logger.warn('[SongGen] Generation failed:', (error as Error)?.message ?? error);
     return null;
   }
 }
@@ -124,7 +126,11 @@ async function attemptGeneration(
   model: GenerativeModel,
   prompt: string,
 ): Promise<Song | null> {
-  const result = await model.generateContent(prompt);
+  const result = await withTimeout(
+    model.generateContent(prompt),
+    30000,
+    'SongGeneration.generateContent',
+  );
   const text = result.response.text();
   const parsed: unknown = JSON.parse(text);
 

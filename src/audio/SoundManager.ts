@@ -1,6 +1,7 @@
 import { Audio } from 'expo-av';
 
 import { generateAllSoundUris } from './generateUiSounds';
+import { logger } from '../utils/logger';
 
 let Haptics: typeof import('expo-haptics') | null = null;
 try {
@@ -136,7 +137,7 @@ export class SoundManager {
     // Log failures but don't crash
     for (const r of results) {
       if (r.status === 'rejected') {
-        console.warn('[SoundManager] Failed to preload sound:', r.reason);
+        logger.warn('[SoundManager] Failed to preload sound:', r.reason);
       }
     }
 

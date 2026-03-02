@@ -25,6 +25,7 @@ import { getMidiInput } from '../input/MidiInput';
 import MidiDeviceManager from '../input/MidiDevice';
 import type { MidiDevice } from '../input/MidiInput';
 import type { MidiNoteEvent } from '../core/exercises/types';
+import { logger } from '../utils/logger';
 
 /**
  * Setup Step Type
@@ -60,7 +61,7 @@ export const MidiSetupScreen: React.FC<MidiSetupScreenProps> = ({
     const initMidi = async () => {
       try {
         await getMidiInput().initialize();
-        console.log('[MidiSetupScreen] MIDI initialized');
+        logger.log('[MidiSetupScreen] MIDI initialized');
       } catch (error) {
         console.error('[MidiSetupScreen] MIDI init failed:', error);
         Alert.alert('Error', 'Failed to initialize MIDI. Please check your device.');

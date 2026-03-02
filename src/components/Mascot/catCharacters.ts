@@ -9,6 +9,7 @@
  */
 
 import type { EvolutionStage, CatAbility, CatStageVisuals, AbilityEffect } from '@/stores/types';
+import { getCatColors } from './catColorPalette';
 
 export type CatVariant = 'default' | 'tuxedo';
 export type CatPattern = 'solid' | 'tuxedo' | 'tabby' | 'siamese' | 'spotted';
@@ -44,6 +45,18 @@ export interface CatCharacter {
   evolutionVisuals: Record<EvolutionStage, CatStageVisuals>;
   /** Abilities unlocked at each evolution stage */
   abilities: CatAbility[];
+}
+
+function paletteToVisuals(catId: string, pattern: CatPattern): CatVisuals {
+  const c = getCatColors(catId);
+  return {
+    bodyColor: c.body,
+    bellyColor: c.belly,
+    earInnerColor: c.earInner,
+    eyeColor: c.eye,
+    noseColor: c.nose,
+    pattern,
+  };
 }
 
 function ability(
@@ -92,14 +105,7 @@ export const CAT_CHARACTERS: CatCharacter[] = [
     starterCat: true,
     gemCost: null,
     legendary: false,
-    visuals: {
-      bodyColor: '#1A1A1A',
-      bellyColor: '#F5F5F5',
-      earInnerColor: '#DC143C',
-      eyeColor: '#2ECC71',
-      noseColor: '#DC143C',
-      pattern: 'tuxedo',
-    },
+    visuals: paletteToVisuals('mini-meowww', 'tuxedo'),
     evolutionVisuals: makeStageVisuals({
       teen: { accessories: ['bow-tie'], hasGlow: false, hasParticles: false, hasCrown: false, auraIntensity: 0 },
       adult: { accessories: ['bow-tie', 'scarf'], hasGlow: true, hasParticles: false, hasCrown: false, auraIntensity: 0.3 },
@@ -126,14 +132,7 @@ export const CAT_CHARACTERS: CatCharacter[] = [
     starterCat: true,
     gemCost: null,
     legendary: false,
-    visuals: {
-      bodyColor: '#4A4A6A',
-      bellyColor: '#6B6B8A',
-      earInnerColor: '#9B59B6',
-      eyeColor: '#D4A5FF',
-      noseColor: '#9B59B6',
-      pattern: 'solid',
-    },
+    visuals: paletteToVisuals('jazzy', 'solid'),
     evolutionVisuals: makeStageVisuals({
       teen: { accessories: ['sunglasses'], hasGlow: false, hasParticles: false, hasCrown: false, auraIntensity: 0 },
       adult: { accessories: ['sunglasses', 'fedora'], hasGlow: true, hasParticles: false, hasCrown: false, auraIntensity: 0.3 },
@@ -160,14 +159,7 @@ export const CAT_CHARACTERS: CatCharacter[] = [
     starterCat: true,
     gemCost: null,
     legendary: false,
-    visuals: {
-      bodyColor: '#1C1C3A',
-      bellyColor: '#2A2A52',
-      earInnerColor: '#5B6EAE',
-      eyeColor: '#7EB8FF',
-      noseColor: '#3D4F8A',
-      pattern: 'solid',
-    },
+    visuals: paletteToVisuals('luna', 'tabby'),
     evolutionVisuals: makeStageVisuals({
       teen: { accessories: ['crescent-collar'], hasGlow: false, hasParticles: false, hasCrown: false, auraIntensity: 0 },
       adult: { accessories: ['crescent-collar', 'tiara'], hasGlow: true, hasParticles: false, hasCrown: false, auraIntensity: 0.4 },
@@ -198,14 +190,7 @@ export const CAT_CHARACTERS: CatCharacter[] = [
     starterCat: false,
     gemCost: 750,
     legendary: false,
-    visuals: {
-      bodyColor: '#F5D5C8',
-      bellyColor: '#FFF0EB',
-      earInnerColor: '#F39C9C',
-      eyeColor: '#81D4FA',
-      noseColor: '#F48FB1',
-      pattern: 'solid',
-    },
+    visuals: paletteToVisuals('biscuit', 'solid'),
     evolutionVisuals: makeStageVisuals({
       teen: { accessories: ['pink-bow'], hasGlow: false, hasParticles: false, hasCrown: false, auraIntensity: 0 },
       adult: { accessories: ['pink-bow', 'apron'], hasGlow: true, hasParticles: false, hasCrown: false, auraIntensity: 0.3 },
@@ -232,14 +217,7 @@ export const CAT_CHARACTERS: CatCharacter[] = [
     starterCat: false,
     gemCost: 1000,
     legendary: false,
-    visuals: {
-      bodyColor: '#D4763A',
-      bellyColor: '#FFF3E0',
-      earInnerColor: '#1ABC9C',
-      eyeColor: '#1ABC9C',
-      noseColor: '#C0713B',
-      pattern: 'tabby',
-    },
+    visuals: paletteToVisuals('ballymakawww', 'tabby'),
     evolutionVisuals: makeStageVisuals({
       teen: { accessories: ['flat-cap'], hasGlow: false, hasParticles: false, hasCrown: false, auraIntensity: 0 },
       adult: { accessories: ['flat-cap', 'scarf'], hasGlow: true, hasParticles: false, hasCrown: false, auraIntensity: 0.3 },
@@ -266,14 +244,7 @@ export const CAT_CHARACTERS: CatCharacter[] = [
     starterCat: false,
     gemCost: 1500,
     legendary: false,
-    visuals: {
-      bodyColor: '#F5E6D3',
-      bellyColor: '#FFF8F0',
-      earInnerColor: '#8B6914',
-      eyeColor: '#4FC3F7',
-      noseColor: '#8B6914',
-      pattern: 'siamese',
-    },
+    visuals: paletteToVisuals('aria', 'solid'),
     evolutionVisuals: makeStageVisuals({
       teen: { accessories: ['pearl-necklace'], hasGlow: false, hasParticles: false, hasCrown: false, auraIntensity: 0 },
       adult: { accessories: ['pearl-necklace', 'tiara-gold'], hasGlow: true, hasParticles: false, hasCrown: false, auraIntensity: 0.4 },
@@ -300,14 +271,7 @@ export const CAT_CHARACTERS: CatCharacter[] = [
     starterCat: false,
     gemCost: 2000,
     legendary: false,
-    visuals: {
-      bodyColor: '#D4553A',
-      bellyColor: '#FFCCBC',
-      earInnerColor: '#E74C3C',
-      eyeColor: '#FFEB3B',
-      noseColor: '#E74C3C',
-      pattern: 'tabby',
-    },
+    visuals: paletteToVisuals('tempo', 'solid'),
     evolutionVisuals: makeStageVisuals({
       teen: { accessories: ['lightning-collar'], hasGlow: false, hasParticles: false, hasCrown: false, auraIntensity: 0 },
       adult: { accessories: ['lightning-collar', 'racing-goggles'], hasGlow: true, hasParticles: false, hasCrown: false, auraIntensity: 0.4 },
@@ -334,14 +298,7 @@ export const CAT_CHARACTERS: CatCharacter[] = [
     starterCat: false,
     gemCost: 1000,
     legendary: false,
-    visuals: {
-      bodyColor: '#F5E6D3',
-      bellyColor: '#FFF8F0',
-      earInnerColor: '#FF7043',
-      eyeColor: '#80DEEA',
-      noseColor: '#FFAB91',
-      pattern: 'siamese',
-    },
+    visuals: paletteToVisuals('shibu', 'siamese'),
     evolutionVisuals: makeStageVisuals({
       teen: { accessories: ['temple-bell'], hasGlow: false, hasParticles: false, hasCrown: false, auraIntensity: 0 },
       adult: { accessories: ['temple-bell', 'kimono-sash'], hasGlow: true, hasParticles: false, hasCrown: false, auraIntensity: 0.3 },
@@ -368,14 +325,7 @@ export const CAT_CHARACTERS: CatCharacter[] = [
     starterCat: false,
     gemCost: 1500,
     legendary: false,
-    visuals: {
-      bodyColor: '#F5F5F5',
-      bellyColor: '#FFFFFF',
-      earInnerColor: '#FFB6C1',
-      eyeColor: '#64B5F6',
-      noseColor: '#FFB6C1',
-      pattern: 'solid',
-    },
+    visuals: paletteToVisuals('bella', 'solid'),
     evolutionVisuals: makeStageVisuals({
       teen: { accessories: ['pearl-necklace'], hasGlow: false, hasParticles: false, hasCrown: false, auraIntensity: 0 },
       adult: { accessories: ['pearl-necklace', 'tiara-silver'], hasGlow: true, hasParticles: false, hasCrown: false, auraIntensity: 0.3 },
@@ -402,14 +352,7 @@ export const CAT_CHARACTERS: CatCharacter[] = [
     starterCat: false,
     gemCost: 2000,
     legendary: false,
-    visuals: {
-      bodyColor: '#212121',
-      bellyColor: '#424242',
-      earInnerColor: '#AB47BC',
-      eyeColor: '#CE93D8',
-      noseColor: '#7B1FA2',
-      pattern: 'solid',
-    },
+    visuals: paletteToVisuals('sable', 'solid'),
     evolutionVisuals: makeStageVisuals({
       teen: { accessories: ['velvet-ribbon'], hasGlow: false, hasParticles: false, hasCrown: false, auraIntensity: 0 },
       adult: { accessories: ['velvet-ribbon', 'cape-purple'], hasGlow: true, hasParticles: false, hasCrown: false, auraIntensity: 0.4 },
@@ -436,14 +379,7 @@ export const CAT_CHARACTERS: CatCharacter[] = [
     starterCat: false,
     gemCost: 3000,
     legendary: false,
-    visuals: {
-      bodyColor: '#546E7A',
-      bellyColor: '#78909C',
-      earInnerColor: '#42A5F5',
-      eyeColor: '#BBDEFB',
-      noseColor: '#37474F',
-      pattern: 'solid',
-    },
+    visuals: paletteToVisuals('coda', 'solid'),
     evolutionVisuals: makeStageVisuals({
       teen: { accessories: ['monocle'], hasGlow: false, hasParticles: false, hasCrown: false, auraIntensity: 0 },
       adult: { accessories: ['monocle', 'baton'], hasGlow: true, hasParticles: false, hasCrown: false, auraIntensity: 0.4 },
@@ -474,14 +410,7 @@ export const CAT_CHARACTERS: CatCharacter[] = [
     starterCat: false,
     gemCost: null, // Cannot be bought — legendary unlock only
     legendary: true,
-    visuals: {
-      bodyColor: '#E8871E',
-      bellyColor: '#FFF3E0',
-      earInnerColor: '#FFB74D',
-      eyeColor: '#FFD54F',
-      noseColor: '#FF8C00',
-      pattern: 'tabby',
-    },
+    visuals: paletteToVisuals('chonky-monke', 'tabby'),
     evolutionVisuals: makeStageVisuals({
       baby: { accessories: ['tiny-crown'], hasGlow: false, hasParticles: false, hasCrown: true, auraIntensity: 0 },
       teen: { accessories: ['gold-chain', 'tiny-crown'], hasGlow: true, hasParticles: false, hasCrown: true, auraIntensity: 0.2 },
@@ -522,14 +451,7 @@ export const SALSA_COACH: CoachCharacter = {
   personality: 'Sassy, encouraging, dramatic, warm. Think passionate dance teacher meets motivational speaker.',
   voiceStyle: 'Warm, expressive, slightly theatrical. Uses occasional Spanish exclamations. Never boring.',
   color: '#FF5252',
-  visuals: {
-    bodyColor: '#7A7A8A',
-    bellyColor: '#B0B0BE',
-    earInnerColor: '#FF5252',
-    eyeColor: '#2ECC71',
-    noseColor: '#FF5252',
-    pattern: 'solid',
-  },
+  visuals: paletteToVisuals('salsa', 'solid'),
   catchphrases: [
     '¡Mira! You\'re not playing notes, you\'re telling a STORY.',
     'Oh honey, that was *chef\'s kiss*!',

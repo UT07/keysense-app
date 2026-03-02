@@ -18,6 +18,7 @@ import type { ReactElement, ReactNode, ErrorInfo } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 
 import { CatAvatar } from '../CatAvatar';
+import { logger } from '../../../utils/logger';
 
 // Safe wrapper: useIsFocused throws if not inside a NavigationContainer
 // (e.g. in Jest tests or standalone overlays). Default to "focused".
@@ -56,9 +57,9 @@ try {
    
   CatModel3DComponent = require('./CatModel3D').CatModel3D;
   gl3DAvailable = true;
-  console.log('[Cat3DCanvas] 3D rendering available (expo-gl loaded)');
+  logger.log('[Cat3DCanvas] 3D rendering available (expo-gl loaded)');
 } catch (error) {
-  console.log('[Cat3DCanvas] 3D not available — using SVG fallback:', (error as Error).message);
+  logger.log('[Cat3DCanvas] 3D not available — using SVG fallback:', (error as Error).message);
 }
 
 // ────────────────────────────────────────────────
@@ -98,7 +99,7 @@ class ThreeErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryStat
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.warn('[Cat3DCanvas] 3D render error caught by boundary:', error.message, info.componentStack?.slice(0, 200));
+    logger.warn('[Cat3DCanvas] 3D render error caught by boundary:', error.message, info.componentStack?.slice(0, 200));
     this.props.onError?.(error);
   }
 
@@ -204,7 +205,7 @@ export const Cat3DCanvas = React.memo(function Cat3DCanvas({
 
     const timer = setTimeout(() => {
       if (!canvasReady) {
-        console.warn(`[Cat3DCanvas] Loading timed out after ${LOAD_TIMEOUT_MS}ms for ${catId}, falling back to SVG`);
+        logger.warn(`[Cat3DCanvas] Loading timed out after ${LOAD_TIMEOUT_MS}ms for ${catId}, falling back to SVG`);
         setTimedOut(true);
       }
     }, LOAD_TIMEOUT_MS);
@@ -217,7 +218,7 @@ export const Cat3DCanvas = React.memo(function Cat3DCanvas({
   }, []);
 
   const handleError = useCallback((error: Error) => {
-    console.warn('[Cat3DCanvas] Error:', error.message);
+    logger.warn('[Cat3DCanvas] Error:', error.message);
     setHasError(true);
   }, []);
 

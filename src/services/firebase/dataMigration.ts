@@ -9,6 +9,7 @@ import { useProgressStore } from '../../stores/progressStore';
 import { auth } from './config';
 import { createGamificationData, addXp, createLessonProgress } from './firestore';
 import type { ExerciseProgress as FirestoreExerciseProgress } from './firestore';
+import { logger } from '../../utils/logger';
 
 const MIGRATION_KEY = 'purrrfect_keys_migrated';
 
@@ -73,11 +74,11 @@ export async function migrateLocalToCloud(): Promise<{ migrated: boolean; error?
 
     // 3. Mark as migrated
     await AsyncStorage.setItem(MIGRATION_KEY, 'true');
-    console.log('[DataMigration] Successfully migrated local data to cloud');
+    logger.log('[DataMigration] Successfully migrated local data to cloud');
 
     return { migrated: true };
   } catch (error) {
-    console.warn('[DataMigration] Migration failed:', (error as Error)?.message);
+    logger.warn('[DataMigration] Migration failed:', (error as Error)?.message);
     return { migrated: false, error: (error as Error)?.message ?? 'Unknown error' };
   }
 }

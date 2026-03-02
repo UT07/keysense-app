@@ -14,6 +14,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logger } from '../utils/logger';
 
 /**
  * Storage wrapper with sync-like interface for compatibility
@@ -78,7 +79,7 @@ export class PersistenceManager {
       await storage.setString(key, serialized);
 
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[PERSIST] Saved ${key}:`, state);
+        logger.log(`[PERSIST] Saved ${key}:`, state);
       }
     } catch (error) {
       console.error(`[PERSIST] Failed to save ${key}:`, error);
@@ -98,7 +99,7 @@ export class PersistenceManager {
       const parsed = JSON.parse(serialized) as T;
 
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[PERSIST] Loaded ${key}:`, parsed);
+        logger.log(`[PERSIST] Loaded ${key}:`, parsed);
       }
 
       return parsed;
@@ -116,7 +117,7 @@ export class PersistenceManager {
       await storage.delete(key);
 
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[PERSIST] Deleted ${key}`);
+        logger.log(`[PERSIST] Deleted ${key}`);
       }
     } catch (error) {
       console.error(`[PERSIST] Failed to delete ${key}:`, error);
@@ -135,7 +136,7 @@ export class PersistenceManager {
       );
 
       if (process.env.NODE_ENV === 'development') {
-        console.log('[PERSIST] Cleared all KeySense data');
+        logger.log('[PERSIST] Cleared all KeySense data');
       }
     } catch (error) {
       console.error('[PERSIST] Failed to clear all data:', error);

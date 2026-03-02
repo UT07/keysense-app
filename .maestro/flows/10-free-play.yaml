@@ -11,8 +11,9 @@ tags:
 - runFlow: ../helpers/ensure-home.yaml
 
 # Scroll to Free Play card
-- scroll:
-    direction: DOWN
+- swipe:
+    direction: UP
+    duration: 400
 
 # Tap Free Play card
 - tapOn:

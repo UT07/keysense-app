@@ -24,6 +24,7 @@ import * as Haptics from 'expo-haptics';
 import { PianoKey } from './PianoKey';
 import { hitTestPianoKey, getWhiteKeysInRange } from './keyboardHitTest';
 import type { MidiNoteEvent } from '@/core/exercises/types';
+import { logger } from '../../utils/logger';
 
 export interface KeyboardProps {
   startNote?: number; // Default: C3 (48)
@@ -238,7 +239,7 @@ export const Keyboard = React.memo(
             newTouchMap.set(Number(touch.identifier), midiNote);
           } else if (__DEV__) {
             // Diagnostic: log when a touch doesn't map to any key
-            console.warn(
+            logger.warn(
               '[Keyboard] hitTest miss',
               `localX=${localX.toFixed(1)} localY=${localY.toFixed(1)}`,
               `pageX=${touch.pageX.toFixed(1)} pageY=${touch.pageY.toFixed(1)}`,

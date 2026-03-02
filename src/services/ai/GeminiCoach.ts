@@ -8,6 +8,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase/config';
 import { getOfflineCoachingText } from '../../content/offlineCoachingTemplates';
+import { withTimeout } from '../../utils/withTimeout';
+import { logger } from '../../utils/logger';
 
 // ============================================================================
 // Type Definitions
@@ -131,7 +133,7 @@ export class GeminiCoach {
     if (!this.genAI) {
       const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
       if (!apiKey) {
-        console.warn('[GeminiCoach] EXPO_PUBLIC_GEMINI_API_KEY is not set, using fallback feedback');
+        logger.warn('[GeminiCoach] EXPO_PUBLIC_GEMINI_API_KEY is not set, using fallback feedback');
         throw new Error('EXPO_PUBLIC_GEMINI_API_KEY is not set');
       }
       this.genAI = new GoogleGenerativeAI(apiKey);
@@ -281,7 +283,7 @@ export class GeminiCoach {
         return text;
       }
     } catch (cfError) {
-      console.warn('[GeminiCoach] Cloud Function unavailable, using direct API:', (cfError as Error)?.message ?? cfError);
+      logger.warn('[GeminiCoach] Cloud Function unavailable, using direct API:', (cfError as Error)?.message ?? cfError);
     }
 
     // Fall back to direct Gemini API call
@@ -298,14 +300,18 @@ export class GeminiCoach {
 
       const prompt = this.buildPrompt(request);
 
-      const result = await model.generateContent(prompt);
+      const result = await withTimeout(
+        model.generateContent(prompt),
+        15000,
+        'GeminiCoach.generateContent',
+      );
       const response = result.response;
       const text = response.text();
 
       // Validate response
       const validationResult = this.validateResponse(text);
       if (!validationResult.valid) {
-        console.warn('Invalid AI response:', validationResult.reason);
+        logger.warn('Invalid AI response:', validationResult.reason);
         return this.getFallbackFeedback(request);
       }
 
@@ -315,7 +321,7 @@ export class GeminiCoach {
       return text;
     } catch (error) {
       // Use warn (not error) to avoid Expo error overlay for expected API failures
-      console.warn('[GeminiCoach] API call failed, using fallback:', (error as Error)?.message ?? error);
+      logger.warn('[GeminiCoach] API call failed, using fallback:', (error as Error)?.message ?? error);
       return this.getFallbackFeedback(request);
     }
   }

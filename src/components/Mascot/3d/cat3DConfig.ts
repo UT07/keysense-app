@@ -13,8 +13,10 @@
  */
 
 import type { CatPose } from '../animations/catAnimations';
+import { logger } from '../../../utils/logger';
 import type { EvolutionStage } from '@/stores/types';
 import { CAT_CHARACTERS } from '../catCharacters';
+import { getCatColors } from '../catColorPalette';
 
 // ────────────────────────────────────────────────
 // Types
@@ -80,180 +82,43 @@ export function getAnimationName(bodyType: BodyType3D, pose: CatPose): string {
 }
 
 // ────────────────────────────────────────────────
-// Per-cat configs
+// Per-cat configs (colors sourced from shared palette)
 // ────────────────────────────────────────────────
+
+function paletteToMaterials(catId: string): Cat3DMaterials {
+  const c = getCatColors(catId);
+  return {
+    body: c.body,
+    belly: c.belly,
+    earInner: c.earInner,
+    eye: c.eye,
+    nose: c.nose,
+    blush: c.blush ?? undefined,
+    accent: c.accent,
+  };
+}
 
 const CAT_3D_CONFIGS: Record<string, Cat3DConfig> = {
   // ─── Starters ───────────────────────────────
-  'mini-meowww': {
-    bodyType: 'slim',
-    hasBlush: true,
-    materials: {
-      body: '#555555',   // Charcoal grey (visible on dark BG)
-      belly: '#F5F5F5',
-      earInner: '#FF3355',
-      eye: '#3DFF88',    // Brighter green for pop
-      nose: '#FF3355',
-      blush: '#FF9999',
-      accent: '#FF3355',
-    },
-  },
-  'jazzy': {
-    bodyType: 'slim',
-    hasBlush: false,
-    materials: {
-      body: '#5D5D80',   // Brighter purple-grey
-      belly: '#8888A8',
-      earInner: '#B06EDE',
-      eye: '#E0B8FF',
-      nose: '#B06EDE',
-      accent: '#B06EDE',
-    },
-  },
-  'luna': {
-    bodyType: 'standard',
-    hasBlush: false,
-    materials: {
-      body: '#454580',   // Brighter midnight blue
-      belly: '#5E5EA0',
-      earInner: '#7088CC',
-      eye: '#99CCFF',
-      nose: '#5568AA',
-      accent: '#7088CC',
-    },
-  },
+  'mini-meowww': { bodyType: 'slim', hasBlush: true, materials: paletteToMaterials('mini-meowww') },
+  'jazzy': { bodyType: 'slim', hasBlush: false, materials: paletteToMaterials('jazzy') },
+  'luna': { bodyType: 'standard', hasBlush: false, materials: paletteToMaterials('luna') },
 
   // ─── Gem-unlockable ─────────────────────────
-  'biscuit': {
-    bodyType: 'round',
-    hasBlush: true,
-    materials: {
-      body: '#F5D5C8',
-      belly: '#FFF0EB',
-      earInner: '#F39C9C',
-      eye: '#81D4FA',
-      nose: '#F48FB1',
-      blush: '#FFAAAA',
-      accent: '#F39C9C',
-    },
-  },
-  'ballymakawww': {
-    bodyType: 'round',
-    hasBlush: true,
-    materials: {
-      body: '#D4763A',
-      belly: '#FFF3E0',
-      earInner: '#1ABC9C',
-      eye: '#1ABC9C',
-      nose: '#C0713B',
-      blush: '#FFB07C',
-      accent: '#1ABC9C',
-    },
-  },
-  'aria': {
-    bodyType: 'slim',
-    hasBlush: false,
-    materials: {
-      body: '#F5E6D3',
-      belly: '#FFF8F0',
-      earInner: '#8B6914',
-      eye: '#4FC3F7',
-      nose: '#8B6914',
-      accent: '#FFD700',
-    },
-  },
-  'tempo': {
-    bodyType: 'slim',
-    hasBlush: false,
-    materials: {
-      body: '#D4553A',
-      belly: '#FFCCBC',
-      earInner: '#E74C3C',
-      eye: '#FFEB3B',
-      nose: '#E74C3C',
-      accent: '#E74C3C',
-    },
-  },
-  'shibu': {
-    bodyType: 'slim',
-    hasBlush: true,
-    materials: {
-      body: '#F5E6D3',
-      belly: '#FFF8F0',
-      earInner: '#FF7043',
-      eye: '#80DEEA',
-      nose: '#FFAB91',
-      blush: '#FFCCAA',
-      accent: '#FF7043',
-    },
-  },
-  'bella': {
-    bodyType: 'round',
-    hasBlush: true,
-    materials: {
-      body: '#F5F5F5',
-      belly: '#FFFFFF',
-      earInner: '#FFB6C1',
-      eye: '#64B5F6',
-      nose: '#FFB6C1',
-      blush: '#FFD1DC',
-      accent: '#90CAF9',
-    },
-  },
-  'sable': {
-    bodyType: 'slim',
-    hasBlush: false,
-    materials: {
-      body: '#5A5A5A',   // Medium grey (visible on dark BG)
-      belly: '#787878',
-      earInner: '#C060D8',
-      eye: '#E0A8F0',
-      nose: '#9540B0',
-      accent: '#C060D8',
-    },
-  },
-  'coda': {
-    bodyType: 'standard',
-    hasBlush: false,
-    materials: {
-      body: '#546E7A',
-      belly: '#78909C',
-      earInner: '#42A5F5',
-      eye: '#BBDEFB',
-      nose: '#37474F',
-      accent: '#42A5F5',
-    },
-  },
+  'biscuit': { bodyType: 'round', hasBlush: true, materials: paletteToMaterials('biscuit') },
+  'ballymakawww': { bodyType: 'round', hasBlush: true, materials: paletteToMaterials('ballymakawww') },
+  'aria': { bodyType: 'slim', hasBlush: false, materials: paletteToMaterials('aria') },
+  'tempo': { bodyType: 'slim', hasBlush: false, materials: paletteToMaterials('tempo') },
+  'shibu': { bodyType: 'slim', hasBlush: true, materials: paletteToMaterials('shibu') },
+  'bella': { bodyType: 'round', hasBlush: true, materials: paletteToMaterials('bella') },
+  'sable': { bodyType: 'slim', hasBlush: false, materials: paletteToMaterials('sable') },
+  'coda': { bodyType: 'standard', hasBlush: false, materials: paletteToMaterials('coda') },
 
   // ─── Legendary ──────────────────────────────
-  'chonky-monke': {
-    bodyType: 'chonky',
-    hasBlush: true,
-    materials: {
-      body: '#E8871E',
-      belly: '#FFF3E0',
-      earInner: '#FFB74D',
-      eye: '#FFD54F',
-      nose: '#FF8C00',
-      blush: '#FFB74D',
-      accent: '#FF8C00',
-    },
-  },
+  'chonky-monke': { bodyType: 'chonky', hasBlush: true, materials: paletteToMaterials('chonky-monke') },
 
   // ─── Coach NPC ──────────────────────────────
-  'salsa': {
-    bodyType: 'standard',
-    hasBlush: true,
-    materials: {
-      body: '#7A7A8A',
-      belly: '#B0B0BE',
-      earInner: '#FF5252',
-      eye: '#2ECC71',
-      nose: '#FF5252',
-      blush: '#FF5252',
-      accent: '#FF5252',
-    },
-  },
+  'salsa': { bodyType: 'standard', hasBlush: true, materials: paletteToMaterials('salsa') },
 };
 
 /** Get 3D config for a cat by ID, falling back to Salsa's config.
@@ -268,7 +133,7 @@ export function getCat3DConfig(catId: string): Cat3DConfig {
   // If the resolved body type's GLB failed to require() (would be undefined/0),
   // fall back to 'standard' which maps to salsa-cat.glb.
   if (!MODEL_PATHS[config.bodyType]) {
-    console.warn(
+    logger.warn(
       `[cat3DConfig] No model for bodyType '${config.bodyType}' (cat: ${catId}), falling back to 'standard'`
     );
     return { ...config, bodyType: 'standard' };

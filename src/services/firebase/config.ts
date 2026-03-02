@@ -16,6 +16,7 @@ import { initializeAuth, getReactNativePersistence, connectAuthEmulator } from '
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logger } from '../../utils/logger';
 
 // ============================================================================
 // Firebase Config
@@ -27,7 +28,7 @@ export const firebaseAvailable = Boolean(
 );
 
 if (!firebaseAvailable) {
-  console.warn(
+  logger.warn(
     '[Firebase] API keys missing — auth and cloud features unavailable. ' +
     'Set EXPO_PUBLIC_FIREBASE_* env vars or EAS secrets.',
   );

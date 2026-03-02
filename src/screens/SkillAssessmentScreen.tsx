@@ -32,6 +32,7 @@ import { getRandomCatMessage } from '../content/catDialogue';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS } from '../theme/tokens';
 import type { NoteEvent, MidiNoteEvent } from '../core/exercises/types';
 import { InputManager, type ActiveInputMethod } from '../input/InputManager';
+import { logger } from '../utils/logger';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -504,7 +505,7 @@ export function SkillAssessmentScreen(): React.ReactElement {
           audioReadyRef.current = true;
         }
       } catch (error) {
-        console.warn('[SkillAssessment] Audio init failed. Continuing without sound.', error);
+        logger.warn('[SkillAssessment] Audio init failed. Continuing without sound.', error);
         if (mounted) {
           audioReadyRef.current = false;
         }
@@ -537,7 +538,7 @@ export function SkillAssessmentScreen(): React.ReactElement {
           });
         }
       } catch (e) {
-        console.warn('[SkillAssessment] InputManager init failed:', e);
+        logger.warn('[SkillAssessment] InputManager init failed:', e);
       }
     };
 
@@ -568,7 +569,7 @@ export function SkillAssessmentScreen(): React.ReactElement {
       const handle = audioEngineRef.current.playNote(note, velocity);
       activeNoteHandlesRef.current.set(note, handle);
     } catch (error) {
-      console.warn('[SkillAssessment] Failed to play note:', error);
+      logger.warn('[SkillAssessment] Failed to play note:', error);
     }
   }, []);
 

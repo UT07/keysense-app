@@ -11,6 +11,8 @@
  */
 
 const API_BASE = 'https://api.elevenlabs.io/v1';
+import { logger } from '../../utils/logger';
+
 const MODEL_ID = 'eleven_turbo_v2_5'; // Fastest model, ~150ms TTFB
 
 /** Voice tuning for expressiveness */
@@ -44,7 +46,7 @@ function getFileSystem(): FileSystemModule | null {
     try {
       _FileSystem = require('expo-file-system') as FileSystemModule;
     } catch {
-      console.warn('[ElevenLabs] expo-file-system not available');
+      logger.warn('[ElevenLabs] expo-file-system not available');
     }
   }
   return _FileSystem;
@@ -56,7 +58,7 @@ function getAudio(): AudioModule['Audio'] | null {
       const mod = require('expo-av') as AudioModule;
       _Audio = mod.Audio;
     } catch {
-      console.warn('[ElevenLabs] expo-av not available');
+      logger.warn('[ElevenLabs] expo-av not available');
     }
   }
   return _Audio;
@@ -167,7 +169,7 @@ export async function speakWithElevenLabs(
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
-      console.warn(`[ElevenLabs] API error ${response.status}: ${errorText}`);
+      logger.warn(`[ElevenLabs] API error ${response.status}: ${errorText}`);
       return false;
     }
 
@@ -180,7 +182,7 @@ export async function speakWithElevenLabs(
 
     return await playFromFile(cachePath, options?.onDone, options?.onError);
   } catch (error) {
-    console.warn('[ElevenLabs] Failed:', (error as Error).message);
+    logger.warn('[ElevenLabs] Failed:', (error as Error).message);
     options?.onError?.(error as Error);
     return false;
   }
@@ -248,7 +250,7 @@ async function playFromFile(
 
     return true;
   } catch (error) {
-    console.warn('[ElevenLabs] Playback failed:', (error as Error).message);
+    logger.warn('[ElevenLabs] Playback failed:', (error as Error).message);
     onError?.(error as Error);
     return false;
   }

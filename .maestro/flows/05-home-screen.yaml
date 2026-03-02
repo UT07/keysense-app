@@ -27,8 +27,9 @@ tags:
     id: "challenge-game-card"
 
 # Scroll down to see more content
-- scroll:
-    direction: DOWN
+- swipe:
+    direction: UP
+    duration: 400
 
 # Music library card
 - assertVisible:

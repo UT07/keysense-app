@@ -5,6 +5,7 @@
  */
 
 import type { Exercise } from '../core/exercises/types';
+import { logger } from '../utils/logger';
 
 // ============================================================================
 // Lesson manifest type (matches content/lessons/*.json structure)
@@ -142,7 +143,7 @@ export function getLessonExercises(lessonId: string): Exercise[] {
     if (exercise) {
       exercises.push(exercise);
     } else {
-      console.warn(`[ContentLoader] Missing exercise "${entry.id}" in lesson "${lessonId}" — not found in registry`);
+      logger.warn(`[ContentLoader] Missing exercise "${entry.id}" in lesson "${lessonId}" — not found in registry`);
     }
   }
   return exercises;

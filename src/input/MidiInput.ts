@@ -12,6 +12,7 @@
 import { Platform, NativeModules } from 'react-native';
 import type { MidiNoteEvent } from '@/core/exercises/types';
 export type { MidiNoteEvent } from '@/core/exercises/types';
+import { logger } from '../utils/logger';
 
 export interface MidiDevice {
   id: string;
@@ -81,18 +82,18 @@ export class NativeMidiInput implements MidiInput {
       // Import the Web MIDI API polyfill from @motiz88/react-native-midi
       const { requestMIDIAccess } = require('@motiz88/react-native-midi');
       this.midiAccess = await requestMIDIAccess();
-      console.log('[MIDI] Web MIDI access granted');
+      logger.log('[MIDI] Web MIDI access granted');
 
       // Listen for device connection/disconnection
       this.midiAccess.onstatechange = this._handleStateChange.bind(this);
 
       // Get initial device list
       await this.getConnectedDevices();
-      console.log(`[MIDI] Found ${this.state.connectedDevices.length} connected devices`);
+      logger.log(`[MIDI] Found ${this.state.connectedDevices.length} connected devices`);
 
       this.state.isInitialized = true;
     } catch (error) {
-      console.error('[MIDI] Initialization failed:', error);
+      logger.error('[MIDI] Initialization failed:', error);
       throw error;
     }
   }
@@ -116,9 +117,9 @@ export class NativeMidiInput implements MidiInput {
       this.noteCallbacks = [];
       this.connectionCallbacks = [];
       this.controlChangeCallbacks = [];
-      console.log('[MIDI] Shutdown complete');
+      logger.log('[MIDI] Shutdown complete');
     } catch (error) {
-      console.error('[MIDI] Shutdown error:', error);
+      logger.error('[MIDI] Shutdown error:', error);
     }
   }
 
@@ -152,7 +153,7 @@ export class NativeMidiInput implements MidiInput {
 
     const input = this.midiAccess.inputs.get(deviceId);
     if (!input) {
-      console.warn(`[MIDI] Device ${deviceId} not found`);
+      logger.warn(`[MIDI] Device ${deviceId} not found`);
       return;
     }
 
@@ -161,7 +162,7 @@ export class NativeMidiInput implements MidiInput {
     this.activeInput = input;
     this.state.activeDeviceId = deviceId;
 
-    console.log(`[MIDI] Connected to device: ${input.name}`);
+    logger.log(`[MIDI] Connected to device: ${input.name}`);
     const device = this.state.connectedDevices.find((d) => d.id === deviceId);
     if (device) {
       this.connectionCallbacks.forEach((cb) => cb(device, true));
@@ -175,7 +176,7 @@ export class NativeMidiInput implements MidiInput {
       this.state.activeDeviceId = null;
 
       const device = this.state.connectedDevices.find((d) => d.id === deviceId);
-      console.log(`[MIDI] Disconnected from device: ${device?.name}`);
+      logger.log(`[MIDI] Disconnected from device: ${device?.name}`);
       if (device) {
         this.connectionCallbacks.forEach((cb) => cb(device, false));
       }
@@ -238,7 +239,7 @@ export class NativeMidiInput implements MidiInput {
           try {
             cb(noteEvent);
           } catch (error) {
-            console.error('[MIDI] Error in note callback:', error);
+            logger.error('[MIDI] Error in note callback:', error);
           }
         });
         break;
@@ -256,7 +257,7 @@ export class NativeMidiInput implements MidiInput {
           try {
             cb(noteOffEvent);
           } catch (error) {
-            console.error('[MIDI] Error in note callback:', error);
+            logger.error('[MIDI] Error in note callback:', error);
           }
         });
         break;
@@ -267,7 +268,7 @@ export class NativeMidiInput implements MidiInput {
           try {
             cb(data1, data2, channel);
           } catch (error) {
-            console.error('[MIDI] Error in CC callback:', error);
+            logger.error('[MIDI] Error in CC callback:', error);
           }
         });
         break;
@@ -298,7 +299,7 @@ export class NativeMidiInput implements MidiInput {
         try {
           cb(device, true);
         } catch (error) {
-          console.error('[MIDI] Error in connection callback:', error);
+          logger.error('[MIDI] Error in connection callback:', error);
         }
       });
     } else if (port.state === 'disconnected') {
@@ -316,7 +317,7 @@ export class NativeMidiInput implements MidiInput {
           try {
             cb(device, false);
           } catch (error) {
-            console.error('[MIDI] Error in disconnection callback:', error);
+            logger.error('[MIDI] Error in disconnection callback:', error);
           }
         });
       }
@@ -419,7 +420,7 @@ export class NoOpMidiInput implements MidiInput {
       try {
         cb(note);
       } catch (error) {
-        console.error('[MIDI] Error in note callback:', error);
+        logger.error('[MIDI] Error in note callback:', error);
       }
     });
   }
@@ -463,7 +464,7 @@ export function getMidiInput(): MidiInput {
       }
     }
     midiInputInstance = useNative ? new NativeMidiInput() : new NoOpMidiInput();
-    console.log(
+    logger.log(
       `[MIDI] Using ${useNative ? 'native (Web MIDI API)' : 'no-op'} MIDI input implementation`
     );
   }

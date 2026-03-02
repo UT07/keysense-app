@@ -12,6 +12,7 @@
 import { parseABC } from '@/core/songs/abcParser';
 import type { Song, SongSection, SongRequestParams, SongSource } from '@/core/songs/songTypes';
 import type { NoteEvent } from '@/core/exercises/types';
+import { logger } from '../../utils/logger';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -137,7 +138,7 @@ export function assembleSong(
     // Parse melody (required)
     const melodyResult = parseABC(rawSection.melodyABC);
     if ('error' in melodyResult) {
-      console.warn(`[SongGen] Failed to parse melody for section "${rawSection.label}":`, melodyResult.error);
+      logger.warn(`[SongGen] Failed to parse melody for section "${rawSection.label}":`, melodyResult.error);
       return null;
     }
 

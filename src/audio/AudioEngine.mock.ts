@@ -4,6 +4,7 @@
  */
 
 import type { IAudioEngine, NoteHandle, AudioContextState } from './types';
+import { logger } from '../utils/logger';
 
 export class MockAudioEngine implements IAudioEngine {
   private initialized = false;
@@ -11,26 +12,26 @@ export class MockAudioEngine implements IAudioEngine {
   private activeNotes = new Map<number, number>();
 
   async initialize(): Promise<void> {
-    console.log('[MockAudioEngine] Initializing...');
+    logger.log('[MockAudioEngine] Initializing...');
     this.initialized = true;
   }
 
   async suspend(): Promise<void> {
-    console.log('[MockAudioEngine] Suspended');
+    logger.log('[MockAudioEngine] Suspended');
   }
 
   async resume(): Promise<void> {
-    console.log('[MockAudioEngine] Resumed');
+    logger.log('[MockAudioEngine] Resumed');
   }
 
   dispose(): void {
-    console.log('[MockAudioEngine] Disposed');
+    logger.log('[MockAudioEngine] Disposed');
     this.initialized = false;
     this.activeNotes.clear();
   }
 
   playNote(note: number, velocity: number = 0.8): NoteHandle {
-    console.log(`[MockAudioEngine] Playing note ${note} with velocity ${velocity}`);
+    logger.log(`[MockAudioEngine] Playing note ${note} with velocity ${velocity}`);
 
     const startTime = Date.now();
     this.activeNotes.set(note, startTime);
@@ -43,7 +44,7 @@ export class MockAudioEngine implements IAudioEngine {
   }
 
   private doRelease(note: number): void {
-    console.log(`[MockAudioEngine] Releasing note ${note}`);
+    logger.log(`[MockAudioEngine] Releasing note ${note}`);
     this.activeNotes.delete(note);
   }
 
@@ -52,13 +53,13 @@ export class MockAudioEngine implements IAudioEngine {
   }
 
   releaseAllNotes(): void {
-    console.log('[MockAudioEngine] Releasing all notes');
+    logger.log('[MockAudioEngine] Releasing all notes');
     this.activeNotes.clear();
   }
 
   setVolume(volume: number): void {
     this.volume = Math.max(0, Math.min(1, volume));
-    console.log(`[MockAudioEngine] Volume set to ${this.volume}`);
+    logger.log(`[MockAudioEngine] Volume set to ${this.volume}`);
   }
 
   getLatency(): number {

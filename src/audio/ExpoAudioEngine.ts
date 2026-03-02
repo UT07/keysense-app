@@ -14,6 +14,7 @@
 import { Audio, AVPlaybackSource } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import type { IAudioEngine, NoteHandle, AudioContextState } from './types';
+import { logger } from '../utils/logger';
 
 const BASE_MIDI_NOTE = 60;
 const BASE_FREQUENCY = 261.63;
@@ -130,12 +131,12 @@ export class ExpoAudioEngine implements IAudioEngine {
         staysActiveInBackground: false,
         shouldDuckAndroid: true,
       });
-      console.log(`[ExpoAudioEngine] Audio mode configured (${Date.now() - audioModeStart}ms)`);
+      logger.log(`[ExpoAudioEngine] Audio mode configured (${Date.now() - audioModeStart}ms)`);
 
       // Generate and write base WAV
       const wavStart = Date.now();
       const wavBuffer = generatePianoWav();
-      console.log(`[ExpoAudioEngine] WAV generated: ${wavBuffer.byteLength} bytes (${Date.now() - wavStart}ms)`);
+      logger.log(`[ExpoAudioEngine] WAV generated: ${wavBuffer.byteLength} bytes (${Date.now() - wavStart}ms)`);
 
       const writeStart = Date.now();
       const base64 = arrayBufferToBase64(wavBuffer);
@@ -149,7 +150,7 @@ export class ExpoAudioEngine implements IAudioEngine {
       });
 
       const fileInfo = await FileSystem.getInfoAsync(fileUri);
-      console.log(`[ExpoAudioEngine] WAV written: ${fileUri}, exists=${fileInfo.exists} (${Date.now() - writeStart}ms)`);
+      logger.log(`[ExpoAudioEngine] WAV written: ${fileUri}, exists=${fileInfo.exists} (${Date.now() - writeStart}ms)`);
 
       this.soundSource = { uri: fileUri };
 
@@ -164,13 +165,13 @@ export class ExpoAudioEngine implements IAudioEngine {
       const loadedCount = this.voicePools.size;
       const expectedCount = PRELOAD_NOTES.length;
       const totalVoices = loadedCount * VOICES_PER_NOTE;
-      console.log(
+      logger.log(
         `[ExpoAudioEngine] Pool health: ${loadedCount}/${expectedCount} notes loaded, ` +
         `${totalVoices} total voices (${poolMs}ms)`
       );
 
       const totalMs = Date.now() - totalStart;
-      console.log(`[ExpoAudioEngine] Initialized in ${totalMs}ms (${loadedCount} notes x ${VOICES_PER_NOTE} voices)`);
+      logger.log(`[ExpoAudioEngine] Initialized in ${totalMs}ms (${loadedCount} notes x ${VOICES_PER_NOTE} voices)`);
 
       await this.warmUpAudio();
     } catch (error) {
@@ -192,12 +193,12 @@ export class ExpoAudioEngine implements IAudioEngine {
         setTimeout(() => {
           pool.sounds[0].stopAsync().catch(() => {});
         }, 50);
-        console.log(`[ExpoAudioEngine] Audio warm-up complete (${Date.now() - warmStart}ms)`);
+        logger.log(`[ExpoAudioEngine] Audio warm-up complete (${Date.now() - warmStart}ms)`);
       } else {
-        console.warn('[ExpoAudioEngine] Warm-up skipped: no pool for note 60');
+        logger.warn('[ExpoAudioEngine] Warm-up skipped: no pool for note 60');
       }
     } catch (error) {
-      console.warn(`[ExpoAudioEngine] Warm-up failed after ${Date.now() - warmStart}ms (non-critical):`, error);
+      logger.warn(`[ExpoAudioEngine] Warm-up failed after ${Date.now() - warmStart}ms (non-critical):`, error);
     }
   }
 
@@ -229,7 +230,7 @@ export class ExpoAudioEngine implements IAudioEngine {
 
         this.voicePools.set(note, { sounds, nextVoice: 0 });
       } catch (error) {
-        console.warn(`[ExpoAudioEngine] Failed to pre-load note ${note}:`, error);
+        logger.warn(`[ExpoAudioEngine] Failed to pre-load note ${note}:`, error);
       }
     });
 
@@ -269,7 +270,7 @@ export class ExpoAudioEngine implements IAudioEngine {
     this.activeVoices.clear();
     this.soundSource = null;
     this.initialized = false;
-    console.log('[ExpoAudioEngine] Disposed');
+    logger.log('[ExpoAudioEngine] Disposed');
   }
 
   /**
@@ -282,7 +283,7 @@ export class ExpoAudioEngine implements IAudioEngine {
    */
   playNote(note: number, velocity: number = 0.8): NoteHandle {
     if (!this.initialized || !this.soundSource) {
-      console.warn(`[ExpoAudioEngine] playNote(${note}) skipped: initialized=${this.initialized}, soundSource=${!!this.soundSource}, pools=${this.voicePools.size}`);
+      logger.warn(`[ExpoAudioEngine] playNote(${note}) skipped: initialized=${this.initialized}, soundSource=${!!this.soundSource}, pools=${this.voicePools.size}`);
       return {
         note,
         startTime: Date.now() / 1000,

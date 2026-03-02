@@ -13,6 +13,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { MidiDevice as IMidiDevice } from './MidiInput';
+import { logger } from '../utils/logger';
 
 /**
  * Known MIDI keyboards and their specs for compatibility
@@ -165,7 +166,7 @@ export class MidiDeviceManager {
     this.storage = new MidiStorage();
     // Load devices asynchronously (fire-and-forget)
     this._loadDiscoveredDevices().catch(err =>
-      console.error('[MIDI Device] Failed to load devices:', err)
+      logger.error('[MIDI Device] Failed to load devices:', err)
     );
   }
 
@@ -320,7 +321,7 @@ export class MidiDeviceManager {
       try {
         callback(info, connected);
       } catch (error) {
-        console.error('[MIDI Device] Error in status listener:', error);
+        logger.error('[MIDI Device] Error in status listener:', error);
       }
     });
   }
@@ -343,7 +344,7 @@ export class MidiDeviceManager {
     this.lastUsedDeviceId = null;
     this.autoConnect = false;
     this.storage.clearAll();
-    console.log('[MIDI Device] Cleared all device history');
+    logger.log('[MIDI Device] Cleared all device history');
   }
 
   /**
@@ -378,10 +379,10 @@ export class MidiDeviceManager {
         for (const [id, device] of Object.entries(devices)) {
           this.discoveredDevices.set(id, device as MidiDeviceInfo);
         }
-        console.log(`[MIDI Device] Loaded ${this.discoveredDevices.size} devices from storage`);
+        logger.log(`[MIDI Device] Loaded ${this.discoveredDevices.size} devices from storage`);
       }
     } catch (error) {
-      console.error('[MIDI Device] Error loading devices:', error);
+      logger.error('[MIDI Device] Error loading devices:', error);
     }
   }
 
@@ -396,7 +397,7 @@ export class MidiDeviceManager {
       });
       await this.storage.set(STORAGE_KEYS.discoveredDevices, JSON.stringify(data));
     } catch (error) {
-      console.error('[MIDI Device] Error saving devices:', error);
+      logger.error('[MIDI Device] Error saving devices:', error);
     }
   }
 }

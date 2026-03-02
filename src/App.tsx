@@ -10,6 +10,7 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from './navigation/AppNavigator';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { PersistenceManager, STORAGE_KEYS } from './stores/persistence';
 import { useProgressStore } from './stores/progressStore';
 import { useSettingsStore } from './stores/settingsStore';
@@ -28,6 +29,8 @@ import { hydrateLeagueStore, useLeagueStore } from './stores/leagueStore';
 import { getCurrentLeagueMembership, assignToLeague } from './services/firebase/leagueService';
 import { registerFriendCode } from './services/firebase/socialService';
 import { useSoundManagerSync } from './hooks/useSoundManager';
+import { logger } from './utils/logger';
+import { withTimeout } from './utils/withTimeout';
 
 // Configure Google Sign-In at module level (synchronous, must run before any signIn call)
 // iosClientId is passed explicitly so the native module doesn't need GoogleService-Info.plist
@@ -40,9 +43,9 @@ try {
       webClientId,
       iosClientId: '619761780367-tqf3t4srqtkklkigep0clojvoailsteu.apps.googleusercontent.com',
     });
-    console.log('[App] Google Sign-In configured');
+    logger.log('[App] Google Sign-In configured');
   } else {
-    console.warn('[App] EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID not set — Google Sign-In will not work');
+    logger.warn('[App] EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID not set — Google Sign-In will not work');
   }
 } catch {
   // Package not available (e.g. Expo Go) — Google Sign-In button will show "Coming Soon"
@@ -52,29 +55,6 @@ try {
 SplashScreen.preventAutoHideAsync().catch(() => {
   // Catching errors in case SplashScreen is not available
 });
-
-async function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  label: string,
-): Promise<T> {
-  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
-
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        timeoutHandle = setTimeout(() => {
-          reject(new Error(`${label} timed out after ${timeoutMs}ms`));
-        }, timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timeoutHandle != null) {
-      clearTimeout(timeoutHandle);
-    }
-  }
-}
 
 export default function App(): React.ReactElement {
   const [appIsReady, setAppIsReady] = useState(false);
@@ -136,7 +116,7 @@ export default function App(): React.ReactElement {
             ...(reminderEnabled != null ? { reminderEnabled: reminderEnabled as boolean } : {}),
             ...(completionNotifications != null ? { completionNotifications: completionNotifications as boolean } : {}),
           });
-          console.log('[App] Settings state hydrated from storage (onboarding:', hasCompletedOnboarding, ')');
+          logger.log('[App] Settings state hydrated from storage (onboarding:', hasCompletedOnboarding, ')');
         }
 
         // Hydrate progress state from AsyncStorage
@@ -156,12 +136,12 @@ export default function App(): React.ReactElement {
             ...(lessonProgress ? { lessonProgress: lessonProgress as any } : {}),
             ...(dailyGoalData ? { dailyGoalData: dailyGoalData as any } : {}),
           });
-          console.log('[App] Progress state hydrated from storage (level', levelFromXp(xp), ')');
+          logger.log('[App] Progress state hydrated from storage (level', levelFromXp(xp), ')');
         }
 
         // Hydrate achievement state
         await useAchievementStore.getState().hydrate();
-        console.log('[App] Achievement state hydrated from storage');
+        logger.log('[App] Achievement state hydrated from storage');
 
         // Hydrate full learner profile state (adaptive learning, note accuracy, skills, weak areas)
         const learnerData = await PersistenceManager.loadState(STORAGE_KEYS.LEARNER_PROFILE, null);
@@ -183,23 +163,23 @@ export default function App(): React.ReactElement {
           });
           const masteredCount = (ld.masteredSkills as string[] | undefined)?.length ?? 0;
           const noteCount = Object.keys(ld.noteAccuracy ?? {}).length;
-          console.log(`[App] Learner profile fully hydrated (${masteredCount} mastered skills, ${noteCount} note records)`);
+          logger.log(`[App] Learner profile fully hydrated (${masteredCount} mastered skills, ${noteCount} note records)`);
         }
 
         // Hydrate remaining stores in parallel (all independent AsyncStorage reads)
         await Promise.all([
-          hydrateGemStore().then(() => console.log('[App] Gem store hydrated')),
-          hydrateCatEvolutionStore().then(() => console.log('[App] Cat evolution store hydrated')),
-          hydrateSongStore().then(() => console.log('[App] Song store hydrated')),
-          hydrateSocialStore().then(() => console.log('[App] Social store hydrated')),
-          hydrateLeagueStore().then(() => console.log('[App] League store hydrated')),
+          hydrateGemStore().then(() => logger.log('[App] Gem store hydrated')),
+          hydrateCatEvolutionStore().then(() => logger.log('[App] Cat evolution store hydrated')),
+          hydrateSongStore().then(() => logger.log('[App] Song store hydrated')),
+          hydrateSocialStore().then(() => logger.log('[App] Social store hydrated')),
+          hydrateLeagueStore().then(() => logger.log('[App] League store hydrated')),
         ]);
 
         // ── Phase 2: Firebase Auth (network, may be slow) ──────────────
         try {
           await withTimeout(useAuthStore.getState().initAuth(), 8000, 'initAuth');
         } catch (authInitError) {
-          console.warn(
+          logger.warn(
             '[App] Auth initialization did not resolve in time. Continuing with unauthenticated fallback.',
             authInitError,
           );
@@ -218,7 +198,7 @@ export default function App(): React.ReactElement {
           useSettingsStore.getState().setDisplayName(authUser.displayName);
         }
       } catch (e) {
-        console.warn('[App] Failed during app preparation:', e);
+        logger.warn('[App] Failed during app preparation:', e);
       } finally {
         // App is ready to render — local state is hydrated, auth resolved.
         setAppIsReady(true);
@@ -230,28 +210,28 @@ export default function App(): React.ReactElement {
         const authState = useAuthStore.getState();
         if (authState.isAuthenticated) {
           syncManager.startPeriodicSync();
-          console.log('[App] Periodic sync started');
+          logger.log('[App] Periodic sync started');
         }
 
         if (authState.isAuthenticated && !authState.isAnonymous) {
           try {
             const migrationResult = await migrateLocalToCloud();
             if (migrationResult.migrated) {
-              console.log('[App] Local data migrated to cloud');
+              logger.log('[App] Local data migrated to cloud');
             }
           } catch (err) {
-            console.warn('[App] Migration failed:', err);
+            logger.warn('[App] Migration failed:', err);
           }
 
           try {
             const pullResult = await syncManager.pullRemoteProgress();
             if (pullResult.merged) {
-              console.log('[App] Remote progress merged into local state');
+              logger.log('[App] Remote progress merged into local state');
             } else if (pullResult.pulled) {
-              console.log('[App] Remote progress checked — no new data');
+              logger.log('[App] Remote progress checked — no new data');
             }
           } catch (err) {
-            console.warn('[App] Remote progress pull failed:', err);
+            logger.warn('[App] Remote progress pull failed:', err);
           }
 
           // Ensure social features (league membership + friend code) are set up
@@ -270,27 +250,27 @@ export default function App(): React.ReactElement {
                 );
               }
               useLeagueStore.getState().setMembership(membership);
-              console.log('[App] League membership ensured:', membership.leagueId);
+              logger.log('[App] League membership ensured:', membership.leagueId);
 
               // Friend code registration
               if (!useSocialStore.getState().friendCode) {
                 const code = await registerFriendCode(user.uid);
                 useSocialStore.getState().setFriendCode(code);
-                console.log('[App] Friend code registered:', code);
+                logger.log('[App] Friend code registered:', code);
               }
             }
           } catch (err) {
-            console.warn('[App] Social setup failed (non-blocking):', err);
+            logger.warn('[App] Social setup failed (non-blocking):', err);
           }
         }
       } catch (e) {
-        console.warn('[App] Cloud sync error (non-blocking):', e);
+        logger.warn('[App] Cloud sync error (non-blocking):', e);
       }
     }
 
     // Failsafe: Force app ready after 3s if auth/hydration hangs
     const failsafeTimeout = setTimeout(() => {
-      console.warn('[App] Hydration took too long, forcing app ready');
+      logger.warn('[App] Hydration took too long, forcing app ready');
       setAppIsReady(true);
     }, 3000);
 
@@ -314,12 +294,14 @@ export default function App(): React.ReactElement {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <AppContent />
-        <StatusBar style="light" />
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <AppContent />
+          <StatusBar style="light" />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
 

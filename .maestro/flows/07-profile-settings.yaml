@@ -27,8 +27,9 @@ tags:
 - back
 
 # Navigate to Account screen
-- scroll:
-    direction: DOWN
+- swipe:
+    direction: UP
+    duration: 400
 - tapOn:
     id: "profile-open-account"
     optional: true

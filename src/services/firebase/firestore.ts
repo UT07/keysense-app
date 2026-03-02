@@ -23,6 +23,7 @@ import {
 } from 'firebase/firestore';
 import { db, functions } from './config';
 import { httpsCallable } from 'firebase/functions';
+import { logger } from '../../utils/logger';
 
 // ============================================================================
 // Type Definitions (matching PRD section 5.3)
@@ -769,47 +770,47 @@ async function removeFromFriendLists(uid: string): Promise<number> {
  *   6. Delete the root user document
  */
 async function deleteUserDataClientSide(uid: string): Promise<void> {
-  console.log('[deleteUserData] Using client-side deletion for uid:', uid);
+  logger.log('[deleteUserData] Using client-side deletion for uid:', uid);
 
   // 1. Remove from other users' friend lists BEFORE deleting own friends subcollection
   //    (need to read own friends list to know who to clean up)
   try {
     const removed = await removeFromFriendLists(uid);
     if (removed > 0) {
-      console.log(`[deleteUserData] Removed from ${removed} friend lists`);
+      logger.log(`[deleteUserData] Removed from ${removed} friend lists`);
     }
   } catch (err) {
-    console.warn('[deleteUserData] Friend list cleanup failed:', err);
+    logger.warn('[deleteUserData] Friend list cleanup failed:', err);
   }
 
   // 2. Delete friend codes
   try {
     const deleted = await deleteFriendCodes(uid);
     if (deleted > 0) {
-      console.log(`[deleteUserData] Deleted ${deleted} friend codes`);
+      logger.log(`[deleteUserData] Deleted ${deleted} friend codes`);
     }
   } catch (err) {
-    console.warn('[deleteUserData] Friend code cleanup failed:', err);
+    logger.warn('[deleteUserData] Friend code cleanup failed:', err);
   }
 
   // 3. Delete league membership
   try {
     const deleted = await deleteLeagueMembership(uid);
     if (deleted > 0) {
-      console.log(`[deleteUserData] Deleted ${deleted} league memberships`);
+      logger.log(`[deleteUserData] Deleted ${deleted} league memberships`);
     }
   } catch (err) {
-    console.warn('[deleteUserData] League membership cleanup failed:', err);
+    logger.warn('[deleteUserData] League membership cleanup failed:', err);
   }
 
   // 4. Delete challenges
   try {
     const deleted = await deleteChallenges(uid);
     if (deleted > 0) {
-      console.log(`[deleteUserData] Deleted ${deleted} challenges`);
+      logger.log(`[deleteUserData] Deleted ${deleted} challenges`);
     }
   } catch (err) {
-    console.warn('[deleteUserData] Challenge cleanup failed:', err);
+    logger.warn('[deleteUserData] Challenge cleanup failed:', err);
   }
 
   // 5. Delete all user subcollections
@@ -817,16 +818,16 @@ async function deleteUserDataClientSide(uid: string): Promise<void> {
     try {
       const deleted = await deleteSubcollection(uid, subcollection);
       if (deleted > 0) {
-        console.log(`[deleteUserData] Deleted ${deleted} docs from ${subcollection}`);
+        logger.log(`[deleteUserData] Deleted ${deleted} docs from ${subcollection}`);
       }
     } catch (err) {
-      console.warn(`[deleteUserData] Failed to delete subcollection ${subcollection}:`, err);
+      logger.warn(`[deleteUserData] Failed to delete subcollection ${subcollection}:`, err);
     }
   }
 
   // 6. Delete the root user document
   await deleteDoc(doc(db, 'users', uid));
-  console.log('[deleteUserData] Root user document deleted');
+  logger.log('[deleteUserData] Root user document deleted');
 }
 
 /**
@@ -852,13 +853,13 @@ export async function deleteUserData(uid: string): Promise<void> {
 
     const result = await deleteAllData({});
     if (result.data.success) {
-      console.log(`[deleteUserData] Cloud Function deleted ${result.data.deletedDocuments} documents`);
+      logger.log(`[deleteUserData] Cloud Function deleted ${result.data.deletedDocuments} documents`);
       return;
     }
     // Cloud Function returned failure — fall through to client-side
-    console.warn('[deleteUserData] Cloud Function returned failure, falling back to client-side');
+    logger.warn('[deleteUserData] Cloud Function returned failure, falling back to client-side');
   } catch (err) {
-    console.warn('[deleteUserData] Cloud Function unavailable, falling back to client-side:', err);
+    logger.warn('[deleteUserData] Cloud Function unavailable, falling back to client-side:', err);
   }
 
   // Fallback: client-side deletion

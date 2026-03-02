@@ -15,6 +15,7 @@
  */
 
 import type { MidiNoteEvent } from '../core/exercises/types';
+import { logger } from '../utils/logger';
 
 /**
  * Sustain Pedal State
@@ -256,7 +257,7 @@ export class MidiEventHandler {
       if (start) {
         const duration = Date.now() - start;
         if (duration > 3) {
-          console.warn(`[MIDI Event] ${label} took ${duration}ms (budget: <3ms)`);
+          logger.warn(`[MIDI Event] ${label} took ${duration}ms (budget: <3ms)`);
         }
       }
     }

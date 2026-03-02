@@ -24,6 +24,7 @@ import { useAuthStore } from '../stores/authStore';
 import { GoogleAuthProvider, OAuthProvider, EmailAuthProvider } from 'firebase/auth';
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../theme/tokens';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+import { logger } from '../utils/logger';
 
 function isGoogleAuthAvailable(): boolean {
   try {
@@ -97,7 +98,7 @@ export function AccountScreen(): React.ReactElement {
         const credential = GoogleAuthProvider.credential(idToken);
         await reauthAndDelete(credential);
       } catch (err) {
-        console.warn('[AccountScreen] Google re-auth failed:', err);
+        logger.warn('[AccountScreen] Google re-auth failed:', err);
         Alert.alert('Re-authentication Failed', 'Please try again.');
       }
     } else if (providers.includes('apple.com')) {
@@ -126,7 +127,7 @@ export function AccountScreen(): React.ReactElement {
           await reauthAndDelete(credential);
         }
       } catch (err) {
-        console.warn('[AccountScreen] Apple re-auth failed:', err);
+        logger.warn('[AccountScreen] Apple re-auth failed:', err);
         Alert.alert('Re-authentication Failed', 'Please try again.');
       }
     } else if (providers.includes('password')) {
@@ -199,7 +200,7 @@ export function AccountScreen(): React.ReactElement {
     } catch (err: unknown) {
       const errObj = err as { code?: string; message?: string };
       if (errObj.code === 'SIGN_IN_CANCELLED') return;
-      console.warn('[AccountScreen] Google link error:', err);
+      logger.warn('[AccountScreen] Google link error:', err);
       Alert.alert('Link Failed', errObj.message ?? 'Google linking failed. Please try again.');
     }
   }, []);
@@ -233,7 +234,7 @@ export function AccountScreen(): React.ReactElement {
     } catch (err: unknown) {
       const errObj = err as { code?: string; message?: string };
       if (errObj.code === 'ERR_REQUEST_CANCELED') return;
-      console.warn('[AccountScreen] Apple link error:', err);
+      logger.warn('[AccountScreen] Apple link error:', err);
       Alert.alert('Link Failed', errObj.message ?? 'Apple linking failed. Please try again.');
     }
   }, []);

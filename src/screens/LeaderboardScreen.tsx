@@ -236,6 +236,7 @@ export function LeaderboardScreen(): React.JSX.Element {
   const currentUserUid = useAuthStore((s) => s.user?.uid ?? '');
 
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Auto-fetch standings on mount
   useEffect(() => {
@@ -243,12 +244,13 @@ export function LeaderboardScreen(): React.JSX.Element {
     let cancelled = false;
 
     setLoadingStandings(true);
+    setFetchError(null);
     getLeagueStandings(membership.leagueId)
       .then((data) => {
         if (!cancelled) setStandings(data);
       })
-      .catch((err) => {
-        console.warn('[Leaderboard] Auto-fetch failed:', err);
+      .catch(() => {
+        if (!cancelled) setFetchError('Could not load standings. Pull down to retry.');
       })
       .finally(() => {
         if (!cancelled) setLoadingStandings(false);
@@ -272,11 +274,12 @@ export function LeaderboardScreen(): React.JSX.Element {
     if (!membership?.leagueId) return;
     setRefreshing(true);
     setLoadingStandings(true);
+    setFetchError(null);
     try {
       const data = await getLeagueStandings(membership.leagueId);
       setStandings(data);
-    } catch (err) {
-      console.warn('[Leaderboard] Failed to fetch standings:', err);
+    } catch {
+      setFetchError('Could not load standings. Pull down to retry.');
     } finally {
       setRefreshing(false);
       setLoadingStandings(false);
@@ -389,6 +392,14 @@ export function LeaderboardScreen(): React.JSX.Element {
           <Text style={styles.legendText}>Demotion zone</Text>
         </View>
       </View>
+
+      {/* Error banner */}
+      {fetchError && standings.length === 0 && (
+        <View style={styles.errorBanner}>
+          <MaterialCommunityIcons name="wifi-off" size={18} color={COLORS.error} />
+          <Text style={styles.errorBannerText}>{fetchError}</Text>
+        </View>
+      )}
 
       {/* Standings list (4th place onwards — top 3 are in the podium) */}
       {isLoadingStandings && standings.length === 0 ? (
@@ -611,6 +622,24 @@ const styles = StyleSheet.create({
   emptyListText: {
     ...TYPOGRAPHY.body.md,
     color: COLORS.textMuted,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginHorizontal: SPACING.md,
+    marginTop: SPACING.sm,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    backgroundColor: COLORS.error + '15',
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.error + '30',
+  },
+  errorBannerText: {
+    ...TYPOGRAPHY.body.sm,
+    color: COLORS.error,
+    flex: 1,
   },
 
   // Podium

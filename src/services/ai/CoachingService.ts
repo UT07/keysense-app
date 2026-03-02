@@ -5,6 +5,7 @@
 
 import type { ExerciseScore } from '@/core/exercises/types';
 import { GeminiCoach, type CoachRequest } from './GeminiCoach';
+import { logger } from '../../utils/logger';
 
 export interface CoachFeedback {
   feedback: string;
@@ -92,7 +93,7 @@ export class CoachingService {
         suggestedAction: input.score.isPassed ? 'continue' : 'retry',
       };
     } catch (error) {
-      console.warn('[CoachingService] Feedback generation failed, using fallback:', (error as Error)?.message ?? error);
+      logger.warn('[CoachingService] Feedback generation failed, using fallback:', (error as Error)?.message ?? error);
       return {
         feedback: 'Keep practicing! You are making progress.',
         suggestedAction: 'retry',

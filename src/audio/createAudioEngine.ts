@@ -21,6 +21,7 @@
 import { Platform } from 'react-native';
 import type { IAudioEngine } from './types';
 import { ExpoAudioEngine } from './ExpoAudioEngine';
+import { logger } from '../utils/logger';
 
 /**
  * Singleton instance managed by the factory
@@ -40,10 +41,10 @@ function tryCreateWebAudioEngine(): IAudioEngine | null {
      
     const { WebAudioEngine } = require('./WebAudioEngine');
     const engine = new WebAudioEngine();
-    console.log(`[createAudioEngine] WebAudioEngine created in ${Date.now() - start}ms`);
+    logger.log(`[createAudioEngine] WebAudioEngine created in ${Date.now() - start}ms`);
     return engine;
   } catch (error) {
-    console.warn(
+    logger.warn(
       `[createAudioEngine] WebAudioEngine unavailable after ${Date.now() - start}ms:`,
       (error as Error).message
     );
@@ -88,13 +89,13 @@ export async function ensureAudioModeConfigured(allowRecording = false): Promise
         : ['defaultToSpeaker'],
       iosAllowHaptics: true,
     });
-    console.log(
+    logger.log(
       `[createAudioEngine] Audio session configured via AudioManager ` +
       `(category=${allowRecording ? 'playAndRecord' : 'playback'})`
     );
     return;
   } catch (audioManagerError) {
-    console.warn('[createAudioEngine] AudioManager unavailable, falling back to expo-av:', audioManagerError);
+    logger.warn('[createAudioEngine] AudioManager unavailable, falling back to expo-av:', audioManagerError);
   }
 
   // Fallback: expo-av (async — only used when react-native-audio-api is not available)
@@ -107,12 +108,12 @@ export async function ensureAudioModeConfigured(allowRecording = false): Promise
       shouldDuckAndroid: true,
       ...(allowRecording ? { interruptionModeIOS: 1 } : {}),
     });
-    console.log(
+    logger.log(
       `[createAudioEngine] iOS audio mode configured via expo-av ` +
       `(allowsRecordingIOS=${allowRecording})`
     );
   } catch (error) {
-    console.warn('[createAudioEngine] Audio mode configuration failed:', error);
+    logger.warn('[createAudioEngine] Audio mode configuration failed:', error);
   }
 }
 
@@ -136,7 +137,7 @@ export function createAudioEngine(): IAudioEngine {
   ensureAudioModeConfigured();
 
   // Log device/platform info for debugging audio latency across environments
-  console.log(
+  logger.log(
     `[createAudioEngine] Platform: ${Platform.OS} ${Platform.Version ?? 'unknown'}, ` +
     `isTV=${Platform.isTV}`
   );
@@ -145,14 +146,14 @@ export function createAudioEngine(): IAudioEngine {
   if (webEngine) {
     factoryInstance = webEngine;
     const estimatedLatency = webEngine.getLatency();
-    console.log(
+    logger.log(
       `[createAudioEngine] Selected WebAudioEngine (JSI, 3-harmonic, pre-warmed) ` +
       `in ${Date.now() - selectionStart}ms — estimated latency: ${estimatedLatency}ms`
     );
   } else {
     factoryInstance = new ExpoAudioEngine();
     const estimatedLatency = factoryInstance.getLatency();
-    console.log(
+    logger.log(
       `[createAudioEngine] Selected ExpoAudioEngine (expo-av fallback) ` +
       `in ${Date.now() - selectionStart}ms — estimated latency: ${estimatedLatency}ms`
     );
@@ -169,6 +170,6 @@ export function resetAudioEngineFactory(): void {
   if (factoryInstance) {
     factoryInstance.dispose();
     factoryInstance = null;
-    console.log('[createAudioEngine] Factory reset — engine disposed');
+    logger.log('[createAudioEngine] Factory reset — engine disposed');
   }
 }

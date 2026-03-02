@@ -17,6 +17,7 @@ import type { Song, SongSummary, SongFilter, SongMastery, SongRequestParams } fr
 import { PersistenceManager, STORAGE_KEYS, createDebouncedSave } from './persistence';
 import { getSong, getSongSummaries } from '@/services/songService';
 import { generateAndSaveSong } from '@/services/songGenerationService';
+import { logger } from '../utils/logger';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -119,7 +120,7 @@ export const useSongStore = create<SongStoreState>((set, get) => ({
       set({ summaries, isLoadingSummaries: false });
     } catch (err) {
       if (thisRequest !== loadRequestId) return; // stale
-      console.warn('[SongStore] loadSummaries failed:', err);
+      logger.warn('[SongStore] loadSummaries failed:', err);
       set({ summaries: [], isLoadingSummaries: false });
     }
   },
@@ -144,7 +145,7 @@ export const useSongStore = create<SongStoreState>((set, get) => ({
       });
     } catch (err) {
       if (thisRequest !== loadRequestId) return; // stale
-      console.warn('[SongStore] loadMoreSummaries failed:', err);
+      logger.warn('[SongStore] loadMoreSummaries failed:', err);
       set({ isLoadingSummaries: false });
     }
   },
@@ -161,7 +162,7 @@ export const useSongStore = create<SongStoreState>((set, get) => ({
       const song = await getSong(songId);
       set({ currentSong: song, isLoadingSong: false });
     } catch (err) {
-      console.warn('[SongStore] loadSong failed:', err);
+      logger.warn('[SongStore] loadSong failed:', err);
       set({ isLoadingSong: false });
     }
   },
@@ -203,7 +204,7 @@ export const useSongStore = create<SongStoreState>((set, get) => ({
       set({ isGeneratingSong: false, generationError: 'Generation failed — try again' });
       return null;
     } catch (err) {
-      console.warn('[SongStore] requestSong failed:', err);
+      logger.warn('[SongStore] requestSong failed:', err);
       set({ isGeneratingSong: false, generationError: 'Generation failed — try again' });
       return null;
     }

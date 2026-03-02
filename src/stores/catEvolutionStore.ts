@@ -20,6 +20,7 @@ import { PersistenceManager, STORAGE_KEYS, createDebouncedSave, createImmediateS
 import { CAT_CHARACTERS } from '@/components/Mascot/catCharacters';
 import { postActivity } from '@/services/firebase/socialService';
 import { auth } from '@/services/firebase/config';
+import { logger } from '@/utils/logger';
 
 /** Calculate evolution stage from accumulated XP */
 export function stageFromXp(xp: number): EvolutionStage {
@@ -220,7 +221,7 @@ export const useCatEvolutionStore = create<CatEvolutionStoreState>((set, get) =>
         type: 'evolution',
         detail: `Cat evolved to ${newStage}`,
         timestamp: Date.now(),
-      }).catch(() => {});
+      }).catch((err) => logger.warn('[catEvolutionStore] postActivity failed:', (err as Error)?.message));
     }
 
     return evolved ? newStage : null;

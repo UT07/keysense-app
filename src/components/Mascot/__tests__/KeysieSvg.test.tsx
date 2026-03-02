@@ -251,9 +251,9 @@ describe('KeysieSvg', () => {
       const paths = allViews.filter(
         (v) => v.props.accessibilityLabel === 'Path',
       );
-      // Happy mouth: Path with d starting with "M 43 54"
+      // Happy mouth: Path with d starting with "M 43 49"
       const mouthPath = paths.find(
-        (p) => typeof p.props.d === 'string' && p.props.d.includes('M 43 54'),
+        (p) => typeof p.props.d === 'string' && p.props.d.includes('M 43 49'),
       );
       expect(mouthPath).toBeTruthy();
     });
@@ -267,7 +267,7 @@ describe('KeysieSvg', () => {
         (v) => v.props.accessibilityLabel === 'Path',
       );
       const mouthPath = paths.find(
-        (p) => typeof p.props.d === 'string' && p.props.d.includes('M 44 54'),
+        (p) => typeof p.props.d === 'string' && p.props.d.includes('M 44 49'),
       );
       expect(mouthPath).toBeTruthy();
     });
@@ -280,9 +280,9 @@ describe('KeysieSvg', () => {
       const ellipses = allViews.filter(
         (v) => v.props.accessibilityLabel === 'Ellipse',
       );
-      // Excited mouth: Ellipse at cx=50, cy=55 with fill=DARK_RED (#8B0000)
+      // Excited mouth: Ellipse at cx=50, cy=50 with fill=DARK_RED (#8B0000)
       const mouthEllipse = ellipses.find(
-        (e) => e.props.cx === '50' && e.props.cy === '55',
+        (e) => e.props.cx === '50' && e.props.cy === '50',
       );
       expect(mouthEllipse).toBeTruthy();
     });
@@ -295,9 +295,9 @@ describe('KeysieSvg', () => {
       const lines = allViews.filter(
         (v) => v.props.accessibilityLabel === 'Line',
       );
-      // Teaching mouth: Line from (44,55) to (56,55)
+      // Teaching mouth: Line from (44,50) to (56,50)
       const mouthLine = lines.find(
-        (l) => l.props.x1 === '44' && l.props.y1 === '55',
+        (l) => l.props.x1 === '44' && l.props.y1 === '50',
       );
       expect(mouthLine).toBeTruthy();
     });
@@ -313,7 +313,7 @@ describe('KeysieSvg', () => {
       const mouthPath = paths.find(
         (p) =>
           typeof p.props.d === 'string' &&
-          p.props.d.includes('M 42 53') &&
+          p.props.d.includes('M 42 48') &&
           p.props.fill === '#8B0000',
       );
       expect(mouthPath).toBeTruthy();

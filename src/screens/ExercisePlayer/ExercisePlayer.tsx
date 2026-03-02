@@ -88,6 +88,7 @@ import { generateExercise as generateFreePlayExercise } from '../../services/gem
 import { getTemplateForSkill, getTemplateExercise } from '../../content/templateExercises';
 import { getChestType, getChestReward } from '../../core/rewards/chestSystem';
 import type { ChestType } from '../../core/rewards/chestSystem';
+import { logger } from '../../utils/logger';
 
 export interface ExercisePlayerProps {
   exercise?: Exercise;
@@ -402,7 +403,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
     // (Cloud Functions have 5s timeout, direct Gemini ~3-5s, so 8s covers both paths)
     const loadTimeout = setTimeout(() => {
       if (cancelled) return;
-      console.warn('[ExercisePlayer] AI exercise load timed out after 8s — using template fallback');
+      logger.warn('[ExercisePlayer] AI exercise load timed out after 8s — using template fallback');
       const profile = useLearnerProfileStore.getState();
       const difficulty = (profile.totalExercisesCompleted > 20 ? 3 : profile.totalExercisesCompleted > 10 ? 2 : 1) as 1 | 2 | 3;
       setAiExercise({ ...getTemplateExercise(difficulty, profile.weakNotes), id: `tmpl-timeout-${Date.now()}` });
@@ -874,7 +875,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       const paramSkill = getSkillById(skillIdParam);
       if (paramSkill) skillNodes = [paramSkill];
     }
-    console.log('[ExercisePlayer] Skill mastery check:', {
+    logger.log('[ExercisePlayer] Skill mastery check:', {
       exerciseId: ex.id,
       skillIdParam,
       skillNodesFound: skillNodes.length,
@@ -887,7 +888,7 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
       useLearnerProfileStore.getState().recordSkillPractice(node.id, score.isPassed);
       // Direct mastery when score meets threshold
       if (score.overall / 100 >= node.masteryThreshold && score.isPassed) {
-        console.log('[ExercisePlayer] Mastering skill:', node.id, `(${score.overall}% >= ${node.masteryThreshold * 100}%)`);
+        logger.log('[ExercisePlayer] Mastering skill:', node.id, `(${score.overall}% >= ${node.masteryThreshold * 100}%)`);
         useLearnerProfileStore.getState().markSkillMastered(node.id);
       }
     }

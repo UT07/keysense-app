@@ -36,6 +36,7 @@ import type { Exercise, NoteEvent, ExerciseScore } from '../core/exercises/types
 import { COLORS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../theme/tokens';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/authStore';
+import { logger } from '../utils/logger';
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 type SongPlayerRouteProp = RouteProp<RootStackParamList, 'SongPlayer'>;
@@ -393,7 +394,7 @@ export function SongPlayerScreen() {
     // Guard: don't navigate to an exercise with no notes
     if (!exercise.notes || exercise.notes.length === 0) {
       const label = selectedSectionIndex === null ? 'Full Song' : song.sections[selectedSectionIndex]?.id;
-      console.warn('[SongPlayer] No notes:', label, layer);
+      logger.warn('[SongPlayer] No notes:', label, layer);
       Alert.alert('No Notes', 'This selection has no playable notes. Try a different section or layer.');
       return;
     }
@@ -406,7 +407,7 @@ export function SongPlayerScreen() {
       layer,
     };
 
-    console.log(`[SongPlayer] Playing: ${exercise.id}, notes=${exercise.notes.length}, tempo=${exercise.settings.tempo}, countIn=${exercise.settings.countIn}`);
+    logger.log(`[SongPlayer] Playing: ${exercise.id}, notes=${exercise.notes.length}, tempo=${exercise.settings.tempo}, countIn=${exercise.settings.countIn}`);
     setCurrentExercise(exercise);
     navigation.navigate('Exercise', { exerciseId: exercise.id });
   }, [song, selectedSectionIndex, layer, loop, setCurrentExercise, navigation]);

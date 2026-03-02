@@ -4,6 +4,7 @@
  */
 
 import PostHog from 'posthog-react-native';
+import { logger } from '../../utils/logger';
 
 // ============================================================================
 // PostHog Initialization
@@ -22,7 +23,7 @@ export class AnalyticsService {
 
     const apiKey = process.env.EXPO_PUBLIC_POSTHOG_API_KEY;
     if (!apiKey) {
-      console.warn('EXPO_PUBLIC_POSTHOG_API_KEY is not set. Analytics disabled.');
+      logger.warn('EXPO_PUBLIC_POSTHOG_API_KEY is not set. Analytics disabled.');
       return;
     }
 

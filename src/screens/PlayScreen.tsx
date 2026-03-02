@@ -38,6 +38,7 @@ import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS, SHADOWS, glowColor } from '
 import { computeZoomedRange } from '../components/Keyboard/computeZoomedRange';
 import type { NoteEvent } from '../core/exercises/types';
 import type { SongSection } from '../core/songs/songTypes';
+import { logger } from '../utils/logger';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
 // ============================================================================
@@ -308,7 +309,7 @@ export function PlayScreen(): React.JSX.Element {
         await audioEngineRef.current.initialize();
         if (mounted) setIsAudioReady(true);
       } catch {
-        console.warn('[PlayScreen] Audio init failed');
+        logger.warn('[PlayScreen] Audio init failed');
       }
     };
     init();

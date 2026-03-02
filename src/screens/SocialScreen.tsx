@@ -422,11 +422,13 @@ export function SocialScreen(): React.JSX.Element {
   const setFriends = useSocialStore((s) => s.setFriends);
   const setMembership = useLeagueStore((s) => s.setMembership);
   const setStandings = useLeagueStore((s) => s.setStandings);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   // Sync friends + league from Firestore on mount
   useEffect(() => {
     if (!user?.uid || isAnonymous) return;
     let cancelled = false;
+    let hadError = false;
 
     (async () => {
       // Sync friends
@@ -452,7 +454,7 @@ export function SocialScreen(): React.JSX.Element {
           if (!cancelled) setFriends(enriched);
         }
       } catch {
-        // Silently fail — local data still available
+        hadError = true;
       }
 
       // Sync league membership + standings
@@ -460,7 +462,6 @@ export function SocialScreen(): React.JSX.Element {
         const m = await getCurrentLeagueMembership(user.uid);
         if (!cancelled && m) {
           setMembership(m);
-          // Also fetch standings so the leaderboard has data
           try {
             const s = await getLeagueStandings(m.leagueId);
             if (!cancelled) setStandings(s);
@@ -469,7 +470,11 @@ export function SocialScreen(): React.JSX.Element {
           }
         }
       } catch {
-        // League sync failed — non-blocking
+        hadError = true;
+      }
+
+      if (!cancelled && hadError) {
+        setSyncError('Some data may be outdated. Check your connection.');
       }
     })();
 
@@ -494,6 +499,13 @@ export function SocialScreen(): React.JSX.Element {
         testID="social-scroll"
       >
         <Text style={styles.screenTitle}>The Arena</Text>
+
+        {syncError && (
+          <View style={styles.syncErrorBanner}>
+            <MaterialCommunityIcons name="cloud-off-outline" size={16} color={COLORS.warning} />
+            <Text style={styles.syncErrorText}>{syncError}</Text>
+          </View>
+        )}
 
         <LeagueCard />
         <FriendsSection />
@@ -553,6 +565,23 @@ const styles = StyleSheet.create({
   authGateButtonText: {
     ...TYPOGRAPHY.button.lg,
     color: COLORS.textPrimary,
+  },
+
+  // Sync error banner
+  syncErrorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    backgroundColor: COLORS.warning + '15',
+    borderRadius: BORDER_RADIUS.sm,
+    marginBottom: SPACING.md,
+  },
+  syncErrorText: {
+    ...TYPOGRAPHY.caption.lg,
+    color: COLORS.warning,
+    flex: 1,
   },
 
   // Card base — glassmorphism

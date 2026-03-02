@@ -22,6 +22,7 @@ import { YINPitchDetector, NoteTracker } from './PitchDetector';
 import type { PitchDetectorConfig, NoteTrackerConfig } from './PitchDetector';
 import { PolyphonicDetector } from './PolyphonicDetector';
 import { MultiNoteTracker } from './MultiNoteTracker';
+import { logger } from '../utils/logger';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -110,7 +111,7 @@ export class MicrophoneInput {
     this.detector = new YINPitchDetector(pitchConfig);
     this.tracker = new NoteTracker(trackerConfig);
 
-    console.log(
+    logger.log(
       `[MicrophoneInput] Created in ${this.mode} mode, pitchConfig: threshold=${pitchConfig.threshold}, ` +
       `minConfidence=${pitchConfig.minConfidence}, trackerConfig: onsetHold=${trackerConfig.onsetHoldMs}ms`
     );
@@ -134,9 +135,9 @@ export class MicrophoneInput {
         this.polyDetector = new PolyphonicDetector();
         await this.polyDetector.initialize();
         this.multiTracker = new MultiNoteTracker({ onsetHoldMs: 30, releaseHoldMs: 60 });
-        console.log('[MicrophoneInput] Polyphonic detection initialized (ONNX Basic Pitch)');
+        logger.log('[MicrophoneInput] Polyphonic detection initialized (ONNX Basic Pitch)');
       } catch (err) {
-        console.warn('[MicrophoneInput] Polyphonic detection unavailable, falling back to monophonic:', err);
+        logger.warn('[MicrophoneInput] Polyphonic detection unavailable, falling back to monophonic:', err);
         this.polyDetector?.dispose();
         this.polyDetector = null;
         this.multiTracker = null;
@@ -167,7 +168,7 @@ export class MicrophoneInput {
         this._emitNoteEvent(noteEvent);
       });
 
-      console.log('[MicrophoneInput] Pipeline: AudioCapture → PolyphonicDetector → MultiNoteTracker');
+      logger.log('[MicrophoneInput] Pipeline: AudioCapture → PolyphonicDetector → MultiNoteTracker');
     } else {
       // Wire: AudioCapture → YIN → NoteTracker → callbacks (monophonic)
       this.unsubCapture = this.capture.onAudioBuffer((samples) => {
@@ -176,7 +177,7 @@ export class MicrophoneInput {
         if (result.voiced) this.voicedCount++;
 
         if (this.detectionCount % 100 === 0) {
-          console.log(
+          logger.log(
             `[MicrophoneInput] Detection stats: ${this.voicedCount}/${this.detectionCount} voiced ` +
             `(${((this.voicedCount / this.detectionCount) * 100).toFixed(1)}%), ` +
             `currentNote=${this.tracker.getCurrentNote()}`
@@ -190,7 +191,7 @@ export class MicrophoneInput {
         this._emitNoteEvent(noteEvent);
       });
 
-      console.log('[MicrophoneInput] Pipeline: AudioCapture → YIN → NoteTracker');
+      logger.log('[MicrophoneInput] Pipeline: AudioCapture → YIN → NoteTracker');
     }
   }
 
@@ -218,7 +219,7 @@ export class MicrophoneInput {
     this.detectionCount = 0;
     this.voicedCount = 0;
     await this.capture.start();
-    console.log('[MicrophoneInput] Started listening');
+    logger.log('[MicrophoneInput] Started listening');
   }
 
   /**
@@ -230,7 +231,7 @@ export class MicrophoneInput {
     this.tracker.reset();
     this.multiTracker?.reset();
     await this.capture.stop();
-    console.log(
+    logger.log(
       `[MicrophoneInput] Stopped. Final stats: ${this.voicedCount}/${this.detectionCount} voiced`
     );
   }
@@ -283,10 +284,10 @@ export class MicrophoneInput {
 export async function createMicrophoneInput(
   config?: Partial<MicrophoneInputConfig>
 ): Promise<MicrophoneInput | null> {
-  console.log('[MicrophoneInput] Requesting mic permission...');
+  logger.log('[MicrophoneInput] Requesting mic permission...');
   const granted = await requestMicrophonePermission();
   if (!granted) {
-    console.warn(
+    logger.warn(
       '[MicrophoneInput] Mic permission denied. ' +
       'Check that NSMicrophoneUsageDescription is set in Info.plist ' +
       'and the user has granted permission in Settings.'
@@ -294,14 +295,14 @@ export async function createMicrophoneInput(
     return null;
   }
 
-  console.log('[MicrophoneInput] Permission granted, creating MicrophoneInput...');
+  logger.log('[MicrophoneInput] Permission granted, creating MicrophoneInput...');
   try {
     const mic = new MicrophoneInput(config);
     await mic.initialize();
-    console.log('[MicrophoneInput] Ready');
+    logger.log('[MicrophoneInput] Ready');
     return mic;
   } catch (error) {
-    console.error('[MicrophoneInput] Failed to create MicrophoneInput:', error);
+    logger.error('[MicrophoneInput] Failed to create MicrophoneInput:', error);
     return null;
   }
 }

@@ -13,6 +13,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { AIExercise, GenerationParams } from './geminiExerciseService';
+import { logger } from '../utils/logger';
 import { generateExercise } from './geminiExerciseService';
 import { getGenerationHints } from '../core/curriculum/SkillTree';
 
@@ -68,7 +69,7 @@ async function loadBuffer(): Promise<BufferedExercise[]> {
 
     return parsed as BufferedExercise[];
   } catch {
-    console.warn('[ExerciseBuffer] Failed to load buffer from storage');
+    logger.warn('[ExerciseBuffer] Failed to load buffer from storage');
     return [];
   }
 }
@@ -103,7 +104,7 @@ export async function getNextExerciseForSkill(
     await saveBuffer(buffer);
     return entry.exercise;
   } catch (error) {
-    console.warn(
+    logger.warn(
       '[ExerciseBuffer] Failed to get exercise for skill:',
       (error as Error)?.message ?? error
     );
@@ -126,7 +127,7 @@ export async function getNextExercise(): Promise<AIExercise | null> {
     await saveBuffer(buffer);
     return entry.exercise;
   } catch (error) {
-    console.warn(
+    logger.warn(
       '[ExerciseBuffer] Failed to get next exercise:',
       (error as Error)?.message ?? error
     );
@@ -153,7 +154,7 @@ export async function addExercise(
 
     await saveBuffer(buffer);
   } catch (error) {
-    console.warn(
+    logger.warn(
       '[ExerciseBuffer] Failed to add exercise:',
       (error as Error)?.message ?? error
     );
@@ -189,14 +190,14 @@ export async function fillBuffer(params: GenerationParams): Promise<void> {
           currentSize++; // Prevent infinite loop
         }
       } catch {
-        console.warn('[ExerciseBuffer] Single generation attempt failed, continuing');
+        logger.warn('[ExerciseBuffer] Single generation attempt failed, continuing');
         currentSize++; // Prevent infinite loop
       }
     }
 
     await saveBuffer(buffer);
   } catch (error) {
-    console.warn(
+    logger.warn(
       '[ExerciseBuffer] Failed to fill buffer:',
       (error as Error)?.message ?? error
     );
@@ -225,7 +226,7 @@ export async function fillBufferForSkills(
             buffer.push({ exercise, targetSkillId: req.skillId });
           }
         } catch {
-          console.warn(
+          logger.warn(
             `[ExerciseBuffer] Failed to generate for skill ${req.skillId}, skipping`
           );
         }
@@ -234,7 +235,7 @@ export async function fillBufferForSkills(
 
     await saveBuffer(buffer);
   } catch (error) {
-    console.warn(
+    logger.warn(
       '[ExerciseBuffer] Failed to fill buffer for skills:',
       (error as Error)?.message ?? error
     );
@@ -281,7 +282,7 @@ export async function clearBuffer(): Promise<void> {
   try {
     await AsyncStorage.removeItem(STORAGE_KEY);
   } catch (error) {
-    console.warn(
+    logger.warn(
       '[ExerciseBuffer] Failed to clear buffer:',
       (error as Error)?.message ?? error
     );

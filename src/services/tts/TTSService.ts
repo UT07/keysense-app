@@ -11,6 +11,7 @@
  */
 
 import { getCatVoiceSettings, type CatVoiceSettings } from './catVoiceConfig';
+import { logger } from '../../utils/logger';
 import {
   speakWithElevenLabs,
   stopElevenLabs,
@@ -22,7 +23,7 @@ let Speech: typeof import('expo-speech') | null = null;
 try {
   Speech = require('expo-speech');
 } catch {
-  console.warn('[TTSService] expo-speech native module not available — TTS disabled');
+  logger.warn('[TTSService] expo-speech native module not available — TTS disabled');
 }
 
 export interface TTSOptions {
@@ -103,7 +104,7 @@ class TTSServiceImpl {
         return;
       }
       // ElevenLabs failed — fall through to expo-speech
-      console.log('[TTSService] ElevenLabs unavailable, falling back to expo-speech');
+      logger.log('[TTSService] ElevenLabs unavailable, falling back to expo-speech');
     }
 
     // Fallback: expo-speech
