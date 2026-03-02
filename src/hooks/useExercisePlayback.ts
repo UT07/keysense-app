@@ -408,7 +408,10 @@ export function useExercisePlayback({
       if (forceUpdate || currentTime - lastStateUpdateRef.current >= 50) {
         lastStateUpdateRef.current = currentTime;
         setCurrentBeat(beat);
-        exerciseStore.setCurrentBeat(beat);
+        // Use getState() to avoid closing over store reference (which changes
+        // on every store update and would re-trigger this useEffect, tearing
+        // down and recreating the interval on every note event).
+        useExerciseStore.getState().setCurrentBeat(beat);
       }
 
       // Early completion: if the user has played at least as many notes as the
@@ -441,7 +444,13 @@ export function useExercisePlayback({
         clearInterval(playbackIntervalRef.current);
       }
     };
-  }, [isPlaying, exercise, exerciseStore]);
+    // IMPORTANT: Do NOT include exerciseStore in deps. The playback loop
+    // accesses the store via useExerciseStore.getState() inside the callback.
+    // Including exerciseStore would cause the interval to be torn down and
+    // recreated on every store update (e.g. addPlayedNote from mic input),
+    // effectively freezing the beat counter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying, exercise]);
 
   /**
    * Start playback (fresh start — resets all state)
@@ -646,6 +655,13 @@ export function useExercisePlayback({
 
       // Only record notes for scoring when exercise is playing
       if (!isPlaying) return;
+
+      // When mic is the active input, do NOT record touch events for scoring.
+      // The mic pipeline will pick up the speaker output and record its own noteOn
+      // with proper latency compensation. Recording both double-counts notes and
+      // inflates the played note count, potentially triggering early completion.
+      const currentInputMethod = inputManagerRef.current?.activeMethod;
+      if (currentInputMethod === 'mic') return;
 
       const midiEvent: MidiNoteEvent = {
         type: 'noteOn',

@@ -103,9 +103,9 @@ describe('ExerciseLoadingScreen', () => {
     // Before timer: should NOT have called onReady
     expect(onReady).not.toHaveBeenCalled();
 
-    // Advance past minimum display time
+    // Advance past minimum display time (1000ms)
     act(() => {
-      jest.advanceTimersByTime(2000);
+      jest.advanceTimersByTime(1000);
     });
 
     expect(onReady).toHaveBeenCalledTimes(1);
@@ -117,9 +117,9 @@ describe('ExerciseLoadingScreen', () => {
       <ExerciseLoadingScreen visible={true} exerciseReady={true} onReady={onReady} />,
     );
 
-    // Advance only 1 second — still under 2s minimum
+    // Advance only 500ms — still under 1s minimum
     act(() => {
-      jest.advanceTimersByTime(1000);
+      jest.advanceTimersByTime(500);
     });
 
     expect(onReady).not.toHaveBeenCalled();
@@ -133,7 +133,7 @@ describe('ExerciseLoadingScreen', () => {
 
     // Timer elapses but exercise not ready
     act(() => {
-      jest.advanceTimersByTime(2000);
+      jest.advanceTimersByTime(1000);
     });
     expect(onReady).not.toHaveBeenCalled();
 

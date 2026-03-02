@@ -1643,7 +1643,11 @@ export const ExercisePlayer: React.FC<ExercisePlayerProps> = ({
         setComboCount((prev) => prev + 1);
         setFeedback({ type: feedbackType, noteIndex: bestMatch.index, timestamp: Date.now(), timingOffsetMs: bestMatch.beatDiffSigned * msPerBeat });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      } else {
+      } else if (activeInputMethod !== 'mic') {
+        // Only show "miss" for non-mic inputs. When mic is active, unmatched
+        // external notes are often speaker echoes of touch events that were
+        // already consumed by handleKeyDown. Showing "miss" would incorrectly
+        // overwrite the correct feedback that was already displayed.
         setComboCount(0);
         setFeedback({ type: 'miss', noteIndex: -1, timestamp: Date.now(), timingOffsetMs: 0 });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});

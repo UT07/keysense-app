@@ -20,7 +20,7 @@ import { getRandomLoadingTip } from '../../content/loadingTips';
 import { ttsService } from '../../services/tts/TTSService';
 import { COLORS, TYPOGRAPHY, SPACING, BORDER_RADIUS } from '../../theme/tokens';
 
-const MIN_DISPLAY_MS = 2000;
+const MIN_DISPLAY_MS = 1000;
 
 export interface ExerciseLoadingScreenProps {
   /** Controls visibility — returns null when false */

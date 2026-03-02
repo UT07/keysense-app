@@ -316,6 +316,7 @@ export function CatStudioScreen() {
           catId={selectedCatId}
           pose="idle"
           size={180}
+          evolutionStage={currentStage}
         />
         {catData && (
           <Text style={styles.catName}>{catData.name}</Text>

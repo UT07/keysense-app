@@ -125,11 +125,36 @@ function applyMaterials(scene: THREE.Group, materials: Cat3DMaterials, hasBlush:
         const cloned = mat.clone();
         const color = hexToColor(colorHex);
         cloned.color = color;
-        cloned.roughness = 0.2;    // Glossy anime/vinyl toy look
-        cloned.metalness = 0.08;   // Subtle specular sheen
-        // Add slight emissive so dark cats self-illuminate
-        cloned.emissive = color;
-        cloned.emissiveIntensity = 0.08;
+
+        // Per-part material properties for expressive anime look
+        if (materialKey === 'eye') {
+          // Eyes: bright, wet, glossy with strong catchlight
+          cloned.roughness = 0.05;
+          cloned.metalness = 0.15;
+          cloned.emissive = color;
+          cloned.emissiveIntensity = 0.25;
+        } else if (materialKey === 'nose') {
+          // Nose: wet, shiny
+          cloned.roughness = 0.1;
+          cloned.metalness = 0.25;
+          cloned.emissive = color;
+          cloned.emissiveIntensity = 0.1;
+        } else if (materialKey === 'blush') {
+          // Blush: soft, warm glow
+          cloned.roughness = 0.4;
+          cloned.metalness = 0.0;
+          cloned.emissive = color;
+          cloned.emissiveIntensity = 0.2;
+          cloned.transparent = true;
+          cloned.opacity = 0.7;
+        } else {
+          // Body/belly/earInner: glossy vinyl toy look
+          cloned.roughness = 0.2;
+          cloned.metalness = 0.08;
+          cloned.emissive = color;
+          cloned.emissiveIntensity = 0.08;
+        }
+
         if (Array.isArray(node.material)) {
           node.material[i] = cloned;
         } else {
@@ -141,30 +166,42 @@ function applyMaterials(scene: THREE.Group, materials: Cat3DMaterials, hasBlush:
   });
 
   // Fallback for models with no named materials (slim-cat, round-cat):
-  // Apply the body color to all meshes so the cat isn't dark/default grey
+  // Apply per-part colors based on mesh node names
   if (!anyMaterialMatched) {
     const bodyColor = hexToColor(materials.body);
     const bellyColor = hexToColor(materials.belly);
     const eyeColor = hexToColor(materials.eye);
+    const noseColor = materials.nose ? hexToColor(materials.nose) : bodyColor;
 
     scene.traverse((node) => {
       if (!(node instanceof THREE.Mesh)) return;
 
-      // Choose color based on node name for variety
       const name = node.name.toLowerCase();
       let color = bodyColor;
+      let roughness = 0.2;
+      let metalness = 0.08;
+      let emissiveIntensity = 0.08;
+
       if (name.includes('eye') || name.includes('iris')) {
         color = eyeColor;
+        roughness = 0.05;
+        metalness = 0.15;
+        emissiveIntensity = 0.25;
+      } else if (name.includes('nose')) {
+        color = noseColor;
+        roughness = 0.1;
+        metalness = 0.25;
+        emissiveIntensity = 0.1;
       } else if (name.includes('belly') || name.includes('chest')) {
         color = bellyColor;
       }
 
       const newMat = new THREE.MeshStandardMaterial({
         color,
-        roughness: 0.2,    // Glossy anime/vinyl toy look
-        metalness: 0.08,   // Subtle specular sheen
+        roughness,
+        metalness,
         emissive: color,
-        emissiveIntensity: 0.08,  // Subtle self-illumination
+        emissiveIntensity,
       });
       node.material = newMat;
     });
@@ -252,8 +289,9 @@ function CatModel3DInner({
   // Apply materials to the original scene (clone caused bounding box issues on device).
   // Use hardcoded scale — all 4 GLB models are ~5.4 Blender units tall.
   // Camera at z=3.5, FOV 50° sees ~3.26 units. Scale 0.5 → model ~2.7 units → fills view nicely.
-  const HARDCODED_SCALE = 0.50;   // Large, prominent cat
-  const HARDCODED_Y_OFFSET = -1.35; // -5.4/2 * 0.50 = -1.35 (centers model vertically)
+  const MODEL_HEIGHT = 5.4;        // All GLBs are ~5.4 Blender units tall
+  const HARDCODED_SCALE = 0.50;    // Large, prominent cat
+  const HARDCODED_Y_OFFSET = -1.35; // -MODEL_HEIGHT/2 * 0.50 = -1.35 (centers model vertically)
 
   useMemo(() => {
     applyMaterials(scene, config.materials, config.hasBlush);
@@ -298,6 +336,7 @@ function CatModel3DInner({
 
   // Simple transform: scale down, center vertically, no bounding box magic.
   // The group nesting keeps animation ref separate from positioning.
+  // Accessories go INSIDE the same scale/offset group so they align with the model.
   return (
     <group ref={groupRef} dispose={null}>
       <group
@@ -305,15 +344,19 @@ function CatModel3DInner({
         position={[0, HARDCODED_Y_OFFSET * scale, 0]}
       >
         <primitive object={scene} />
+        {/* Accessories were designed for a normalized 0-1 unit model.
+            Scale by MODEL_HEIGHT so their coordinates align with the actual GLB body. */}
+        {accessoryProps && (
+          <group scale={[MODEL_HEIGHT, MODEL_HEIGHT, MODEL_HEIGHT]}>
+            <CatAccessories3D
+              accessories={accessoryProps.accessories}
+              accentColor={accessoryProps.accentColor}
+              hasGlow={accessoryProps.hasGlow}
+              auraIntensity={accessoryProps.auraIntensity}
+            />
+          </group>
+        )}
       </group>
-      {accessoryProps && (
-        <CatAccessories3D
-          accessories={accessoryProps.accessories}
-          accentColor={accessoryProps.accentColor}
-          hasGlow={accessoryProps.hasGlow}
-          auraIntensity={accessoryProps.auraIntensity}
-        />
-      )}
     </group>
   );
 }
